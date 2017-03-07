@@ -9,7 +9,7 @@ DWORD WeightOnBody = 0;
 static void __declspec(naked) determine_to_hit_func_hook() {
  __asm {
   call stat_level_                          // Perception|Восприятие
-  cmp  edi, dword ptr ds:[_obj_dude]
+  cmp  edi, ds:[_obj_dude]
   jne  end
   xchg ecx, eax
   mov  eax, edi                             // _obj_dude
@@ -110,19 +110,19 @@ static void __declspec(naked) item_d_check_addict_hook() {
   cmp  eax, -1                              // Есть drug_pid?
   je   skip                                 // Нет
   xchg ebx, eax                             // ebx = drug_pid
-  mov  eax, esi                             // eax = who
+  mov  eax, esi                             // eax = source
   call queue_find_first_
 loopQueue:
   test eax, eax                             // Есть что в списке?
   jz   end                                  // Нет
   cmp  ebx, dword ptr [eax+0x4]             // drug_pid == queue_addict.drug_pid?
   je   end                                  // Есть конкретная зависимость
-  mov  eax, esi                             // eax = who
+  mov  eax, esi                             // eax = source
   mov  edx, 2                               // type = зависимость
   call queue_find_next_
   jmp  loopQueue
 skip:
-  mov  eax, dword ptr ds:[_obj_dude]
+  mov  eax, ds:[_obj_dude]
   call queue_find_first_
 end:
   mov  esi, 0x47A6A1
@@ -132,7 +132,7 @@ end:
 
 static void __declspec(naked) remove_jet_addict() {
  __asm {
-  cmp  eax, dword ptr ds:[_wd_obj]
+  cmp  eax, ds:[_wd_obj]
   jne  end
   cmp  dword ptr [edx+0x4], PID_JET         // queue_addict.drug_pid == PID_JET?
   jne  end
@@ -153,7 +153,7 @@ static void __declspec(naked) item_d_take_drug_hook() {
   mov  eax, esi
   call perform_withdrawal_end_
 skip:
-  mov  dword ptr ds:[_wd_obj], esi
+  mov  ds:[_wd_obj], esi
   mov  eax, 2                               // type = зависимость
   mov  edx, offset remove_jet_addict
   call queue_clear_type_
@@ -247,7 +247,7 @@ static void __declspec(naked) partyMemberIncLevels_hook() {
   je   end
   pushad
   mov  edx, ebx
-  xchg edx, eax                             // eax=who, edx=type
+  xchg edx, eax                             // eax=source, edx=type
   call queue_remove_this_
   mov  ecx, 8
   mov  edi, _drugInfoList
@@ -274,7 +274,7 @@ end:
 static void __declspec(naked) gdProcessUpdate_hook() {
  __asm {
   add  eax, esi
-  cmp  eax, dword ptr ds:[_optionRect + 12] // _optionRect.offy
+  cmp  eax, ds:[_optionRect + 12]           // _optionRect.offy
   jge  skip
   add  eax, 2
   mov  esi, 0x44702D
@@ -294,7 +294,7 @@ static void __declspec(naked) invenWieldFunc_hook() {
   push ebx
   mov  cl, byte ptr [edi+0x27]
   and  cl, 0x3
-  xchg edx, eax                             // eax=who, edx=item
+  xchg edx, eax                             // eax=source, edx=item
   call item_remove_mult_
 nextWeapon:
   mov  eax, esi
@@ -414,7 +414,6 @@ static void __declspec(naked) inven_pickup_hook() {
 }
 
 static DWORD inven_pickup_loop=-1;
-static const DWORD inven_pickup_hook1_Loop = 0x471145;
 static void __declspec(naked) inven_pickup_hook1() {
  __asm {
   cmp  inven_pickup_loop, -1
@@ -427,12 +426,12 @@ startLoop:
   xor  edx, edx
   mov  inven_pickup_loop, edx
 nextLoop:
-  mov  eax, 124                             // x_start
   mov  ebx, 188                             // x_end
   add  edx, 35                              // y_start
   mov  ecx, edx
   add  ecx, 48                              // y_end
-  jmp  inven_pickup_hook1_Loop
+  mov  eax, 0x471140
+  jmp  eax
 inLoop:
   test eax, eax
   mov  eax, inven_pickup_loop
@@ -510,7 +509,7 @@ static void __declspec(naked) PipStatus_hook() {
  __asm {
   call AddHotLines_
   xor  eax, eax
-  mov  dword ptr ds:[_hot_line_count], eax
+  mov  ds:[_hot_line_count], eax
   retn
  }
 }
@@ -637,8 +636,7 @@ static void __declspec(naked) set_new_results_hook() {
   mov  eax, esi
   xor  edx, edx
   inc  edx                                  // type = отключка
-  call queue_remove_this_                   // Удаляем отключку из очереди (если отключка там есть)
-  retn
+  jmp  queue_remove_this_                   // Удаляем отключку из очереди (если отключка там есть)
 end:
   pop  eax                                  // Уничтожаем адрес возврата
   mov  eax, 0x424FC6
@@ -755,6 +753,32 @@ static void __declspec(naked) action_explode_hook1() {
  }
 }
 
+static void __declspec(naked) ai_danger_source_hook() {
+ __asm {
+  xor  ecx, ecx
+  test byte ptr [ebx+0x25], 0x8             // is target multihex?
+  mov  ebx, [ebx+0x4]                       // ebx = pobj.tile_num (target's tilenum)
+  jz   end                                  // skip if not multihex
+  inc  ebx                                  // otherwise, increase tilenum by 1
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) combat_display_hook() {
+ __asm {
+  mov  ecx, [eax+0x20]                      // pobj.fid
+  and  ecx, 0x0F000000
+  sar  ecx, 0x18
+  cmp  ecx, ObjType_Critter
+  jne  skip
+  jmp  stat_level_
+skip:
+  xor  eax, eax
+  retn
+ }
+}
+
 void BugsInit() {
 
  dlog("Applying sharpshooter patch.", DL_INIT);
@@ -821,7 +845,9 @@ void BugsInit() {
 
 // Исправление ошибки в инвентаре игрока связанной с IFACE_BAR_MODE=1 из f2_res.ini, ну
 // и ошибки обратного порядка
- MakeCall(0x47114A, &inven_pickup_hook1, true);
+ if (*((DWORD*)0x471140) == 0x00007CB8) {   // костыль для проверки старой версии f2_res
+  MakeCall(0x47114A, &inven_pickup_hook1, true);
+ }
 
 // Исправление ошибки использования только одной пачки патронов когда оружие находится перед
 // патронами
@@ -839,7 +865,7 @@ void BugsInit() {
  MakeCall(0x47A013, &item_d_take_drug_hook1, true);
  dlogr(" Done", DL_INIT);
 
- dlog("Applying shiv patch. ", DL_INIT);
+ dlog("Applying shiv patch.", DL_INIT);
  SafeWrite8(0x477B2B, 0xEB);
  dlogr(" Done", DL_INIT);
 
@@ -872,5 +898,24 @@ void BugsInit() {
  MakeCall(0x4837A2, &map_fix_critter_combat_data_hook, true);
  MakeCall(0x4130C3, &action_explode_hook, false);
  MakeCall(0x4130E5, &action_explode_hook1, false);
+
+ dlog("Applying MultiHex Pathing Fix.", DL_INIT);
+ MakeCall(0x42901F, &ai_danger_source_hook, false);
+ MakeCall(0x429170, &ai_danger_source_hook, false);
+ dlogr(" Done", DL_INIT);
+
+ dlog("Applying imported procedure patch. ", DL_INIT);// http://teamx.ru/site_arc/smf/index.php-topic=398.0.htm
+ SafeWrite32(0x46B35A, 0x1C24A489);         // Исправление проблем с временным стеком
+ SafeWrite8(0x46DBF1, 0xEB);                // Отключение предупреждений
+ SafeWrite8(0x46DDC4, 0xEB);                // Отключение предупреждений
+ SafeWrite8(0x4415CC, 0x00);                // предотвращение слета при повторном экспорте
+ dlogr(" Done", DL_INIT);
+
+ dlog("Applying NPCLevelFix.", DL_INIT);
+ HookCall(0x495BC9, (void*)0x495E51);
+ dlogr(" Done", DL_INIT);
+
+// Временный костыль, ошибка в sfall, нужно поискать причину
+ HookCall(0x42530A, &combat_display_hook);
 
 }

@@ -55,18 +55,20 @@ struct CritStruct {
 
 static CritStruct* critTable;
 static CritStruct* playerCrit;
-static bool Inited=false;
+static bool Inited = false;
 
 void _stdcall SetCriticalTable(DWORD critter, DWORD bodypart, DWORD slot, DWORD element, DWORD value) {
- if(!Inited) return;
+ if (!Inited) return;
  if(critter>=CritTableCount||bodypart>=9||slot>=6||element>=7) return;
  critTable[critter*9*6+bodypart*6+slot].values[element]=value;
 }
+
 DWORD _stdcall GetCriticalTable(DWORD critter, DWORD bodypart, DWORD slot, DWORD element) {
- if(!Inited) return 0;
+ if (!Inited) return 0;
  if(critter>=CritTableCount||bodypart>=9||slot>=6||element>=7) return 0;
  return critTable[critter*9*6+bodypart*6+slot].values[element];
 }
+
 void _stdcall ResetCriticalTable(DWORD critter, DWORD bodypart, DWORD slot, DWORD element) {
  if(!Inited) return;
  if(critter>=CritTableCount||bodypart>=9||slot>=6||element>=7) return;
@@ -80,7 +82,7 @@ void _stdcall ResetCriticalTable(DWORD critter, DWORD bodypart, DWORD slot, DWOR
 void CritLoad() {
  if(!Inited) return;
  CritStruct* defaultTable=(CritStruct*)_crit_succ_eff;
- if(mode==1) {
+ if (mode == 1) {
   char section[16];
   dlogr("Setting up critical hit table using CriticalOverrides.ini", DL_CRITICALS);
   memset(critTable, 0, CritTableSize*sizeof(CritStruct));
@@ -109,7 +111,7 @@ void CritLoad() {
   memset(&critTable[6*9*19], 0, 6*9*19*sizeof(CritStruct));
   memcpy(playerCrit, (void*)_pc_crit_succ_eff, 6*9*sizeof(CritStruct));
 
-  if(mode==3) {
+  if (mode == 3) {
    char buf[32], buf2[32], buf3[32];
    for(int critter=0;critter<CritTableCount;critter++) {
     sprintf_s(buf, "c_%02d", critter);
@@ -138,10 +140,10 @@ void CritLoad() {
 
 #define SetEntry(a,b,c,d,e) defaultTable[a*9*6 + b*6 + c].values[d]=e;
 void CritInit() {
- mode=GetPrivateProfileIntA("Misc", "OverrideCriticalTable", 2, ini);
- if(mode<0||mode>3) mode=0;
+ mode = GetPrivateProfileIntA("Misc", "OverrideCriticalTable", 2, ini);
+ if (mode < 0 || mode > 3) mode = 0;
 
- if(!mode) return;
+ if (!mode) return;
 
  dlog("Initilizing critical table override.", DL_INIT);
  critTable=new CritStruct[CritTableSize];
@@ -150,7 +152,7 @@ void CritInit() {
  SafeWrite32(0x423FB3, (DWORD)critTable);
  dlog(". ", DL_INIT);
 
- if(mode==2 || mode==3) {
+ if (mode==2 || mode==3) {
   CritStruct* defaultTable=(CritStruct*)_crit_succ_eff;
 
   SetEntry(2,4,1,4,0);
@@ -249,6 +251,6 @@ void CritInit() {
   SetEntry(18,7,5,5,7101);
  }
 
- Inited=true;
+ Inited = true;
  dlogr(" Done", DL_INIT);
 }

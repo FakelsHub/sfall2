@@ -209,8 +209,7 @@ noKey:
   xor  ebx, ebx
 end:
   mov  edx, _mouse_y
-  mov  eax, 0x49708D
-  jmp  eax
+  retn
  }
 }
 
@@ -369,7 +368,7 @@ static void __declspec(naked) PipAlarm_hook() {
 void QuestListInit() {
 //<comments removed because they couldn't display correctly in this encoding>
  MakeCall(0x497544, &StartPipboy_hook, true);
- MakeCall(0x497088, &pipboy_hook, true);
+ MakeCall(0x497088, &pipboy_hook, false);
  MakeCall(0x4971B2, &pipboy_hook1, true);
  HookCall(0x498186, &PipStatus_hook);
  HookCall(0x4982B0, &PipStatus_hook1);

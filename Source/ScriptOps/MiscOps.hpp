@@ -161,11 +161,6 @@ static void __declspec(naked) GetYear() {
   mov ebx, esp;
   call game_time_date_
   mov edx, [esp];
-  mov eax, AddUnarmedStatToGetYear;
-  test eax, eax;
-  jz end;
-  add edx, ds:[_pc_proto + 0x4C]
-end:
   mov eax, edi;
   call interpretPushLong_
   mov edx, 0xc001;
@@ -483,7 +478,7 @@ static void __declspec(naked) ModKillCounter2() {
   jnz end;
   cmp eax, 38;
   jge end;
-  add word ptr ds:[_pc_kill_counts+eax*2], di;
+  add ds:[_pc_kill_counts+eax*2], di;
 end:
   pop esi;
   pop edi;
@@ -500,7 +495,7 @@ static void __declspec(naked) GetActiveHand() {
   push ecx;
   push edx;
   mov ecx, eax;
-  mov edx, dword ptr ds:[_itemCurrentItem]
+  mov edx, ds:[_itemCurrentItem]
   call interpretPushLong_
   mov edx, 0xc001;
   mov eax, ecx;
@@ -555,9 +550,8 @@ static void _stdcall IncNPCLevel4(char* npc) {
   //SafeWrite32(0x00495C8E, 0x90909090);
   SafeWrite16(0x00495CEC, 0x9090); //Check that the npc hasn't already levelled up recently
   SafeWrite32(0x00495CEE, 0x90909090);
-  if(!npcautolevel) {
-   SafeWrite16(0x00495D22, 0x9090);//Random element
-   SafeWrite32(0x00495D24, 0x90909090);
+  if (!npcautolevel) {
+   SafeWrite8(0x495CFB, 0xEB);           // jmps 0x495D28 (skip random check)
   }
  }
 }
@@ -586,9 +580,8 @@ static void _stdcall IncNPCLevel2(char* npc) {
  //SafeWrite32(0x00495C8E, 0x000001bf);
  SafeWrite16(0x00495CEC, 0x850f);
  SafeWrite32(0x00495CEE, 0x00000130);
- if(!npcautolevel) {
-  SafeWrite16(0x00495D22, 0x8f0f);
-  SafeWrite32(0x00495D24, 0x00000129);
+ if (!npcautolevel) {
+  SafeWrite8(0x495CFB, 0x74);           // jz 0x495D28
  }
 }
 static void __declspec(naked) IncNPCLevel() {
@@ -1557,23 +1550,29 @@ end:
   retn;
  }
 }
+
 static void __declspec(naked) block_combat() {
  __asm {
-  pushad;
-  mov ecx, eax;
+  pushad
+  mov  ecx, eax
   call interpretPopShort_
-  mov edx, eax;
-  mov eax, ecx;
+  mov  edx, eax
+  mov  eax, ecx
   call interpretPopLong_
-  cmp dx, 0xC001;
-  jnz end;
-  push eax;
-  call AIBlockCombat;
+  cmp  dx, 0xC001
+  jne  end
+  test eax, eax
+  jz   skip
+  xor  eax, eax
+  inc  eax
+skip:
+  mov  CombatDisabled, eax
 end:
   popad
-  retn;
+  retn
  }
 }
+
 static void __declspec(naked) tile_under_cursor() {
  __asm {
   push edx;
@@ -1584,7 +1583,7 @@ static void __declspec(naked) tile_under_cursor() {
   lea edx, [esp];
   lea eax, [esp+4];
   call mouse_get_position_
-  mov ebx, dword ptr ds:[_map_elevation]
+  mov ebx, ds:[_map_elevation]
   mov edx, [esp];
   mov eax, [esp+4];
   call tile_num_

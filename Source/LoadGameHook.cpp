@@ -45,29 +45,25 @@
 
 static DWORD InLoop=0;
 DWORD GainStatFix=0;
-static DWORD SaveInCombatFix;
 
 DWORD InWorldMap() { return (InLoop&WORLDMAP)?1:0; }
 DWORD InCombat()   { return (InLoop&COMBAT)?1:0;   }
 DWORD GetCurrentLoops() { return InLoop; }
 
+static const DWORD GainPerks[] = {
+ 0x4AF11F, 0x4AF181, 0x4AF19D, 0x4AF1BD, 0x4AF214, 0x4AF230, 0x4AF24B,
+};
+
 static void ModifyGainXXXPerks() {
- SafeWrite8(0x004AF11F, 0xeb); //Strength
- SafeWrite8(0x004AF181, 0xeb); //Perception
- SafeWrite8(0x004AF19D, 0xeb); //Endurance
- SafeWrite8(0x004AF1BD, 0xeb); //Charisma
- SafeWrite8(0x004AF214, 0xeb); //Intelligance
- SafeWrite8(0x004AF230, 0xeb); //Agility
- SafeWrite8(0x004AF24B, 0xeb); //Luck
+ for (int i = 0; i < sizeof(GainPerks)/4; i++) {
+  SafeWrite8(GainPerks[i], 0xEB);           // jmps
+ }
 }
+
 static void RestoreGainXXXPerks() {
- SafeWrite8(0x004AF11F, 0x74); //Strength
- SafeWrite8(0x004AF181, 0x74); //Perception
- SafeWrite8(0x004AF19D, 0x74); //Endurance
- SafeWrite8(0x004AF1BD, 0x74); //Charisma
- SafeWrite8(0x004AF214, 0x74); //Intelligance
- SafeWrite8(0x004AF230, 0x74); //Agility
- SafeWrite8(0x004AF24B, 0x74); //Luck
+ for (int i = 0; i < sizeof(GainPerks)/4; i++) {
+  SafeWrite8(GainPerks[i], 0x74);           // jz
+ }
 }
 
 static void _stdcall ResetState(DWORD onLoad) {
@@ -119,8 +115,7 @@ void GetSavePath(char* buf, int type) {
 }
 
 static char SaveSfallDataFailMsg[128];
-
-static void _stdcall SaveGame2() {
+static void _stdcall _SaveGame() {
  char buf[MAX_PATH];
  GetSavePath(buf, 0);
 
@@ -140,7 +135,10 @@ static void _stdcall SaveGame2() {
   CloseHandle(h);
  } else {
   dlogr("ERROR creating sfallgv!", DL_MAIN);
-  DisplayConsoleMessage(SaveSfallDataFailMsg);
+  __asm {
+   mov  eax, offset SaveSfallDataFailMsg
+   call display_print_
+  }
   PlaySfx("IISXXXX1");
  }
  GetSavePath(buf, 1);
@@ -151,67 +149,59 @@ static void _stdcall SaveGame2() {
  CloseHandle(h);
 }
 
+static DWORD SaveInCombatFix;
 static char SaveFailMsg[128];
-static DWORD _stdcall combatSaveTest() {
- if (IsControllingNPC > 0) {
-  DisplayConsoleMessage(SaveFailMsg);
-  return 0;
- }
- if(!SaveInCombatFix) return 1;
- if(InLoop&COMBAT) {
-  if(SaveInCombatFix==2 || !(InLoop&PCOMBAT)) {
-   DisplayConsoleMessage(SaveFailMsg);
-   return 0;
-  }
-  DWORD ap;
-  DWORD bonusmove;
-  __asm {
-   mov edx, STAT_max_move_points
-   mov eax, ds:[_obj_dude]
-   call stat_level_
-   mov ap, eax;
-   mov eax, ds:[_obj_dude]
-   mov edx, PERK_bonus_move
-   call perk_level_
-   mov bonusmove, eax;
-  }
-  if(*(DWORD*)(*(DWORD*)_obj_dude + 0x40) != ap || bonusmove*2!=*(DWORD*)_combat_free_move) {
-   DisplayConsoleMessage(SaveFailMsg);
-   return 0;
-  }
- }
- return 1;
-}
-static void __declspec(naked) SaveGame() {
+static void __declspec(naked) SaveGame_hook() {
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-
-  mov edx, eax;
-  call combatSaveTest;
-  test eax, eax;
-  jz end;
-  mov eax, edx;
-
-  or InLoop, SAVEGAME;
-  call SaveGame_
-  and InLoop, (-1^SAVEGAME);
-  cmp eax, 1;
-  jne end;
-  call SaveGame2;
-  mov eax, 1;
+  pushad
+  test byte ptr ds:[_combat_state], 1       // В бою?
+  jz   canSave                              // Нет
+  cmp  IsControllingNPC, 0
+  jne  skip
+  cmp  SaveInCombatFix, 0
+  je   canSave
+  cmp  SaveInCombatFix, 2
+  je   skip
+  mov  eax, ds:[_obj_dude]
+  mov  ebx, [eax+0x40]                      // curr_mp
+  mov  edx, STAT_max_move_points
+  push eax
+  call stat_level_
+  cmp  eax, ebx
+  pop  eax
+  jne  skip
+  mov  edx, PERK_bonus_move
+  call perk_level_
+  shl  eax, 1
+  cmp  eax, ds:[_combat_free_move]
+  je   canSave
+skip:
+  popad
+  mov  eax, offset SaveFailMsg              // "Cannot save at this time"
+  call display_print_
+  xor  eax, eax
+  retn
+canSave:
+  popad
+  or   InLoop, SAVEGAME
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  esi, 0x47B891
+  jmp  esi
+return:
+  and  InLoop, (-1^SAVEGAME)
+  cmp  eax, 1
+  jne  end
+  pushad
+  call _SaveGame
+  popad
 end:
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  retn
  }
-}
-
-// should be called before savegame is loaded
-static void _stdcall LoadGame2_Before() {
- ResetState(1);
 }
 
 static void _stdcall LoadGame2_After() {
@@ -223,14 +213,14 @@ static void _stdcall LoadGame2_After() {
 #endif
 
  ClearGlobals();
- HANDLE h=CreateFileA(buf, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
- if(h!=INVALID_HANDLE_VALUE) {
-  DWORD size=0;
+ HANDLE h = CreateFileA(buf, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
+ if (h != INVALID_HANDLE_VALUE) {
+  DWORD size = 0;
   DWORD unused;
   LoadGlobals(h);
   ReadFile(h, (&unused), 4, &size, 0);
   ReadFile(h, &GainStatFix, 4, &size, 0);
-  if(!size) GainStatFix = 0;
+  if (!size) GainStatFix = 0;
   else {
    PerksLoad(h);
    LoadArrays(h);
@@ -241,7 +231,7 @@ static void _stdcall LoadGame2_After() {
   dlogr("Cannot read sfallgv.sav - assuming non-sfall save.", DL_MAIN);
  }
 
- if(GainStatFix) ModifyGainXXXPerks();
+ if (GainStatFix) ModifyGainXXXPerks();
  else RestoreGainXXXPerks();
 
  LoadGlobalScripts();
@@ -249,40 +239,46 @@ static void _stdcall LoadGame2_After() {
  LoadHeroAppearance();
 }
 
-static void __declspec(naked) LoadSlot() {
+// should be called before savegame is loaded
+static void __declspec(naked) LoadSlot_hook() {
  __asm {
-  pushad;
-  call LoadGame2_Before;
-  popad;
-  jmp  LoadSlot_
+  pushad
+  push 1
+  call ResetState
+  popad
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  ebx, 0x47DC6D
+  jmp  ebx
  }
 }
 
-static void __declspec(naked) LoadGame() {
+static void __declspec(naked) LoadGame_hook() {
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-  or InLoop, LOADGAME;
-  call LoadGame_
-  /*push eax;
-  push 0x0000101f;
-  push 0x0045E949;
-  call SafeWrite32;*/
-  and InLoop, (-1^LOADGAME);
-  //pop eax;
-  cmp eax, 1;
-  jne end;
-  call LoadGame2_After;
-  mov eax, 1;
+  or   InLoop, LOADGAME
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  esi, 0x47C645
+  jmp  esi
+return:
+  and  InLoop, (-1^LOADGAME)
+  cmp  eax, 1
+  jne  end
+  pushad
+  call LoadGame2_After
+  popad
 end:
-
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  retn
  }
 }
+
 static void NewGame2() {
  ResetState(0);
 
@@ -290,25 +286,27 @@ static void NewGame2() {
 
  SetNewCharAppearanceGlobals();
 
- if(GetPrivateProfileInt("Misc", "GainStatPerkFix", 1, ini)) {
+ if (GetPrivateProfileInt("Misc", "GainStatPerkFix", 1, ini)) {
   ModifyGainXXXPerks();
-  GainStatFix=1;
+  GainStatFix = 1;
  } else {
   RestoreGainXXXPerks();
-  GainStatFix=0;
+  GainStatFix = 0;
  }
 
- if(GetPrivateProfileInt("Misc", "PipBoyAvailableAtGameStart", 0, ini)) {
-  SafeWrite8(0x00596C7B, 1);
+ if (GetPrivateProfileInt("Misc", "PipBoyAvailableAtGameStart", 0, ini)) {
+  SafeWrite8(_gmovie_played_list + 0x3, 1);
  }
- if(GetPrivateProfileInt("Misc", "DisableHorrigan", 0, ini)) {
-  *(DWORD*)0x00672E04=1;
+
+ if (GetPrivateProfileInt("Misc", "DisableHorrigan", 0, ini)) {
+  *(DWORD*)0x672E04 = 1;
  }
 
  LoadGlobalScripts();
  CritLoad();
 }
-static void __declspec(naked) NewGame() {
+
+static void __declspec(naked) main_game_loop_call() {
  __asm {
   pushad
   call NewGame2
@@ -317,7 +315,7 @@ static void __declspec(naked) NewGame() {
  }
 }
 
-static void __declspec(naked) MainMenu() {
+static void __declspec(naked) main_menu_loop_call() {
  __asm {
   pushad
   push 0
@@ -327,188 +325,284 @@ static void __declspec(naked) MainMenu() {
   jmp  main_menu_loop_
  }
 }
-static void __declspec(naked) WorldMapHook() {
+
+static void __declspec(naked) wmWorldMapFunc_hook() {
  __asm {
-  or InLoop, WORLDMAP;
-  xor eax, eax;
-  call wmWorldMapFunc_
-  and InLoop, (-1^WORLDMAP);
-  retn;
+  or   InLoop, WORLDMAP
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  edx, 0x4BFE15
+  jmp  edx
+return:
+  and  InLoop, (-1^WORLDMAP)
+  retn
  }
 }
-static void __declspec(naked) WorldMapHook2() {
+
+static void __declspec(naked) combat_hook() {
  __asm {
-  or InLoop, WORLDMAP;
-  call wmWorldMapFunc_
-  and InLoop, (-1^WORLDMAP);
-  retn;
- }
-}
-static void __declspec(naked) CombatHook() {
- __asm {
-  pushad;
-  call AICombatStart;
+  pushad
+  call AICombatStart
   popad
-  or InLoop, COMBAT;
-  call combat_
-  pushad;
-  call AICombatEnd;
+  or   InLoop, COMBAT
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  esi, 0x422D31
+  jmp  esi
+return:
+  and  InLoop, (-1^COMBAT)
+  pushad
+  call AICombatEnd
   popad
-  and InLoop, (-1^COMBAT);
-  retn;
+  retn
  }
 }
-static void __declspec(naked) PlayerCombatHook() {
+
+static void __declspec(naked) combat_input_hook() {
  __asm {
-  or InLoop, PCOMBAT;
-  call combat_input_
-  and InLoop, (-1^PCOMBAT);
-  retn;
+  or   InLoop, PCOMBAT
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  mov  ecx, ds:[_obj_dude]
+  mov  esi, 0x4227FE
+  jmp  esi
+return:
+  and  InLoop, (-1^PCOMBAT)
+  retn
  }
 }
-static void __declspec(naked) EscMenuHook() {
+
+static void __declspec(naked) do_optionsFunc_hook() {
  __asm {
-  or InLoop, ESCMENU;
-  call do_optionsFunc_
-  and InLoop, (-1^ESCMENU);
-  retn;
+  or   InLoop, ESCMENU
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  esi, 0x48FC55
+  jmp  esi
+return:
+  and  InLoop, (-1^ESCMENU)
+  retn
  }
 }
-static void __declspec(naked) EscMenuHook2() {
- //Bloody stupid watcom compiler optimizations...
+
+static void __declspec(naked) do_prefscreen_hook() {
  __asm {
-  or InLoop, ESCMENU;
-  call do_options_
-  and InLoop, (-1^ESCMENU);
-  retn;
+  or   InLoop, OPTIONS
+  push offset return
+  push ebx
+  push edx
+  xor  edx, edx
+  dec  edx
+  mov  eax, 0x49079F
+  jmp  eax
+return:
+  and  InLoop, (-1^OPTIONS)
+  retn
  }
 }
-static void __declspec(naked) OptionsMenuHook() {
+
+static void __declspec(naked) game_help_hook() {
  __asm {
-  or InLoop, OPTIONS;
-  call do_prefscreen_
-  and InLoop, (-1^OPTIONS);
-  retn;
+  or   InLoop, HELP
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  eax, 0x443F79
+  jmp  eax
+return:
+  and  InLoop, (-1^HELP)
+  retn
  }
 }
-static void __declspec(naked) HelpMenuHook() {
+
+static void __declspec(naked) editor_design_hook() {
  __asm {
-  or InLoop, HELP;
-  call game_help_
-  and InLoop, (-1^HELP);
-  retn;
- }
-}
-static void __declspec(naked) CharacterHook() {
- __asm {
-  or InLoop, CHARSCREEN;
-  pushad;
-  call PerksEnterCharScreen;
-  popad;
-  call editor_design_
-  pushad;
-  test eax, eax;
-  jz success;
-  call PerksCancelCharScreen;
-  jmp end;
+  or   InLoop, CHARSCREEN
+  pushad
+  call PerksEnterCharScreen
+  popad
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  esi, 0x431DFD
+  jmp  esi
+return:
+  pushad
+  test eax, eax
+  jz   success
+  call PerksCancelCharScreen
+  jmp  end
 success:
-  call PerksAcceptCharScreen;
+  call PerksAcceptCharScreen
 end:
-  popad;
-  and InLoop, (-1^CHARSCREEN);
-  retn;
+  popad
+  and  InLoop, (-1^CHARSCREEN)
+  retn
  }
 }
-static void __declspec(naked) DialogHook() {
+
+static void __declspec(naked) gdProcess_hook() {
  __asm {
-  or InLoop, DIALOG;
-  call gdProcess_
-  and InLoop, (-1^DIALOG);
-  retn;
+  or   InLoop, DIALOG
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  edx, 0x4465C5
+  jmp  edx
+return:
+  and  InLoop, (-1^DIALOG)
+  retn
  }
 }
-static void __declspec(naked) PipboyHook() {
+
+static void __declspec(naked) pipboy_hook() {
  __asm {
-  or InLoop, PIPBOY;
-  call pipboy_
-  and InLoop, (-1^PIPBOY);
-  retn;
+  or   InLoop, PIPBOY
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  xchg ecx, eax
+  mov  eax, 0x49700A
+  jmp  eax
+return:
+  and  InLoop, (-1^PIPBOY)
+  retn
  }
 }
-static void __declspec(naked) SkilldexHook() {
+
+static void __declspec(naked) skilldex_select_hook() {
  __asm {
-  or InLoop, SKILLDEX;
-  call skilldex_select_
-  and InLoop, (-1^SKILLDEX);
-  retn;
+  or   InLoop, SKILLDEX
+  push offset return
+  push edx
+  xor  edx, edx
+  dec  edx
+  mov  eax, 0x4ABFD6
+  jmp  eax
+return:
+  and  InLoop, (-1^SKILLDEX)
+  retn
  }
 }
-static void __declspec(naked) InventoryHook() {
+
+static void __declspec(naked) handle_inventory_hook() {
  __asm {
-  or InLoop, INVENTORY;
-  call handle_inventory_
-  and InLoop, (-1^INVENTORY);
-  retn;
+  or   InLoop, INVENTORY
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  eax, 0x46E7B5
+  jmp  eax
+return:
+  and  InLoop, (-1^INVENTORY)
+  retn
  }
 }
-static void __declspec(naked) AutomapHook() {
+
+static void __declspec(naked) automap_hook() {
  __asm {
-  or InLoop, AUTOMAP;
-  call automap_
-  and InLoop, (-1^AUTOMAP);
-  retn;
+  or   InLoop, AUTOMAP
+  push offset return
+  push ebx
+  push ecx
+  push esi
+  push edi
+  push ebp
+  mov  esi, 0x41B8C1
+  jmp  esi
+return:
+  and  InLoop, (-1^AUTOMAP)
+  retn
+ }
+}
+
+static void __declspec(naked) use_inventory_on_hook() {
+ __asm {
+  or   InLoop, INTFACEUSE
+  push offset return
+  push ebx
+  push ecx
+  push edx
+  push esi
+  push edi
+  mov  esi, 0x4717E9
+  jmp  esi
+return:
+  and  InLoop, (-1^INTFACEUSE)
+  retn
+ }
+}
+
+static void __declspec(naked) loot_container_hook() {
+ __asm {
+  or   InLoop, INTFACELOOT
+  push offset return
+  push ebx
+  push ecx
+  push esi
+  push edi
+  push ebp
+  mov  ebx, 0x473909
+  jmp  ebx
+return:
+  and  InLoop, (-1^INTFACELOOT)
+  retn
  }
 }
 
 void LoadGameHookInit() {
- SaveInCombatFix=GetPrivateProfileInt("Misc", "SaveInCombatFix", 1, ini);
- if(SaveInCombatFix>2) SaveInCombatFix=0;
- if(SaveInCombatFix) {
-  GetPrivateProfileString("sfall", "SaveInCombat", "Cannot save at this time", SaveFailMsg, 128, translationIni);
- }
+ GetPrivateProfileString("sfall", "SaveInCombat", "Cannot save at this time", SaveFailMsg, 128, translationIni);
+ SaveInCombatFix = GetPrivateProfileInt("Misc", "SaveInCombatFix", 1, ini);
+ if (SaveInCombatFix < 0 || SaveInCombatFix > 2) SaveInCombatFix = 0;
+
  GetPrivateProfileString("sfall", "SaveSfallDataFail", "ERROR saving extended savegame information! Check if other programs interfere with savegame files/folders and try again!", SaveSfallDataFailMsg, 128, translationIni);
 
- HookCall(0x480AB3, NewGame);
-
- HookCall(0x47C72C, LoadSlot);
- HookCall(0x47D1C9, LoadSlot);
- HookCall(0x443AE4, LoadGame);
- HookCall(0x443B89, LoadGame);
- HookCall(0x480B77, LoadGame);
- HookCall(0x48FD35, LoadGame);
- HookCall(0x443AAC, SaveGame);
- HookCall(0x443B1C, SaveGame);
- HookCall(0x48FcFF, SaveGame);
- 
- HookCall(0x480A28, MainMenu);
-
- HookCall(0x483668, WorldMapHook);
- HookCall(0x4A4073, WorldMapHook);
- HookCall(0x4C4855, WorldMapHook2);
- HookCall(0x426A29, CombatHook);
- HookCall(0x4432BE, CombatHook);
- HookCall(0x45F6D2, CombatHook);
- HookCall(0x4A4020, CombatHook);
- HookCall(0x4A403D, CombatHook);
- HookCall(0x422B09, PlayerCombatHook);
- HookCall(0x480C16, EscMenuHook);
- HookCall(0x4433BE, EscMenuHook2);
- HookCall(0x48FCE4, OptionsMenuHook);
- HookCall(0x48FD17, OptionsMenuHook);
- HookCall(0x48FD4D, OptionsMenuHook);
- HookCall(0x48FD6A, OptionsMenuHook);
- HookCall(0x48FD87, OptionsMenuHook);
- HookCall(0x48FDB3, OptionsMenuHook);
- HookCall(0x443A50, HelpMenuHook);
- HookCall(0x443320, CharacterHook);
- HookCall(0x4A73EB, CharacterHook);
- HookCall(0x4A740A, CharacterHook);
- HookCall(0x445748, DialogHook);
- HookCall(0x443463, PipboyHook);
- HookCall(0x443605, PipboyHook);
- HookCall(0x4434AC, SkilldexHook);
- HookCall(0x44C7BD, SkilldexHook);
- HookCall(0x443357, InventoryHook);
- HookCall(0x44396D, AutomapHook);
- HookCall(0x479519, AutomapHook);
+ HookCall(0x480AB3, &main_game_loop_call);
+ MakeCall(0x47DC68, &LoadSlot_hook, true);
+ MakeCall(0x47C640, &LoadGame_hook, true);  // LOADGAME
+ MakeCall(0x47B88C, &SaveGame_hook, true);  // SAVEGAME
+ HookCall(0x480A28, &main_menu_loop_call);
+ MakeCall(0x4BFE10, &wmWorldMapFunc_hook, true);// WORLDMAP
+ MakeCall(0x422D2C, &combat_hook, true);    // COMBAT
+ MakeCall(0x4227F4, &combat_input_hook, true);// PCOMBAT
+ MakeCall(0x48FC50, &do_optionsFunc_hook, true);// ESCMENU
+ MakeCall(0x490798, &do_prefscreen_hook, true);// OPTIONS
+ MakeCall(0x443F74, &game_help_hook, true); // HELP
+ MakeCall(0x431DF8, &editor_design_hook, true);// CHARSCREEN
+ MakeCall(0x4465C0, &gdProcess_hook, true); // DIALOG
+ MakeCall(0x497004, &pipboy_hook, true);    // PIPBOY
+ MakeCall(0x4ABFD0, &skilldex_select_hook, true);// SKILLDEX
+ MakeCall(0x46E7B0, &handle_inventory_hook, true);// INVENTORY
+ MakeCall(0x41B8BC, &automap_hook, true);   // AUTOMAP
+ MakeCall(0x4717E4, &use_inventory_on_hook, true);// INTFACEUSE
+ MakeCall(0x473904, &loot_container_hook, true);// INTFACELOOT
 }

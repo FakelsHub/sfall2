@@ -48,23 +48,16 @@ static DWORD real_drug_gvar[6];
 static DWORD real_jet_gvar;
 static DWORD real_tag_skill[4];
 
-struct sMessage {
- DWORD number;
- DWORD flags;
- char* audio;
- char* message;
-};
-
 static void __declspec(naked) isRealParty() {
  __asm {
   push edx
   push ecx
   push ebx
-  mov  ecx, dword ptr ds:[_partyMemberMaxCount]
+  mov  ecx, ds:[_partyMemberMaxCount]
   dec  ecx
   jecxz skip                                // Только игрок
-  mov  edx, dword ptr ds:[_partyMemberPidList]
-  mov  ebx, dword ptr [eax+0x64]            // pid
+  mov  edx, ds:[_partyMemberPidList]
+  mov  ebx, [eax+0x64]                      // pid
 loopPid:
   add  edx, 4
   cmp  ebx, dword ptr [edx]
@@ -80,7 +73,7 @@ end:
  }
 }
 
-static void __declspec(naked) CanUseWeapon() {
+void __declspec(naked) PartyControl_CanUseWeapon() {
  __asm {
   push edi
   push esi
@@ -98,10 +91,10 @@ static void __declspec(naked) CanUseWeapon() {
   xchg edi, eax                             // eax=item
   call item_w_anim_weap_
   xchg ebx, eax                             // ebx=ID2=Animation code
-  mov  esi, dword ptr ds:[_inven_dude]
-  mov  edx, dword ptr [esi+0x20]            // fid
+  mov  esi, ds:[_inven_dude]
+  mov  edx, [esi+0x20]                      // fid
   and  edx, 0xFFF                           // edx=Index
-  mov  eax, dword ptr [esi+0x1C]            // cur_rot
+  mov  eax, [esi+0x1C]                      // cur_rot
   inc  eax
   push eax                                  // ID3=Direction code
   mov  eax, ObjType_Critter
@@ -148,9 +141,9 @@ static void __declspec(naked) SaveDudeState() {
   mov  eax, ebx
   call critter_name_
   call critter_pc_set_name_
-  mov  eax, dword ptr ds:[_last_level]
+  mov  eax, ds:[_last_level]
   mov  real_last_level, eax
-  mov  eax, dword ptr ds:[_Level_]
+  mov  eax, ds:[_Level_]
   mov  real_Level, eax
   mov  eax, ebx
   call isRealParty
@@ -158,19 +151,19 @@ static void __declspec(naked) SaveDudeState() {
   jz   saveLevel
   call partyMemberGetCurLevel_
 saveLevel:
-  mov  dword ptr ds:[_Level_], eax
-  mov  dword ptr ds:[_last_level], eax
-  mov  eax, dword ptr ds:[_Experience_]
+  mov  ds:[_Level_], eax
+  mov  ds:[_last_level], eax
+  mov  eax, ds:[_Experience_]
   mov  real_Experience, eax
   movzx eax, byte ptr ds:[_free_perk]
   mov  real_free_perk, eax
-  mov  eax, dword ptr ds:[_curr_pc_stat]
+  mov  eax, ds:[_curr_pc_stat]
   mov  real_unspent_skill_points, eax
-  mov  eax, dword ptr ds:[_map_elevation]
+  mov  eax, ds:[_map_elevation]
   mov  real_map_elevation, eax
-  mov  eax, dword ptr ds:[_sneak_working]
+  mov  eax, ds:[_sneak_working]
   mov  real_sneak_working, eax
-  mov  eax, dword ptr ds:[_obj_dude]
+  mov  eax, ds:[_obj_dude]
   push eax
   mov  edx, 10
   call queue_find_first_
@@ -189,7 +182,7 @@ noSneak:
   mov  real_sneak_queue_time, edx
   pop  eax
   mov  real_dude, eax
-  mov  eax, dword ptr ds:[_itemCurrentItem]
+  mov  eax, ds:[_itemCurrentItem]
   mov  real_hand, eax
   mov  edx, offset real_trait2
   mov  eax, offset real_trait
@@ -198,7 +191,7 @@ noSneak:
   mov  edi, offset real_itemButtonItems
   mov  ecx, (6*4)*2
   rep  movsd
-  mov  esi, dword ptr ds:[_perkLevelDataList]
+  mov  esi, ds:[_perkLevelDataList]
   push esi
   mov  edi, offset real_perkLevelDataList
   mov  ecx, PERK_count
@@ -218,14 +211,14 @@ noSneak:
 clearPerks:
   rep  stosd
 skipPerks:
-  mov  byte ptr ds:[_free_perk], al
-  mov  dword ptr ds:[_curr_pc_stat], eax
-  mov  dword ptr ds:[_sneak_working], eax
-  mov  eax, dword ptr [ebx+0x64]
-  mov  dword ptr ds:[_inven_pid], eax
-  mov  dword ptr ds:[_obj_dude], ebx
-  mov  dword ptr ds:[_inven_dude], ebx
-  mov  esi, dword ptr ds:[_game_global_vars]
+  mov  ds:[_free_perk], al
+  mov  ds:[_curr_pc_stat], eax
+  mov  ds:[_sneak_working], eax
+  mov  eax, [ebx+0x64]
+  mov  ds:[_inven_pid], eax
+  mov  ds:[_obj_dude], ebx
+  mov  ds:[_inven_dude], ebx
+  mov  esi, ds:[_game_global_vars]
   add  esi, 21*4                            // esi->GVAR_NUKA_COLA_ADDICT
   push esi
   mov  edi, offset real_drug_gvar
@@ -308,13 +301,13 @@ skip:
   jne  setActiveHand                        // Нет
   inc  ecx                                  // Правая рука
 setActiveHand:
-  mov  dword ptr ds:[_itemCurrentItem], ecx
+  mov  ds:[_itemCurrentItem], ecx
   mov  eax, ebx
   call inven_right_hand_
   test eax, eax                             // Есть вещь в правой руке?
   jz   noRightHand                          // Нет
   push eax
-  call CanUseWeapon
+  call PartyControl_CanUseWeapon
   test eax, eax
   pop  eax
   jnz  noRightHand
@@ -325,7 +318,7 @@ noRightHand:
   test eax, eax                             // Есть вещь в левой руке?
   jz   noLeftHand                           // Нет
   push eax
-  call CanUseWeapon
+  call PartyControl_CanUseWeapon
   test eax, eax
   pop  eax
   jnz  noLeftHand
@@ -347,21 +340,21 @@ static void __declspec(naked) RestoreDudeState() {
   mov  eax, offset real_pc_name
   call critter_pc_set_name_
   mov  eax, real_last_level
-  mov  dword ptr ds:[_last_level], eax
+  mov  ds:[_last_level], eax
   mov  eax, real_Level
-  mov  dword ptr ds:[_Level_], eax
+  mov  ds:[_Level_], eax
   mov  eax, real_Experience
-  mov  dword ptr ds:[_Experience_], eax
+  mov  ds:[_Experience_], eax
   mov  eax, real_free_perk
   mov  byte ptr ds:[_free_perk], al
   mov  eax, real_unspent_skill_points
-  mov  dword ptr ds:[_curr_pc_stat], eax
+  mov  ds:[_curr_pc_stat], eax
   mov  eax, real_map_elevation
-  mov  dword ptr ds:[_map_elevation], eax
+  mov  ds:[_map_elevation], eax
   mov  eax, real_sneak_working
-  mov  dword ptr ds:[_sneak_working], eax
+  mov  ds:[_sneak_working], eax
   mov  eax, real_hand
-  mov  dword ptr ds:[_itemCurrentItem], eax
+  mov  ds:[_itemCurrentItem], eax
   mov  edx, real_trait2
   mov  eax, real_trait
   call trait_set_
@@ -370,7 +363,7 @@ static void __declspec(naked) RestoreDudeState() {
   mov  ecx, (6*4)*2
   rep  movsd
   mov  esi, offset real_drug_gvar
-  mov  edi, dword ptr ds:[_game_global_vars]
+  mov  edi, ds:[_game_global_vars]
   mov  eax, real_jet_gvar
   mov  dword ptr [edi+296*4], eax           // GVAR_ADDICT_JET
   add  edi, 21*4                            // esi->GVAR_NUKA_COLA_ADDICT
@@ -379,16 +372,16 @@ static void __declspec(naked) RestoreDudeState() {
   mov  edx, 4
   mov  eax, offset real_tag_skill
   call skill_set_tags_
-  mov  eax, dword ptr ds:[_obj_dude]
+  mov  eax, ds:[_obj_dude]
   mov  ecx, real_dude
   push ecx
-  mov  dword ptr ds:[_obj_dude], ecx
-  mov  dword ptr ds:[_inven_dude], ecx
-  mov  esi, dword ptr [ecx+0x64]
-  mov  dword ptr ds:[_inven_pid], esi
+  mov  ds:[_obj_dude], ecx
+  mov  ds:[_inven_dude], ecx
+  mov  esi, [ecx+0x64]
+  mov  ds:[_inven_pid], esi
   mov  ecx, PERK_count
   push ecx
-  mov  esi, dword ptr ds:[_perkLevelDataList]
+  mov  esi, ds:[_perkLevelDataList]
   push esi
   call isRealParty
   test eax, eax
@@ -426,8 +419,8 @@ end:
  }
 }
 
-sMessage cantdo = {675, 0, 0, 0};       // 'Я не могу этого сделать.'
-static void __declspec(naked) PrintWarning() {
+sMessage cantdo = {675, 0, 0, 0};       // 'I can't do that.'/'Я не могу этого сделать.'
+void __declspec(naked) PartyControl_PrintWarning() {
  __asm {
   push edx
   lea  edx, cantdo
@@ -444,37 +437,13 @@ end:
  }
 }
 
-// 1 skip handler, -1 don't skip
-int __stdcall PartyControl_SwitchHandHook(TGameObj* weapon) {
- DWORD result;
- __asm {
-  push eax
-  cmp  IsControllingNPC, 0
-  je   dontSkipHandler
-  mov  eax, weapon
-  call CanUseWeapon
-  test eax, eax
-  jnz  dontSkipHandler
-  call PrintWarning
-  inc  eax
-  jmp  end
-dontSkipHandler:
-  xor  eax, eax
-  dec  eax
-end:  
-  mov  result, eax
-  pop  eax
- }
- return result;
-}
-
 static void _declspec(naked) CombatWrapper_v2() {
  __asm {
   pushad
-  cmp  eax, dword ptr ds:[_obj_dude]
+  cmp  eax, ds:[_obj_dude]
   jne  skip
   xor  edx, edx
-  cmp  dword ptr ds:[_combatNumTurns], edx
+  cmp  ds:[_combatNumTurns], edx
   je   skipControl                          // Это первый ход
   mov  eax, dword ptr [eax+0x4]             // tile_num
   add  edx, 2
@@ -536,8 +505,8 @@ static void _declspec(naked) combat_add_noncoms_hook() {
   inc  eax
   test eax, eax
   jnz  end
-  mov  dword ptr ds:[_list_com], eax
-  mov  ecx, dword ptr [esp+0x4]
+  mov  ds:[_list_com], eax
+  mov  ecx, [esp+0x4]
 end:
   retn
  }
@@ -566,20 +535,6 @@ static void _declspec(naked) Save_as_ASCII_hook() {
   xchg ebx, eax
 end:
   mov  ebx, 649
-  retn
- }
-}
-
-static void _declspec(naked) inven_pickup_hook() {
- __asm {
-  call item_get_type_
-  test eax, eax                             // Это item_type_armor?
-  jnz  end                                  // Нет
-  cmp  IsControllingNPC, eax
-  je   end
-  call PrintWarning
-  dec  eax
-end:
   retn
  }
 }
@@ -676,7 +631,7 @@ static void __declspec(naked) action_skill_use_hook() {
   xor  eax, eax
   cmp  IsControllingNPC, eax
   je   end
-  call PrintWarning
+  call PartyControl_PrintWarning
 skip:
   pop  eax                                  // Уничтожаем адрес возврата
   xor  eax, eax
@@ -690,8 +645,7 @@ static void __declspec(naked) action_use_skill_on_hook() {
  __asm {
   cmp  IsControllingNPC, eax
   je   end
-  call PrintWarning
-  retn
+  jmp  PartyControl_PrintWarning
 end:
   jmp  pc_flag_toggle_
  }
@@ -722,7 +676,6 @@ void PartyControlInit() {
   HookCall(0x422E20, &CombatWrapper_v2);
   MakeCall(0x434AAC, &PrintLevelWin_hook, false);
   MakeCall(0x43964E, &Save_as_ASCII_hook, false);
-  HookCall(0x47139C, &inven_pickup_hook);
   HookCall(0x46E8BA, &handle_inventory_hook);
   HookCall(0x46EC0A, &handle_inventory_hook1);
   SafeWrite32(0x471E48, 152);               // Ширина текста 152, а не 80 

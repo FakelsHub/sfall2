@@ -19,98 +19,70 @@
 #include "main.h"
 
 #include "FalloutEngine.h"
-#include "version.h"
 
-static int usingExtraKillTypes;
-bool UsingExtraKillTypes() { return usingExtraKillTypes!=0; }
+bool usingExtraKillTypes = false;
 
-//Fallout's idea of _fastcall seems to be different to VS2005's.
-//Might as well do this in asm, or the custom prolog code would end up being longer than the function
-static DWORD __declspec(naked) ReadKillCounter(DWORD killtype) {
- //if(killtype>38) return 0;
- //return ((WORD*)_pc_kill_counts)[killtype];
+static const DWORD ExtraKillTypesCount[] = {
+ 0x42D980,                                  // critter_kill_name_
+ 0x42D990,                                  // critter_kill_name_
+ 0x42D9C0,                                  // critter_kill_info_
+ 0x42D9D0,                                  // critter_kill_info_
+ 0x4344E4,                                  // ListKills_
+// 0x43A154,                                  // Save_as_ASCII_ (Не сработает - количество навыков)
+// 0x43A1FF,                                  // Save_as_ASCII_ (равно количеству убитых типов)
+};
+
+static void __declspec(naked) critter_kill_count_hook() {
  __asm {
-  cmp eax, 38;
-  jle func;
-  xor eax, eax;
-  ret;
-func:
-  push ebx;
-  lea ebx, ds:[_pc_kill_counts+eax*2];
-  xor eax,eax;
-  mov ax, word ptr [ebx]
-  pop ebx;
-  ret;
+  cmp  eax, -1
+  je   skip
+  cmp  eax, 38
+  jl   end
+skip:
+  xor  eax, eax
+  retn
+end:
+  push ebx
+  lea  ebx, ds:[_pc_kill_counts+eax*2]
+  xor  eax, eax
+  mov  ax, word ptr [ebx]
+  pop  ebx
+  retn
  }
 }
 
-static void __declspec(naked) IncKillCounter(DWORD killtype) {
- //if(killtype>38) return;
- //((WORD*)_pc_kill_counts)[killtype]++;
+static void __declspec(naked) critter_kill_count_inc_hook() {
  __asm {
-  cmp eax, 38;
-  jle func;
-  ret;
-func:
-  push ebx;
-  lea ebx, ds:[_pc_kill_counts+eax*2];
-  xor eax, eax;
-  mov ax, word ptr [ebx];
-  inc ax;
-  mov word ptr [ebx], ax;
-  pop ebx;
-  ret;
-   }
+  cmp  eax, -1
+  je   skip
+  cmp  eax, 38
+  jl   end
+skip:
+  xor  eax, eax
+  dec  eax
+  retn
+end:
+  push ebx
+  lea  ebx, ds:[_pc_kill_counts+eax*2]
+  inc  word ptr [ebx]
+  xor  eax, eax
+  pop  ebx
+  retn
+ }
 }
 
-void KillCounterInit(bool use) {
- if(!use) {
-  usingExtraKillTypes=0;
-  return;
- }
- usingExtraKillTypes=1;
+void KillCounterInit() {
+ usingExtraKillTypes = true;
 
  //Overwrite the function that reads the kill counter with my own
- SafeWrite32(0x004344C0, ((DWORD)&ReadKillCounter) - 0x004344C4);
- SafeWrite32(0x0043A163, ((DWORD)&ReadKillCounter) - 0x0043A167);
- SafeWrite32(0x004571D9, ((DWORD)&ReadKillCounter) - 0x004571DD);
+ MakeCall(0x42D8A8, &critter_kill_count_hook, true);
 
  //Overwrite the function that increments the kill counter with my own
- SafeWrite32(0x00425145, ((DWORD)&IncKillCounter) - 0x00425149);
+ HookCall(0x425144, &critter_kill_count_inc_hook);
 
- //Edit the GetKillTypeName function to accept kill types over 0x13
- SafeWrite8(0x0042D980, 38);
- SafeWrite8(0x0042D990, 38);
+ for (int i = 0; i < sizeof(ExtraKillTypesCount)/4; i++) {
+  SafeWrite8(ExtraKillTypesCount[i], 38);
+ }
 
- //And the same for GetKillTypeDesc
- SafeWrite8(0x0042D9C0, 38);
- SafeWrite8(0x0042D9D0, 38);
- SafeWrite32(0x0042D9DD, 1488);
-
- //Change char sheet to loop through the extra kill types
- SafeWrite8(0x004344E4, 38);
-
- //Where fallout clears the counters
- /*SafeWrite32(0x0042CF5E, sizeof(KillCounters));
- SafeWrite32(0x0042CFEC, sizeof(KillCounters));
- SafeWrite32(0x0042D863, sizeof(KillCounters));
- SafeWrite32(0x0042CF63, (DWORD)KillCounters);
- SafeWrite32(0x0042CFF1, (DWORD)KillCounters);
- SafeWrite32(0x0042D868, (DWORD)KillCounters);
-
- //Where fallout increments the kill counter
- SafeWrite8(0x0042D881, COUNTERS);
- SafeWrite32(0x0042D895, (DWORD)KillCounters);
- SafeWrite32(0x0042D89E, (DWORD)KillCounters);
-
- //A function that reads the kill counter
- SafeWrite8(0x0042D8AF, COUNTERS);
- SafeWrite32(0x0042D8B8, (DWORD)KillCounters);
-
- //Not sure what these two do. Possibly related to loading the names/descriptions?
- SafeWrite32(0x0042D8C6, COUNTERS); //This one causes a crash on load?
- SafeWrite32(0x0042D8CB, (DWORD)KillCounters);
-
- SafeWrite32(0x0042D8F6, COUNTERS);
- SafeWrite32(0x0042D8FB, (DWORD)KillCounters);*/
+ SafeWrite32(0x42D9DD, 1488);
 }

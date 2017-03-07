@@ -16,11 +16,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #pragma once
 
+extern int AnimationsLimit;
 
-void AnimationsAtOnceInit(signed char aniMax);
+void AnimationsAtOnceInit();
 void AnimationsAtOnceExit();
-
-

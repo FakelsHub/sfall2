@@ -49,12 +49,6 @@ struct npcArmor {
 
 static npcArmor armors[PartyMax];
 
-struct sMessage {
- DWORD number;
- DWORD flags;
- char* audio;
- char* message;
-};
 static const char* MsgSearch(int msgno, DWORD file) {
  if(!file) return 0;
  sMessage msg = { msgno, 0, 0, 0 };
@@ -187,7 +181,7 @@ static __declspec(naked) int CritterCheck() {
   sub esp, 4;
   mov ebx, eax;
 
-  cmp eax, dword ptr ds:[_obj_dude]
+  cmp eax, ds:[_obj_dude]
   je single;
   test mode, 3;
   jnz run;
@@ -410,131 +404,100 @@ static __declspec(naked) void InvenObjExamineFuncHook() {
 }
 
 static char SuperStimMsg[128];
-static int _stdcall SuperStimFix2(DWORD* item, DWORD* target) {
- if(!item || !target) return 0;
- DWORD itm_pid=item[0x64/4], target_pid=target[0x64/4];
- if((target_pid&0xff000000) != 0x01000000) return 0;
- if((itm_pid&0xff000000) != 0) return 0;
- if((itm_pid&0xffffff) != 144) return 0;
- DWORD curr_hp, max_hp;
+static void __declspec(naked) protinst_use_item_on_hook() {
  __asm {
-  mov eax, target;
-  mov edx, STAT_current_hp
+  mov  ebx, [ebx+0x64]                      // ebx = item pid
+  cmp  ebx, PID_SUPER_STIMPAK
+  jne  end
+  mov  edx, [edi+0x64]                      // edx = target pid
+  shr  edx, 0x18
+  cmp  edx, ObjType_Critter
+  jne  end
+  mov  eax, edi                             // eax = target
+  mov  edx, STAT_max_hit_points
   call stat_level_
-  mov curr_hp, eax;
-  mov eax, target;
-  mov edx, STAT_max_hit_points
-  call stat_level_
-  mov max_hp, eax;
- }
- if(curr_hp<max_hp) return 0;
- DisplayConsoleMessage(SuperStimMsg);
- return 1;
-}
-
-static const DWORD UseItemHookRet=0x49C3D3;
-static void __declspec(naked) SuperStimFix() {
- __asm {
-  push eax;
-  push ecx;
-  push edx;
-
-  push edx;
-  push ebx;
-  call SuperStimFix2;
-  pop edx;
-  pop ecx;
-  test eax, eax;
-  jz end;
-  pop eax;
-  xor eax, eax;
-  retn;
+  cmp  eax, [edi+0x58]                      // max_hp == curr_hp?
+  jne  end                                  // Нет
+  pop  eax                                  // Уничтожаем адрес возврата
+  mov  eax, offset SuperStimMsg
+  mov  esi, 0x49C478
+  jmp  esi
 end:
-  pop eax;
-  push ecx;
-  push esi;
-  push edi;
-  push ebp;
-  sub esp, 0x14;
-  jmp UseItemHookRet;
+  xor  edx, edx
+  retn
  }
 }
 
 static int invenapcost;
 static char invenapqpreduction;
-void _stdcall SetInvenApCost(int a) { invenapcost=a; }
-static const DWORD inven_ap_cost_hook_ret=0x46E816;
-static void __declspec(naked) inven_ap_cost_hook() {
+void _stdcall SetInvenApCost(int a) {invenapcost = a;}
+static void __declspec(naked) handle_inventory_hook() {
  _asm {
-  movzx ebx, byte ptr invenapqpreduction;
-  mul bl;
-  mov edx, invenapcost;
-  sub edx, eax;
-  mov eax, edx;
-  jmp inven_ap_cost_hook_ret;
+  movzx ebx, byte ptr invenapqpreduction
+  mul  bl
+  mov  edx, invenapcost
+  mov  ebx, 0x46E812
+  jmp  ebx
  }
 }
 
-static const DWORD add_check_for_item_ammo_cost_back = 0x4266EE;
 // adds check for weapons which require more than 1 ammo for single shot (super cattle prod & mega power fist)
-static void __declspec(naked) add_check_for_item_ammo_cost() {
+static void __declspec(naked) combat_check_bad_shot_hook() {
  __asm {
-  push    edx
-  push    ebx
-  sub     esp, 4
-  call    item_w_cur_ammo_
-  mov     ebx, eax
-  mov     eax, ecx // weapon
-  mov     edx, esp
-  mov     dword ptr [esp], 1
-  pushad
-  push    1 // hook type
-  call    AmmoCostHookWrapper
+  push edx
+  push ebx
+  sub  esp, 4
+  call item_w_cur_ammo_
+  xchg ebx, eax                             // ebx = current ammo
+  mov  eax, ecx                             // weapon
+  mov  edx, edi                             // hit_mode
+  call item_w_anim_weap_
+  cmp  eax, ANIM_fire_burst
+  je   itsBurst
+  cmp  eax, ANIM_fire_continuous
+  je   itsBurst
+  xor  eax, eax
+  inc  eax
+  jmp  skip
+itsBurst:
+  mov  eax, ecx                             // weapon
+  call item_w_rounds_
+skip:
+  mov  [esp], eax
+  mov  eax, ecx                             // weapon
+  mov  edx, esp
+  push 1                                    // hook type
+  call AmmoCostHookWrapper
   add  esp, 4
-  popad
-  mov     eax, [esp]
-  cmp     eax, ebx
-  jle     enoughammo
-  xor     eax, eax // this will force "Out of ammo"
-  jmp     end
-enoughammo:
-  mov     eax, 1 // this will force success
+  xor  edx, edx
+  mov  eax, [esp]
+  cmp  eax, ebx
+  ja   end                                  // this will force "Out of ammo"
+  inc  edx                                  // this will force success
 end:
-  add     esp, 4
-  pop     ebx
-  pop     edx
-  jmp     add_check_for_item_ammo_cost_back; // jump back
+  xchg edx, eax
+  add  esp, 4
+  pop  ebx
+  pop  edx
+  retn
  }
 }
 
-static const DWORD divide_burst_rounds_by_ammo_cost_back = 0x4234B9;
-static void __declspec(naked) divide_burst_rounds_by_ammo_cost() {
+static void __declspec(naked) compute_spray_hook() {
  __asm {
-  // ecx - current ammo, eax - burst rounds; need to set ebp
   push edx
-  sub     esp, 4
-  mov     ebp, eax
-  mov     eax, edx // weapon
-  mov     dword ptr [esp], 1
-  mov     edx, esp // *rounds
-  pushad
-  push    2
-  call    AmmoCostHookWrapper
+  sub  esp, 4
+  call item_w_rounds_
+  mov  [esp], eax
+  xchg edx, eax                             // eax = weapon
+  mov  edx, esp                             // *rounds
+  push 2                                    // hook type
+  call AmmoCostHookWrapper
   add  esp, 4
-  popad
-  mov     edx, 0
-  mov     eax, ebp // rounds in burst
-  imul    dword ptr [esp] // so much ammo is required for this burst
-  cmp     eax, ecx
-  jle     skip
-  mov     eax, ecx // if more than current ammo, set it to current
-skip:
-  idiv    dword ptr [esp] // divide back to get proper number of rounds for damage calculations
-  mov     ebp, eax
-  add     esp, 4
-  pop edx
-  // end overwriten code
-  jmp     divide_burst_rounds_by_ammo_cost_back; // jump back
+  mov  eax, [esp]                           // rounds in burst
+  add  esp, 4
+  pop  edx
+  retn
  }
 }
 
@@ -616,8 +579,8 @@ ourKey:
   call intface_use_item_
   jmp  endReload
 itsWeapon:
-  test byte ptr ds:[_combat_state], 1
-  jnz  inCombat
+  test byte ptr ds:[_combat_state], 1       // В бою?
+  jnz  inCombat                             // Да
   call ReloadActiveHand
   jmp  endReload
 inCombat:
@@ -741,7 +704,8 @@ static int _stdcall ChangeArmorFid(DWORD* item, DWORD* npc) {
     test eax, eax
     jz   noWeapon                           // Оружия в руках нет
     mov  eax, ebx
-    mov  edx, 1                             // правая рука
+    xor  edx, edx
+    inc  edx                                // правая рука (INVEN_TYPE_RIGHT_HAND)
     call inven_unwield_                     // Разоружимся
 noWeapon:
     push pobj                               // pobj = fid брони
@@ -781,11 +745,12 @@ canUse:
     pop  edx                                // Восстановим указатель на оружие, если оно конечно есть
     test edx, edx                           // Оружие было в руках?
     jz   end                                // Нет
-    mov  ebx, 1                             // правая рука
+    xor  ebx, ebx
+    inc  ebx                                // правая рука (INVEN_TYPE_RIGHT_HAND)
     mov  eax, ecx                           // *npc
     call inven_wield_                       // Одеваем оружие
     mov  edx, [ecx+0x20]                    // fid
-    mov  pobj, edx                          // Сохраним fid уже с оружием для correctFidForRemovedItem
+    mov  pobj, edx                          // Сохраним fid уже с оружием для correctFidForRemovedItem_
 end:
    }
    break;
@@ -831,7 +796,8 @@ static void __declspec(naked) ControlWeapon_hook() {
   mov  edx, 0x4494FA
   jmp  edx
 haveWeapon:
-  mov  edx, 1                               // правая рука
+  xor  edx, edx
+  inc  edx                                  // правая рука (INVEN_TYPE_RIGHT_HAND)
   call inven_unwield_
   mov  edx, 0x44952E
   jmp  edx
@@ -844,29 +810,14 @@ static void __declspec(naked) ControlArmor_hook() {
   call inven_worn_
   test eax, eax
   jnz  haveArmor
-  mov  eax, ecx                             // _dialog_target
-  call ai_search_inven_armor_
-  jmp  end
+  xchg ecx, eax                             // _dialog_target
+  jmp  ai_search_inven_armor_
 haveArmor:
-  xor  ebx, ebx                             // новой брони нет
-  mov  edx, eax                             // указатель на снимаемую броню
-  mov  eax, ecx                             // _dialog_target
-  call adjust_ac_
-nextArmor:
-  mov  eax, ecx                             // _dialog_target
-  call inven_worn_
-  test eax, eax
-  jz   noArmor
-  and  byte ptr [eax+0x27], 0xFB            // Сбрасываем флаг одетой брони
-  jmp  nextArmor
-noArmor:
-  cmp  npcCount, 0
-  je   end
-  push ecx                                  // указатель на нпс
-  push eax                                  // новой брони нет
-  call ChangeArmorFid
+  mov  ebx, 0x4000000                       // Worn
+  xchg edx, eax                             // edx = указатель на снимаемую броню
+  xchg ecx, eax                             // eax = _dialog_target
+  call correctFidForRemovedItem_
   xor  eax, eax
-end:
   retn
  }
 }
@@ -888,7 +839,7 @@ static void __declspec(naked) fontHeight() {
 
 static void __declspec(naked) printFreeMaxWeight() {
  __asm {
-// ebx = who, ecx = ToWidth, edi = posOffset, esi = extraWeight
+// ebx = source, ecx = ToWidth, edi = posOffset, esi = extraWeight
   mov  eax, ds:[_curr_font_num]
   push eax
   mov  eax, 101
@@ -1103,7 +1054,7 @@ static void __declspec(naked) SetDefaultAmmo() {
   xchg edx, eax
   mov  ebx, eax
   call item_get_type_
-  cmp  eax, item_type_weapon                // Это item_type_weapon?
+  cmp  eax, item_type_weapon
   jne  end                                  // Нет
   cmp  dword ptr [ebx+0x3C], 0              // Есть патроны в оружии?
   jne  end                                  // Да
@@ -1169,7 +1120,7 @@ useOnPlayer:
   mov  eax, ds:[_stack]
   push eax
   push edx
-  call item_d_take_drug_
+  call useobjon_item_d_take_drug_           // item_d_take_drug_
   pop  edx
   pop  ebx
   cmp  eax, 1
@@ -1206,11 +1157,11 @@ static void __declspec(naked) make_drop_button() {
   jnz  skip                                 // Нет
   xchg ebx, eax
   call item_get_type_
-  cmp  eax, item_type_container             // Это item_type_container?
+  cmp  eax, item_type_container
   je   goodTarget                           // Да
   jmp  noButton
 skip:
-  cmp  eax, ObjType_Critter                 // Это ObjType_Critter?
+  cmp  eax, ObjType_Critter
   jne  noButton                             // Нет
   xchg ebx, eax
   call critter_body_type_
@@ -1288,7 +1239,7 @@ dropKey:
   sar  eax, 0x18
   test eax, eax                             // Это ObjType_Item?
   jz   itsItem                              // Да
-  cmp  eax, ObjType_Critter                 // Это ObjType_Critter?
+  cmp  eax, ObjType_Critter
   jne  end                                  // Нет
   mov  eax, ebp
   call critter_body_type_
@@ -1308,7 +1259,7 @@ dropKey:
 itsItem:
   mov  eax, ebp
   call item_get_type_
-  cmp  eax, item_type_container             // Это item_type_container?
+  cmp  eax, item_type_container
   jne  end                                  // Нет
   mov  eax, ebp
   call item_c_max_size_
@@ -1364,9 +1315,9 @@ end:
 
 void InventoryInit() {
  mode=GetPrivateProfileInt("Misc", "CritterInvSizeLimitMode", 0, ini);
- invenapcost=GetPrivateProfileInt("Misc", "InventoryApCost", 4, ini);
- invenapqpreduction=GetPrivateProfileInt("Misc", "QuickPocketsApCostReduction", 2, ini);
- MakeCall(0x46E80B, inven_ap_cost_hook, true);
+ invenapcost = GetPrivateProfileInt("Misc", "InventoryApCost", 4, ini);
+ invenapqpreduction = GetPrivateProfileInt("Misc", "QuickPocketsApCostReduction", 2, ini);
+ MakeCall(0x46E80B, &handle_inventory_hook, true);
  if(mode>7) mode=0;
  if(mode>=4) {
   mode-=4;
@@ -1397,14 +1348,14 @@ void InventoryInit() {
   HookCall(0x472FFE, &InvenObjExamineFuncHook);
  }
 
- if(GetPrivateProfileInt("Misc", "SuperStimExploitFix", 0, ini)) {
+ if (GetPrivateProfileInt("Misc", "SuperStimExploitFix", 0, ini)) {
   GetPrivateProfileString("sfall", "SuperStimExploitMsg", "You cannot use a super stim on someone who is not injured!", SuperStimMsg, 128, translationIni);
-  MakeCall(0x49C3CC, SuperStimFix, true);
+  MakeCall(0x49C3DE, &protinst_use_item_on_hook, false);
  }
 
- if(GetPrivateProfileInt("Misc", "CheckWeaponAmmoCost", 0, ini)) {
-  MakeCall(0x4266E9, &add_check_for_item_ammo_cost, true);
-  MakeCall(0x4234B3, &divide_burst_rounds_by_ammo_cost, true);
+ if (GetPrivateProfileInt("Misc", "CheckWeaponAmmoCost", 0, ini)) {
+  HookCall(0x4266E9, &combat_check_bad_shot_hook);
+  HookCall(0x4234AE, &compute_spray_hook);
  }
 
  ReloadWeaponKey = GetPrivateProfileIntA("Input", "ReloadWeaponKey", 0, ini);
@@ -1486,5 +1437,5 @@ void InventoryInit() {
 }
 
 void InventoryReset() {
- invenapcost=GetPrivateProfileInt("Misc", "InventoryApCost", 4, ini);
+ invenapcost = GetPrivateProfileInt("Misc", "InventoryApCost", 4, ini);
 }

@@ -95,7 +95,7 @@ static char* db_fgets(char* buf, int max_count, DWORD file) {
 }
 static void db_fclose(DWORD file) {
  __asm {
-  mov eax, file;
+  mov eax, file
   call db_fclose_
  }
 }
@@ -147,10 +147,10 @@ typedef int (_stdcall *functype)();
 static const functype _art_init=(functype)art_init_;
 static BYTE* mask;
 static void CreateMask() {
- mask=new BYTE[80*36];
- DWORD file=db_fopen("art\\tiles\\grid000.frm", "r");
+ mask = new BYTE[80*36];
+ DWORD file = db_fopen("art\\tiles\\grid000.frm", "r");
  db_fseek(file, 0x4a);
- db_freadByteCount(file, mask, 80*36);
+ db_freadByteCount(file, (BYTE*)mask, 80*36);
  db_fclose(file);
 }
 static WORD ByteSwapW(WORD w) { return ((w&0xff) << 8) | ((w&0xff00) >> 8); }
@@ -161,19 +161,19 @@ static int ProcessTile(sArt* tiles, int tile, int listpos) {
  strcpy_s(buf, "art\\tiles\\");
  strcat_s(buf, &tiles->names[13*tile]);
  
- DWORD art=db_fopen(buf, "r");
+ DWORD art = db_fopen(buf, "r");
  if(!art) return 0;
  db_fseek(art, 0x3e);
- int width=db_freadShort(art);  //80;
- if(width==80) {
+ int width = db_freadShort(art);  //80;
+ if(width == 80) {
   db_fclose(art);
   return 0;
  }
- int height=db_freadShort(art); //36
+ int height = db_freadShort(art); //36
  db_fseek(art, 0x4A);
- BYTE* pixeldata=new BYTE[width*height];
- db_freadByteCount(art, pixeldata, width*height);
- DWORD listid=listpos-tiles->total;
+ BYTE* pixeldata = new BYTE[width*height];
+ db_freadByteCount(art, (BYTE*)pixeldata, width*height);
+ DWORD listid = listpos-tiles->total;
  float newwidth = (float)(width - width%8);
  float newheight = (float)(height - height%12);
  int xsize = (int)floor(newwidth/32.0f - newheight/24.0f);
@@ -182,7 +182,7 @@ static int ProcessTile(sArt* tiles, int tile, int listpos) {
   for(int x=0;x<xsize;x++) {
    frm frame;
    db_fseek(art, 0);
-   db_freadByteCount(art, &frame, 0x4a);
+   db_freadByteCount(art, (BYTE*)&frame, 0x4a);
    frame.height=ByteSwapW(36);
    frame.width=ByteSwapW(80);
    frame.frmsize=ByteSwapD(80*36);
@@ -249,17 +249,17 @@ static int _stdcall ArtInitHook2() {
 }
 static void __declspec(naked) ArtInitHook() {
  __asm {
-  pushad;
-  mov eax, dword ptr ds:[_read_callback]
-  push eax;
-  xor eax, eax;
-  mov dword ptr ds:[_read_callback], eax
-  call ArtInitHook2;
-  pop eax;
-  mov dword ptr ds:[_read_callback], eax
-  popad;
-  xor eax, eax;
-  retn;
+  pushad
+  mov  eax, ds:[_read_callback]
+  push eax
+  xor  eax, eax
+  mov  ds:[_read_callback], eax
+  call ArtInitHook2
+  pop  eax
+  mov  ds:[_read_callback], eax
+  popad
+  xor  eax, eax
+  retn
  }
 }
 
@@ -286,16 +286,16 @@ static void _stdcall SquareLoadCheck(tilestruct* data) {
 
 static void __declspec(naked) SquareLoadHook() {
  __asm {
-  mov edi, edx;
+  mov  edi, edx
   call db_freadIntCount_
-  test eax, eax;
-  jnz end;
-  pushad;
-  push edi;
-  call SquareLoadCheck;
-  popad;
+  test eax, eax
+  jnz  end
+  pushad
+  push edi
+  call SquareLoadCheck
+  popad
 end:
-  retn;
+  retn
  }
 }
 

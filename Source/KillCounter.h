@@ -18,5 +18,6 @@
 
 #pragma once
 
-void KillCounterInit(bool use);
-bool UsingExtraKillTypes();
+extern bool usingExtraKillTypes;
+
+void KillCounterInit();

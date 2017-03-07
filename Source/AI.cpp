@@ -47,69 +47,53 @@ static void _stdcall CombatAttackHook(DWORD source, DWORD target) {
 
 static void __declspec(naked) combat_attack_hook() {
  _asm {
-  pushad;
-  push edx;
-  push eax;
-  call CombatAttackHook;
-  popad;
+  pushad
+  push edx
+  push eax
+  call CombatAttackHook
+  popad
   jmp  combat_attack_
  }
 }
 
-static DWORD CombatDisabled;
+DWORD CombatDisabled = 0;
 static char CombatBlockedMessage[128];
 
-static void _stdcall CombatBlocked() {
- DisplayConsoleMessage(CombatBlockedMessage);
-}
-
-static const DWORD BlockCombatHook1Ret1=0x45F6B4;
-static const DWORD BlockCombatHook1Ret2=0x45F6D7;
-static void __declspec(naked) BlockCombatHook1() {
+static void __declspec(naked) intface_use_item_hook() {
  __asm {
-  mov eax, CombatDisabled;
-  test eax, eax;
-  jz end;
-  call CombatBlocked;
-  jmp BlockCombatHook1Ret2;
+  cmp  CombatDisabled, 0
+  je   end
+  mov  eax, offset CombatBlockedMessage
+  call display_print_
+  pop  eax                                  // ”ничтожаем адрес возврата
+  mov  eax, 0x45F6D7
+  jmp  eax
 end:
-  mov eax, 0x14;
-  jmp BlockCombatHook1Ret1;
+  mov  eax, 20
+  retn
  }
 }
 
-static void __declspec(naked) BlockCombatHook2() {
+static void __declspec(naked) game_handle_input_hook() {
  __asm {
-  mov eax, dword ptr ds:[_intfaceEnabled]
-  test eax, eax;
-  jz end;
-  mov eax, CombatDisabled;
-  test eax, eax;
-  jz succeed;
-  pushad;
-  call CombatBlocked;
-  popad;
-  xor eax, eax;
-  jmp end;
-succeed:
-  inc eax;
+  mov  eax, ds:[_intfaceEnabled]
+  test eax, eax
+  jz   end
+  cmp  CombatDisabled, eax
+  jne  end
+  mov  eax, offset CombatBlockedMessage
+  call display_print_
+  xor  eax, eax
 end:
-  retn;
+  retn
  }
-}
-
-void _stdcall AIBlockCombat(DWORD i) {
- if(i) CombatDisabled=1;
- else CombatDisabled=0;
 }
 
 void AIInit() {
- //HookCall(0x42AE1D, ai_attack_hook);
- //HookCall(0x42AE5C, ai_attack_hook);
  HookCall(0x426A95, combat_attack_hook);
  HookCall(0x42A796, combat_attack_hook);
- MakeCall(0x45F6AF, BlockCombatHook1, true);
- HookCall(0x4432A6, BlockCombatHook2);
+ MakeCall(0x45F6AF, &intface_use_item_hook, false);
+ HookCall(0x4432A6, &game_handle_input_hook);
  GetPrivateProfileString("sfall", "BlockedCombat", "You cannot enter combat at this time.", CombatBlockedMessage, 128, translationIni);
 }
 

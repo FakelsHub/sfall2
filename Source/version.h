@@ -1,6 +1,6 @@
 /*
  *    sfall
- *    Copyright (C) 2008 - 2015  The sfall team
+ *    Copyright (C) 2008 - 2016  The sfall team
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -21,13 +21,11 @@
 #define TARGETVERSION "Fallout 2 v1.02 US"
 
 #define VERSION_MAJOR 1
-#define VERSION_MINOR 4
+#define VERSION_MINOR 5
 #define VERSION_BUILD 0
 #define VERSION_REV 0
 #ifdef WIN2K
-#define VERSION_STRING "v1.4 win2k"
+#define VERSION_STRING "v1.5 win2k"
 #else
-#define VERSION_STRING "v1.4"
+#define VERSION_STRING "v1.5"
 #endif
-
-#define CHECK_VAL  (4)

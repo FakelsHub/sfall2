@@ -75,7 +75,7 @@ static void __declspec(naked) MainMenuTextHook() {
   dec ecx; //xpos
   add edi, 12;
   push edi; //ypos
-  mov eax, dword ptr ds:[_main_window];//winptr
+  mov eax, ds:[_main_window];//winptr
   call win_print_
   mov  eax, 0x4817B0
   jmp  eax

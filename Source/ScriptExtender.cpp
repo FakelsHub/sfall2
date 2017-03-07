@@ -118,12 +118,8 @@ static const char* _stdcall GetOpArgStr(int num) {
 
 typedef void (_stdcall *regOpcodeProc)(WORD opcode,void* ptr);
 
-static DWORD highlightingToggled=0;
-static BYTE toggleHighlightsKey;
 static DWORD TurnHighlightContainers = 0;
 static int idle;
-static char HighlightFail1[128];
-static char HighlightFail2[128];
 
 struct sGlobalScript {
  sScriptProgram prog;
@@ -164,7 +160,6 @@ typedef stdext::hash_map<__int64, int> :: const_iterator glob_citr;
 typedef std::pair<__int64, int> glob_pair;
 
 static void* opcodes[0x300];
-DWORD AddUnarmedStatToGetYear=0;
 DWORD AvailableGlobalScriptTypes=0;
 bool isGameLoading;
 
@@ -706,29 +701,126 @@ end:
  }
 }
 
-static void __declspec(naked) MainGameLoopHook() {
+static void __declspec(naked) obj_outline_all_items_on() {
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
+  mov  eax, ds:[_map_elevation]
+  call obj_find_first_at_
+loopObject:
+  test eax, eax
+  jz   end
+  cmp  eax, ds:[_outlined_object]
+  je   nextObject
+  xchg ecx, eax
+  mov  eax, [ecx+0x20]
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  test eax, eax                             // Это ObjType_Item?
+  jnz  nextObject                           // Нет
+  cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
+  jnz  nextObject                           // Да
+  test [ecx+0x74], eax                      // Уже подсвечивается?
+  jnz  nextObject                           // Да
+  mov  edx, 0x10                            // жёлтый
+  test [ecx+0x25], dl                       // Установлен NoHighlight_ (это контейнер)?
+  jz   NoHighlight                          // Нет
+  cmp  TurnHighlightContainers, eax         // Подсвечивать контейнеры?
+  je   nextObject                           // Нет
+  mov  edx, 0x4                             // светло-серый
+NoHighlight:
+  mov  [ecx+0x74], edx
+nextObject:
+  call obj_find_next_at_
+  jmp  loopObject
+end:
+  jmp  tile_refresh_display_
+ }
+}
+
+static void __declspec(naked) obj_outline_all_items_off() {
+ __asm {
+  mov  eax, ds:[_map_elevation]
+  call obj_find_first_at_
+loopObject:
+  test eax, eax
+  jz   end
+  cmp  eax, ds:[_outlined_object]
+  je   nextObject
+  xchg ecx, eax
+  mov  eax, [ecx+0x20]
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  test eax, eax                             // Это ObjType_Item?
+  jnz  nextObject                           // Нет
+  cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
+  jnz  nextObject                           // Да
+  mov  [ecx+0x74], eax
+nextObject:
+  call obj_find_next_at_
+  jmp  loopObject
+end:
+  jmp  tile_refresh_display_
+ }
+}
+
+static DWORD toggleHighlightsKey;
+static char HighlightFail1[128];
+static char HighlightFail2[128];
+static void __declspec(naked) get_input_hook() {
+ __asm {
   call get_input_
-  push eax;
-  call RunGlobalScripts1;
-  pop eax;
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  pushad
+  mov  eax, toggleHighlightsKey
+  test eax, eax
+  jz   end
+  push eax
+  call KeyDown
+  mov  ebx, ds:[_objItemOutlineState]
+  test eax, eax
+  jz   notOurKey
+  test ebx, ebx
+  jnz  end
+  test MotionSensorFlags, 4                 // Sensor is required to use the item highlight feature
+  jnz  checkSensor
+outlineOn:
+  call obj_outline_all_items_on
+  jmp  stateOn
+checkSensor:
+  mov  eax, ds:[_obj_dude]
+  mov  edx, PID_MOTION_SENSOR
+  call inven_pid_is_carried_ptr_
+  test eax, eax
+  jz   noSensor
+  test MotionSensorFlags, 2                 // Sensor doesn't require charges
+  jnz  outlineOn
+  call item_m_dec_charges_                  // Returns -1 if the item has no charges
+  inc  eax
+  test eax, eax
+  jnz  outlineOn
+  mov  eax, offset HighlightFail2           // "Your motion sensor is out of charge."
+  jmp  printFail
+noSensor:
+  mov  eax, offset HighlightFail1           // "You aren't carrying a motion sensor."
+printFail:
+  call display_print_
+  inc  ebx
+stateOn:
+  inc  ebx
+  jmp  setState
+notOurKey:
+  cmp  ebx, 1
+  jne  stateOff
+  call obj_outline_all_items_off
+stateOff:
+  xor  ebx, ebx  
+setState:
+  mov  ds:[_objItemOutlineState], ebx
+end:
+  call RunGlobalScripts1
+  popad
+  retn
  }
 }
-static void __declspec(naked) CombatLoopHook() {
- __asm {
-  pushad;
-  call RunGlobalScripts1;
-  popad;
-  jmp  get_input_
- }
-}
+
 static void __declspec(naked) AfterCombatAttackHook() {
  __asm {
   pushad;
@@ -841,73 +933,6 @@ static void __declspec(naked) FreeProgramHook() {
  }
 }
 
-static void __declspec(naked) obj_outline_all_items_on_() {
- __asm {
-  pushad
-  mov  eax, dword ptr ds:[_map_elevation]
-  call obj_find_first_at_
-loopObject:
-  test eax, eax
-  jz   end
-  cmp  eax, ds:[_outlined_object]
-  je   nextObject
-  xchg ecx, eax
-  mov  eax, [ecx+0x20]
-  and  eax, 0xF000000
-  sar  eax, 0x18
-  test eax, eax                             // Это ObjType_Item?
-  jnz  nextObject                           // Нет
-  cmp  dword ptr [ecx+0x7C], eax            // Кому-то принадлежит?
-  jnz  nextObject                           // Да
-  test dword ptr [ecx+0x74], eax            // Уже подсвечивается?
-  jnz  nextObject                           // Да
-  mov  edx, 0x10                            // жёлтый
-  test byte ptr [ecx+0x25], dl              // Установлен NoHighlight_ (это контейнер)?
-  jz   NoHighlight                          // Нет
-  cmp  TurnHighlightContainers, eax         // Подсвечивать контейнеры?
-  je   nextObject                           // Нет
-  mov  edx, 0x4                             // светло-серый
-NoHighlight:
-  mov  [ecx+0x74], edx
-nextObject:
-  call obj_find_next_at_
-  jmp  loopObject
-end:
-  call tile_refresh_display_
-  popad
-  retn
- }
-}
-
-static void __declspec(naked) obj_outline_all_items_off_() {
- __asm {
-  pushad
-  mov  eax, dword ptr ds:[_map_elevation]
-  call obj_find_first_at_
-loopObject:
-  test eax, eax
-  jz   end
-  cmp  eax, ds:[_outlined_object]
-  je   nextObject
-  xchg ecx, eax
-  mov  eax, [ecx+0x20]
-  and  eax, 0xF000000
-  sar  eax, 0x18
-  test eax, eax                             // Это ObjType_Item?
-  jnz  nextObject                           // Нет
-  cmp  dword ptr [ecx+0x7C], eax            // Кому-то принадлежит?
-  jnz  nextObject                           // Да
-  mov  dword ptr [ecx+0x74], eax
-nextObject:
-  call obj_find_next_at_
-  jmp  loopObject
-end:
-  call tile_refresh_display_
-  popad
-  retn
- }
-}
-
 static void __declspec(naked) gmouse_bk_process_hook() {
  __asm {
   test eax, eax
@@ -926,10 +951,10 @@ static void __declspec(naked) obj_remove_outline_hook() {
   call obj_remove_outline_
   test eax, eax
   jnz  end
-  cmp  highlightingToggled, 1
+  cmp  dword ptr ds:[_objItemOutlineState], 1
   jne  end
   mov  ds:[_outlined_object], eax
-  call obj_outline_all_items_on_
+  call obj_outline_all_items_on
 end:
   retn
  }
@@ -941,17 +966,17 @@ void ScriptExtenderSetup() {
 #else
  const bool AllowUnsafeScripting=false;
 #endif
- toggleHighlightsKey=GetPrivateProfileIntA("Input", "ToggleItemHighlightsKey", 0, ini);
+ toggleHighlightsKey = GetPrivateProfileIntA("Input", "ToggleItemHighlightsKey", 0, ini);
  if (toggleHighlightsKey) {
   HookCall(0x44B9BA, &gmouse_bk_process_hook);
   HookCall(0x44BD1C, &obj_remove_outline_hook);
   HookCall(0x44E559, &obj_remove_outline_hook);
   TurnHighlightContainers = GetPrivateProfileIntA("Input", "TurnHighlightContainers", 0, ini);
+  GetPrivateProfileStringA("Sfall", "HighlightFail1", "You aren't carrying a motion sensor.", HighlightFail1, 128, translationIni);
+  GetPrivateProfileStringA("Sfall", "HighlightFail2", "Your motion sensor is out of charge.", HighlightFail2, 128, translationIni);
  }
- GetPrivateProfileStringA("Sfall", "HighlightFail1", "You aren't carrying a motion sensor.", HighlightFail1, 128, translationIni);
- GetPrivateProfileStringA("Sfall", "HighlightFail2", "Your motion sensor is out of charge.", HighlightFail2, 128, translationIni);
 
- idle=GetPrivateProfileIntA("Misc", "ProcessorIdle", -1, ini);
+ idle = GetPrivateProfileIntA("Misc", "ProcessorIdle", -1, ini);
  modifiedIni=GetPrivateProfileIntA("Main", "ModifiedIni", 0, ini);
 
  dlogr("Adding additional opcodes", DL_SCRIPT);
@@ -969,8 +994,8 @@ void ScriptExtenderSetup() {
  SafeWrite32(0x46ce6c, (DWORD)opcodes); //call that actually jumps to the opcode
  SafeWrite32(0x46e390, (DWORD)opcodes); //mov that writes to the opcode
 
- HookCall(0x480E7B, MainGameLoopHook); //hook the main game loop
- HookCall(0x422845, CombatLoopHook); //hook the combat loop
+ HookCall(0x480E7B, &get_input_hook);       //hook the main game loop
+ HookCall(0x422845, &get_input_hook);       //hook the combat loop
 
  MakeCall(0x4A390C, &FindSidHook, true);
  MakeCall(0x4A5E34, &ScrPtrHook, true);
@@ -1037,7 +1062,7 @@ void ScriptExtenderSetup() {
  opcodes[0x189]=funcSetPerkName;
  opcodes[0x18a]=funcSetPerkDesc;
  opcodes[0x18b]=SetPipBoyAvailable;
- if(UsingExtraKillTypes()) {
+ if (usingExtraKillTypes) {
   opcodes[0x18c]=GetKillCounter2;
   opcodes[0x18d]=ModKillCounter2;
  } else {
@@ -1395,16 +1420,18 @@ void ClearGlobalScripts() {
  SafeWrite8(0x4AFBC1, 2);
  //Stat ranges
  StatsReset();
+
  //Bodypart hit chances
- *((DWORD*)0x510954)=GetPrivateProfileIntA("Misc", "BodypartHitMod0", 0xFFFFFFD8, ini);
- *((DWORD*)0x510958)=GetPrivateProfileIntA("Misc", "BodypartHitMod1", 0xFFFFFFE2, ini);
- *((DWORD*)0x51095C)=GetPrivateProfileIntA("Misc", "BodypartHitMod2", 0xFFFFFFE2, ini);
- *((DWORD*)0x510960)=GetPrivateProfileIntA("Misc", "BodypartHitMod3", 0x00000000, ini);
- *((DWORD*)0x510964)=GetPrivateProfileIntA("Misc", "BodypartHitMod4", 0xFFFFFFEC, ini);
- *((DWORD*)0x510968)=GetPrivateProfileIntA("Misc", "BodypartHitMod5", 0xFFFFFFEC, ini);
- *((DWORD*)0x51096C)=GetPrivateProfileIntA("Misc", "BodypartHitMod6", 0xFFFFFFC4, ini);
- *((DWORD*)0x510970)=GetPrivateProfileIntA("Misc", "BodypartHitMod7", 0xFFFFFFE2, ini);
- *((DWORD*)0x510974)=GetPrivateProfileIntA("Misc", "BodypartHitMod8", 0x00000000, ini);
+ *((DWORD*)0x510954) = GetPrivateProfileIntA("Misc", "BodyHit_Head",      0xFFFFFFD8, ini);
+ *((DWORD*)0x510958) = GetPrivateProfileIntA("Misc", "BodyHit_Left_Arm",  0xFFFFFFE2, ini);
+ *((DWORD*)0x51095C) = GetPrivateProfileIntA("Misc", "BodyHit_Right_Arm", 0xFFFFFFE2, ini);
+ *((DWORD*)0x510960) = GetPrivateProfileIntA("Misc", "BodyHit_Torso",     0x00000000, ini);
+ *((DWORD*)0x510964) = GetPrivateProfileIntA("Misc", "BodyHit_Right_Leg", 0xFFFFFFEC, ini);
+ *((DWORD*)0x510968) = GetPrivateProfileIntA("Misc", "BodyHit_Left_Leg",  0xFFFFFFEC, ini);
+ *((DWORD*)0x51096C) = GetPrivateProfileIntA("Misc", "BodyHit_Eyes",      0xFFFFFFC4, ini);
+ *((DWORD*)0x510970) = GetPrivateProfileIntA("Misc", "BodyHit_Groin",     0xFFFFFFE2, ini);
+ *((DWORD*)0x510974) = GetPrivateProfileIntA("Misc", "BodyHit_Uncalled",  0x00000000, ini);
+
  //skillpoints per level mod
  SafeWrite8(0x43C27a, 5);
 }
@@ -1459,40 +1486,6 @@ void AfterAttackCleanup() {
 
 static void RunGlobalScripts1() {
  if(idle>-1) Sleep(idle);
- if(toggleHighlightsKey) {
-  //0x48C294 to toggle
-  if(KeyDown(toggleHighlightsKey)) {
-   if(!highlightingToggled) {
-    if(MotionSensorFlags&4) {
-     DWORD scanner;
-     __asm {
-      mov eax, ds:[_obj_dude]
-      mov edx, PID_MOTION_SENSOR
-      call inven_pid_is_carried_ptr_
-      mov scanner, eax;
-     }
-     if(scanner) {
-      if(MotionSensorFlags&2) {
-       __asm {
-        mov eax, scanner;
-        call item_m_dec_charges_ //Returns -1 if the item has no charges
-        inc eax;
-        mov highlightingToggled, eax;
-       }
-       if(!highlightingToggled) DisplayConsoleMessage(HighlightFail2);
-      } else highlightingToggled=1;
-     } else {
-      DisplayConsoleMessage(HighlightFail1);
-     }
-    } else highlightingToggled=1;
-    if (highlightingToggled) obj_outline_all_items_on_();
-    else highlightingToggled = 2;
-   }
-  } else if(highlightingToggled) {
-   if (highlightingToggled == 1) obj_outline_all_items_off_();
-   highlightingToggled = 0;
-  }
- }
  for(DWORD d=0;d<globalScripts.size();d++) {
   if(!globalScripts[d].repeat||(globalScripts[d].mode!=0&&globalScripts[d].mode!=3)) continue;
   if(++globalScripts[d].count>=globalScripts[d].repeat) {

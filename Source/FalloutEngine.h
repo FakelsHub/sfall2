@@ -1,6 +1,6 @@
 /*
 * sfall
-* Copyright (C) 2008-2015 The sfall team
+* Copyright (C) 2008-2016 The sfall team
 *
 * This program is free software: you can redistribute it and/or modify
 * it under the terms of the GNU General Public License as published by
@@ -32,32 +32,27 @@ extern const DWORD art_flush_;
 extern const DWORD art_frame_data_;
 extern const DWORD art_frame_length_;
 extern const DWORD art_frame_width_;
-extern const DWORD art_get_code_;
 extern const DWORD art_id_;
 extern const DWORD art_init_;
 extern const DWORD art_lock_;
 extern const DWORD art_ptr_lock_;
 extern const DWORD art_ptr_lock_data_;
 extern const DWORD art_ptr_unlock_;
-extern const DWORD automap_;
-extern const DWORD barter_compute_value_;
 extern const DWORD buf_to_buf_;
 extern const DWORD check_death_;
 extern const DWORD Check4Keys_;
-extern const DWORD combat_;
 extern const DWORD combat_ai_;
 extern const DWORD combat_attack_;
-extern const DWORD combat_input_;
 extern const DWORD combat_should_end_;
 extern const DWORD combat_turn_;
-extern const DWORD compute_damage_;
+extern const DWORD config_set_value_;
+extern const DWORD correctFidForRemovedItem_;
 extern const DWORD credits_;
 extern const DWORD credits_get_next_line_;
 extern const DWORD critter_body_type_;
 extern const DWORD critter_can_obj_dude_rest_;
-extern const DWORD critter_compute_ap_from_distance_;
+extern const DWORD critter_get_hits_;
 extern const DWORD critter_is_dead_;
-extern const DWORD critter_kill_;
 extern const DWORD critter_kill_count_type_;
 extern const DWORD critter_name_;
 extern const DWORD critter_pc_set_name_;
@@ -81,20 +76,16 @@ extern const DWORD db_fwriteInt_;
 extern const DWORD db_read_to_buf_;
 extern const DWORD dbase_close_;
 extern const DWORD dbase_open_;
-extern const DWORD determine_to_hit_func_;
+extern const DWORD debug_register_env_;
 extern const DWORD dialog_out_;
 extern const DWORD display_inventory_;
 extern const DWORD display_print_;
 extern const DWORD display_target_inventory_;
-extern const DWORD do_options_;
-extern const DWORD do_optionsFunc_;
-extern const DWORD do_prefscreen_;
 extern const DWORD DOSCmdLineDestroy_;
 extern const DWORD DrawCard_;
 extern const DWORD DrawFolder_;
 extern const DWORD DrawInfoWin_;
 extern const DWORD dude_stand_;
-extern const DWORD editor_design_;
 extern const DWORD elapsed_time_;
 extern const DWORD elevator_end_;
 extern const DWORD elevator_start_;
@@ -106,11 +97,9 @@ extern const DWORD findVar_;
 extern const DWORD folder_print_line_;
 extern const DWORD frame_ptr_;
 extern const DWORD game_get_global_var_;
-extern const DWORD game_help_;
 extern const DWORD game_set_global_var_;
 extern const DWORD game_time_date_;
 extern const DWORD gdialog_barter_cleanup_tables_;
-extern const DWORD gdProcess_;
 extern const DWORD get_input_;
 extern const DWORD get_time_;
 extern const DWORD getmsg_;
@@ -120,7 +109,6 @@ extern const DWORD GNW_find_;
 extern const DWORD GNW95_process_message_;
 extern const DWORD gsnd_build_weapon_sfx_name_;
 extern const DWORD gsound_play_sfx_file_;
-extern const DWORD handle_inventory_;
 extern const DWORD inc_game_time_;
 extern const DWORD insert_withdrawal_;
 extern const DWORD interpret_;
@@ -166,7 +154,6 @@ extern const DWORD item_total_cost_;
 extern const DWORD item_total_weight_;
 extern const DWORD item_w_anim_code_;
 extern const DWORD item_w_anim_weap_;
-extern const DWORD item_w_compute_ammo_cost_;
 extern const DWORD item_w_cur_ammo_;
 extern const DWORD item_w_dam_div_;
 extern const DWORD item_w_dam_mult_;
@@ -174,8 +161,8 @@ extern const DWORD item_w_damage_;
 extern const DWORD item_w_damage_type_;
 extern const DWORD item_w_dr_adjust_;
 extern const DWORD item_w_max_ammo_;
-extern const DWORD item_w_mp_cost_;
 extern const DWORD item_w_range_;
+extern const DWORD item_w_rounds_;
 extern const DWORD item_w_try_reload_;
 extern const DWORD item_weight_;
 extern const DWORD light_get_tile_;
@@ -183,9 +170,7 @@ extern const DWORD ListDrvdStats_;
 extern const DWORD ListSkills_;
 extern const DWORD ListTraits_;
 extern const DWORD loadColorTable_;
-extern const DWORD LoadGame_;
 extern const DWORD loadProgram_;
-extern const DWORD LoadSlot_;
 extern const DWORD main_game_loop_;
 extern const DWORD main_menu_hide_;
 extern const DWORD main_menu_loop_;
@@ -257,13 +242,11 @@ extern const DWORD perks_dialog_;
 extern const DWORD pick_death_;
 extern const DWORD pip_back_;
 extern const DWORD pip_print_;
-extern const DWORD pipboy_;
 extern const DWORD PipStatus_;
 extern const DWORD PrintBasicStat_;
 extern const DWORD PrintLevelWin_;
 extern const DWORD process_bk_;
 extern const DWORD protinst_use_item_;
-extern const DWORD protinst_use_item_on_;
 extern const DWORD proto_dude_update_gender_;
 extern const DWORD proto_ptr_;
 extern const DWORD pushLongStack_;
@@ -290,7 +273,6 @@ extern const DWORD report_explosion_;
 extern const DWORD RestorePlayer_;
 extern const DWORD roll_random_;
 extern const DWORD runProgram_;
-extern const DWORD SaveGame_;
 extern const DWORD SavePlayer_;
 extern const DWORD scr_exec_map_update_scripts_;
 extern const DWORD scr_find_first_at_;
@@ -303,16 +285,14 @@ extern const DWORD scr_remove_;
 extern const DWORD scr_set_ext_param_;
 extern const DWORD scr_set_objs_;
 extern const DWORD scr_write_ScriptNode_;
+extern const DWORD set_game_time_;
 extern const DWORD SexWindow_;
-extern const DWORD skill_check_stealing_;
 extern const DWORD skill_dec_point_;
 extern const DWORD skill_get_tags_;
 extern const DWORD skill_inc_point_;
 extern const DWORD skill_level_;
 extern const DWORD skill_points_;
 extern const DWORD skill_set_tags_;
-extern const DWORD skill_use_;
-extern const DWORD skilldex_select_;
 extern const DWORD sprintf_;
 extern const DWORD square_num_;
 extern const DWORD stat_get_base_direct_;
@@ -322,7 +302,6 @@ extern const DWORD stat_pc_add_experience_;
 extern const DWORD stat_pc_get_;
 extern const DWORD stat_pc_set_;
 extern const DWORD strncpy_;
-extern const DWORD switch_hand_;
 extern const DWORD talk_to_translucent_trans_buf_to_buf_;
 extern const DWORD text_font_;
 extern const DWORD text_object_create_;
@@ -351,7 +330,6 @@ extern const DWORD win_register_button_disable_;
 extern const DWORD win_show_;
 extern const DWORD wmInterfaceScrollTabsStart_;
 extern const DWORD wmPartyWalkingStep_;
-extern const DWORD wmWorldMapFunc_;
 extern const DWORD wmWorldMapLoadTempData_;
 extern const DWORD xfclose_;
 extern const DWORD xfeof_;
@@ -387,7 +365,6 @@ extern const DWORD xvfprintf_;
 #define _combat_turn_running        0x51093C
 #define _combatNumTurns             0x510940
 #define _crit_succ_eff              0x510978
-#define _critterClearObj            0x518438
 #define _crnt_func                  0x664508
 #define _curr_font_num              0x51E3B0
 #define _curr_pc_stat               0x6681AC
@@ -460,6 +437,8 @@ extern const DWORD xvfprintf_;
 #define _num_game_global_vars       0x5186C4
 #define _num_map_global_vars        0x519574
 #define _obj_dude                   0x6610B8
+#define _objectTable                0x639DA0
+#define _objItemOutlineState        0x519798
 #define _optionRect                 0x58ECC0
 #define _outlined_object            0x518D94
 #define _partyMemberAIOptions       0x519DB8
@@ -485,6 +464,7 @@ extern const DWORD xvfprintf_;
 #define _proto_main_msg_file        0x6647FC
 #define _ptable                     0x59E934
 #define _pud                        0x59E960
+#define _queue                      0x6648C0
 #define _quick_done                 0x5193BC
 #define _read_callback              0x51DEEC
 #define _RedColor                   0x6AB4D0
@@ -523,28 +503,39 @@ extern const DWORD xvfprintf_;
 #define _world_ypos                 0x672E10
 #define _YellowColor                0x6AB8BB
 
-#define MSG_FILE_COMBAT  (0x56D368)
-#define MSG_FILE_AI   (0x56D510)
-#define MSG_FILE_SCRNAME (0x56D754)
-#define MSG_FILE_MISC  (0x58E940)
-#define MSG_FILE_CUSTOM  (0x58EA98)
+#define MSG_FILE_COMBAT   (0x56D368)
+#define MSG_FILE_AI       (0x56D510)
+#define MSG_FILE_SCRNAME  (0x56D754)
+#define MSG_FILE_MISC     (0x58E940)
+#define MSG_FILE_CUSTOM   (0x58EA98)
 #define MSG_FILE_INVENTRY (0x59E814)
-#define MSG_FILE_ITEM  (0x59E980)
-#define MSG_FILE_LSGAME  (0x613D28)
-#define MSG_FILE_MAP  (0x631D48)
-#define MSG_FILE_OPTIONS (0x6637E8)
-#define MSG_FILE_PERK  (0x6642D4)
-#define MSG_FILE_PIPBOY  (0x664348)
-#define MSG_FILE_QUESTS  (0x664410)
-#define MSG_FILE_PROTO  (0x6647FC)
-#define MSG_FILE_SCRIPT  (0x667724)
-#define MSG_FILE_SKILL  (0x668080)
+#define MSG_FILE_ITEM     (0x59E980)
+#define MSG_FILE_LSGAME   (0x613D28)
+#define MSG_FILE_MAP      (0x631D48)
+#define MSG_FILE_OPTIONS  (0x6637E8)
+#define MSG_FILE_PERK     (0x6642D4)
+#define MSG_FILE_PIPBOY   (0x664348)
+#define MSG_FILE_QUESTS   (0x664410)
+#define MSG_FILE_PROTO    (0x6647FC)
+#define MSG_FILE_SCRIPT   (0x667724)
+#define MSG_FILE_SKILL    (0x668080)
 #define MSG_FILE_SKILLDEX (0x6680F8)
-#define MSG_FILE_STAT  (0x66817C)
-#define MSG_FILE_TRAIT  (0x66BE38)
+#define MSG_FILE_STAT     (0x66817C)
+#define MSG_FILE_TRAIT    (0x66BE38)
 #define MSG_FILE_WORLDMAP (0x672FB0)
 
+struct sMessage {
+ DWORD number;
+ DWORD flags;
+ char* audio;
+ char* message;
+};
+
+struct sFile {
+ DWORD fileType;
+ void* handle;
+};
+
 // WRAPPERS:
-void DisplayConsoleMessage(const char* msg);
 const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId);
 int __stdcall ItemGetType(TGameObj* item);

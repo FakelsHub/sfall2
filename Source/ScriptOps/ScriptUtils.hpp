@@ -770,7 +770,10 @@ end:
 static void funcPow2() {
  /*char buf[1024];
  sprintf(buf, "Pow! %d %d %d %d", opArgs[0], opArgTypes[0], opArgs[1], opArgTypes[1]);
- DisplayConsoleMessage(buf);*/
+ __asm {
+  lea  eax, buf
+  call display_print_
+ }*/
  float base, result = 0.0;
  if (!IsOpArgStr(0) && !IsOpArgStr(1)) {
   base = GetOpArgFloat(0);
@@ -856,12 +859,19 @@ static const DWORD game_msg_files[] =
  , 0x66BE38     // TRAIT 
  , 0x672FB0 };  // WORLDMAP
 
+static const DWORD* proto_msg_files = (DWORD*)0x006647AC;
 
 static void _stdcall op_message_str_game2() {
  DWORD fileId = opArgs[0];
- if (IsOpArgInt(0) && IsOpArgInt(1) && fileId < 20) {
+ if (IsOpArgInt(0) && IsOpArgInt(1)) {
   int msgId = GetOpArgInt(1);
-  const char* msg = GetMessageStr(game_msg_files[fileId], msgId);
+  const char* msg;
+  if (fileId < 20) { // main msg files
+   msg = GetMessageStr(game_msg_files[fileId], msgId);
+  }
+  else if (fileId >= 0x1000 && fileId <= 0x1005) { // proto msg files
+   msg = GetMessageStr((DWORD)&proto_msg_files[2*(fileId - 0x1000)], msgId);
+  }
   if (msg != 0)
    SetOpReturn(msg);
   else

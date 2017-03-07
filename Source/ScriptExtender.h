@@ -57,7 +57,6 @@ void GetGlobals(sGlobalVar* globals);
 void SetGlobals(sGlobalVar* globals);
 
 
-extern DWORD AddUnarmedStatToGetYear;
 extern DWORD AvailableGlobalScriptTypes;
 
 void SetAppearanceGlobals(int race, int style);

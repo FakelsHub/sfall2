@@ -16,11 +16,11 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+extern DWORD CombatDisabled;
+
 void AIInit();
 void _stdcall AICombatStart();
 void _stdcall AICombatEnd();
 
 DWORD _stdcall AIGetLastAttacker(DWORD target);
 DWORD _stdcall AIGetLastTarget(DWORD source);
-
-void _stdcall AIBlockCombat(DWORD i);

@@ -282,4 +282,16 @@
 #define ROLL_SUCCESS          (2)
 #define ROLL_CRITICAL_SUCCESS (3)
 
+#define combat_p_proc  (13)
 #define destroy_p_proc (18)
+
+#define COMBAT_SUBTYPE_WEAPON_USED   (1)
+#define COMBAT_SUBTYPE_HIT_SUCCEEDED (2)
+#define COMBAT_SUBTYPE_SEQUENCING    (3)
+#define COMBAT_SUBTYPE_TURN          (4)
+#define COMBAT_SUBTYPE_NONCOM_TURN   (5)
+
+#define KILL_TYPE_robot (10)
+
+#define ANIM_fire_burst      (46)
+#define ANIM_fire_continuous (47)

@@ -408,63 +408,6 @@ end:
  }
 }
 
-// Jim's Formula
-static __declspec(naked) void DamageFunction4() {
-    __asm {
-        mov eax,dword ptr ds:[esi+0x8];        // Get pointer to critter's weapon
-        call item_w_dam_div_            // Retrieve Ammo Divisor
-        imul ebp,eax;                // Ammo Divisor = 1 * Ammo Divisor (ebp set to 1 earlier in function)
-        mov ebx,dword ptr ss:[esp+0x1c];    // Get number of hits
-        xor ecx,ecx;                // Set loop counter to zero
-        test ebx,ebx;                // Is number of hits smaller than= 0?
-        jle end;        // If yes, jump beyond damage calculation loop
-ajmp:                            // Start of damage calculation loop
-        mov edx,dword ptr ds:[esi+0x4];        // Get pointer to weapon (?)
-        mov eax,dword ptr ds:[esi];        // Get pointer to critter (?)
-        call item_w_damage_        // Retrieve Raw Damage
-        mov ebx,eax;                 // Move Raw Damage to ebx
-        mov edx,dword ptr ss:[esp+0x28];    // Get armor DT
-        mov eax,dword ptr ds:[esi+0x8];        // Get pointer to critter's weapon
-        call item_w_dr_adjust_            // Retrieve ammo AM (Armor Modifier: adds or removes a percentage of the DT and DR)
-        cmp edx,eax;                // is ammo DT bigger than AM
-        jge ijmp;                // If yes, go to end of calc because threshold not met
-        mov edx,dword ptr ss:[esp+0x2c];    // Get armor DR
-        mov eax,dword ptr ds:[esi+0x8];        // Get pointer to critter's weapon
-        call item_w_dr_adjust_            // Retrieve ammo AM
-        imul edx,eax;                // DR modifier = armor DR * ammo AM
-        mov dword ptr ss:[esp+0x30],0x64;    //sets some variable to 100
-        mov eax,edx;                //(not sure if I have to do this, but Haen does it)
-        sar edx,0x1f;                // makes DR modifier the dividend
-        idiv dword ptr ss:[esp+0x30];        // DR modifier = DR modifier / 100
-        mov edx,dword ptr ss:[esp+0x2c];    // Get armor DR
-        sub edx,eax;                // DR = DR - DR modifier (can be negative)
-        test edx,edx;                // Is DR >= 0?
-        jge gjmp;
-        xor edx,edx;                // If no, set DR = 0
-        jmp hjmp;
-gjmp:
-        cmp edx,0x64;                // Otherwise, is DR bigger than or equal to 100?
-        jge ijmp;                // If yes, damage will be zero, so stop calculating and go to bottom of loop
-hjmp:
-        imul edx,ebx;                // Otherwise, Resisted Damage = DR * Raw Damage
-        mov dword ptr ss:[esp+0x30],0x64;
-        mov eax,edx;
-        sar edx,0x1f;
-        idiv dword ptr ss:[esp+0x30];        // Resisted Damage = Resisted Damage / 100
-        sub ebx,eax;                // Raw Damage = Raw Damage - Resisted Damage
-        test ebx,ebx;                // Is Raw Damage smaller than 0?
-        jle ijmp;                // If yes, don't accumulate damage
-        add dword ptr ds:[edi],ebx;        // Otherwise, Accumulated Damage = Accumulated Damage + Raw Damage
-ijmp:
-        mov eax,dword ptr ss:[esp+0x1c];    // Get number of hits
-        inc ecx;                // counter += 1
-        cmp ecx,eax;                // Is counter smaller than number of hits?
-        jl ajmp;                // If yes, go back to start of damage calcuation loop (calculate damage for next hit)
-end:
-        jmp DamageFunctionReturn;        // Otherwise, exit loop
-    }
-}
-
 // YAAM
 static __declspec(naked) void DamageFunction5() {
  __asm {
@@ -562,7 +505,7 @@ end:
 
 static void __declspec(naked) item_w_damage_hook() {
  __asm {
-  cmp  ecx, dword ptr ds:[_obj_dude]
+  cmp  ecx, ds:[_obj_dude]
   jne  skip
   mov  edx, PERK_bonus_hth_damage
   mov  eax, ecx
@@ -578,14 +521,14 @@ skip:
 static void __declspec(naked) item_w_damage_hook1() {
  __asm {
   call stat_level_
-  cmp  ecx, dword ptr ds:[_obj_dude]
+  cmp  ecx, ds:[_obj_dude]
   jne  skip
   push eax
   mov  edx, PERK_bonus_hth_damage
   mov  eax, ecx
   call perk_level_
   shl  eax, 1
-  add  dword ptr [esp+0x4+0x8], eax         // min_dmg
+  add  [esp+0x4+0x8], eax                   // min_dmg
   pop  eax
 skip:
   retn
@@ -595,10 +538,10 @@ skip:
 static void __declspec(naked) display_stats_hook() {
  __asm {
   mov  edx, PERK_bonus_hth_damage
-  mov  eax, dword ptr ds:[_stack]
+  mov  eax, ds:[_stack]
   call perk_level_
   shl  eax, 1
-  add  dword ptr [esp+4*4], eax             // min_dmg
+  add  [esp+4*4], eax                       // min_dmg
   jmp  sprintf_
  }
 }
@@ -616,7 +559,7 @@ static void __declspec(naked) display_stats_hook1() {
   shl  eax, 1
   add  eax, 1
   push eax
-  mov  eax, dword ptr [esp+0x98+0x4]
+  mov  eax, [esp+0x98+0x4]
   push eax
   push 0x509EDC                             // '%s %d-%d'
   lea  eax, [esp+0xC+0x4]
@@ -669,34 +612,21 @@ end:
 static void __declspec(naked) display_stats_hook2() {
  __asm {
   mov  edx, PERK_bonus_ranged_damage
-  mov  eax, dword ptr ds:[_stack]
+  mov  eax, ds:[_stack]
   call perk_level_
   shl  eax, 1
-  add  dword ptr [esp+4*4], eax             // min_dmg
-  add  dword ptr [esp+4*5], eax             // max_dmg
+  add  [esp+4*4], eax                       // min_dmg
+  add  [esp+4*5], eax                       // max_dmg
   jmp  sprintf_
  }
 }
 
 void AmmoModInit() {
- int formula;
- if (formula=GetPrivateProfileInt("Misc", "DamageFormula", 0, ini)) {
-  switch(formula) {
-  case 1:
-   MakeCall(0x424995, &DamageFunction1, true);
-   break;
-  case 2:
-   MakeCall(0x424995, &DamageFunction2, true);
-   break;
-  /*case 3:
-   MakeCall(0x424995, &DamageFunction3, true);
-   break;*/
-  case 4:
-   MakeCall(0x424995, &DamageFunction4, true);
-   break;
-  case 5:
-   MakeCall(0x424995, &DamageFunction5, true);
-  }
+
+ switch (GetPrivateProfileIntA("Misc", "DamageFormula", 0, ini)) {
+  case 1: MakeCall(0x424995, &DamageFunction1, true); break;
+  case 2: MakeCall(0x424995, &DamageFunction2, true); break;
+  case 5: MakeCall(0x424995, &DamageFunction5, true); break;
  }
 
  if (GetPrivateProfileIntA("Misc", "BonusHtHDamageFix", 1, ini)) {

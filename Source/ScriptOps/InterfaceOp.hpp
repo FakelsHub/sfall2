@@ -403,7 +403,7 @@ static void __declspec(naked) IsIfaceTagActive() {
   jmp end;
 falloutfunc:
   mov ecx, eax;
-  mov eax, dword ptr ds:[_obj_dude]
+  mov eax, ds:[_obj_dude]
   mov edx, esp;
   mov eax, [eax+0x64];
   call proto_ptr_

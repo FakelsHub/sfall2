@@ -1,6 +1,6 @@
 /*
  *    sfall
- *    Copyright (C) 2008-2015  The sfall team
+ *    Copyright (C) 2008-2016  The sfall team
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -33,32 +33,27 @@ const DWORD art_flush_ = 0x41927C;
 const DWORD art_frame_data_ = 0x419870;
 const DWORD art_frame_length_ = 0x4197B8;
 const DWORD art_frame_width_ = 0x4197A0;
-const DWORD art_get_code_ = 0x419314;
 const DWORD art_id_ = 0x419C88;
 const DWORD art_init_ = 0x418840;
 const DWORD art_lock_ = 0x4191CC;
 const DWORD art_ptr_lock_ = 0x419160;
 const DWORD art_ptr_lock_data_ = 0x419188;
 const DWORD art_ptr_unlock_ = 0x419260;
-const DWORD automap_ = 0x41B8BC;
-const DWORD barter_compute_value_ = 0x474B2C;
 const DWORD buf_to_buf_ = 0x4D36D4;
 const DWORD check_death_ = 0x410814;
 const DWORD Check4Keys_ = 0x43F73C;
-const DWORD combat_ = 0x422D2C;
 const DWORD combat_ai_ = 0x42B130;
 const DWORD combat_attack_ = 0x422F3C;
-const DWORD combat_input_ = 0x4227F4;
 const DWORD combat_should_end_ = 0x422C60;
 const DWORD combat_turn_ = 0x42299C;
-const DWORD compute_damage_ = 0x4247B8;
+const DWORD config_set_value_ = 0x42C160;
+const DWORD correctFidForRemovedItem_ = 0x45409C;
 const DWORD credits_ = 0x42C860;
 const DWORD credits_get_next_line_ = 0x42CE6C;
 const DWORD critter_body_type_ = 0x42DDC4;
 const DWORD critter_can_obj_dude_rest_ = 0x42E564;
-const DWORD critter_compute_ap_from_distance_ = 0x42E62C;
+const DWORD critter_get_hits_ = 0x42D18C;
 const DWORD critter_is_dead_ = 0x42DD18;
-const DWORD critter_kill_ = 0x42DA64;
 const DWORD critter_kill_count_type_ = 0x42D920;
 const DWORD critter_name_ = 0x42D0A8;
 const DWORD critter_pc_set_name_ = 0x42D138;
@@ -82,20 +77,16 @@ const DWORD db_fwriteInt_ = 0x4C6214;
 const DWORD db_read_to_buf_ = 0x4C5DD4;
 const DWORD dbase_close_ = 0x4E5270;
 const DWORD dbase_open_ = 0x4E4F58;
-const DWORD determine_to_hit_func_ = 0x4243A8;
+const DWORD debug_register_env_ = 0x4C6D90;
 const DWORD dialog_out_ = 0x41CF20;
 const DWORD display_inventory_ = 0x46FDF4;
 const DWORD display_print_ = 0x43186C;
 const DWORD display_target_inventory_ = 0x47036C;
-const DWORD do_options_ = 0x48FC48;
-const DWORD do_optionsFunc_ = 0x48FC50;
-const DWORD do_prefscreen_ = 0x490798;
 const DWORD DOSCmdLineDestroy_ = 0x4E3D3C;
 const DWORD DrawCard_ = 0x43AAEC;
 const DWORD DrawFolder_ = 0x43410C;
 const DWORD DrawInfoWin_ = 0x4365AC;
 const DWORD dude_stand_ = 0x418378;
-const DWORD editor_design_ = 0x431DF8;
 const DWORD elapsed_time_ = 0x4C93E0;
 const DWORD elevator_end_ = 0x43F6D0;
 const DWORD elevator_start_ = 0x43F324;
@@ -107,11 +98,9 @@ const DWORD findVar_ = 0x4410AC;
 const DWORD folder_print_line_ = 0x43E3D8;
 const DWORD frame_ptr_ = 0x419880;
 const DWORD game_get_global_var_ = 0x443C68;
-const DWORD game_help_ = 0x443F74;
 const DWORD game_set_global_var_ = 0x443C98;
 const DWORD game_time_date_ = 0x4A3338;
 const DWORD gdialog_barter_cleanup_tables_ = 0x448660;
-const DWORD gdProcess_ = 0x4465C0;
 const DWORD get_input_ = 0x4C8B78;
 const DWORD get_time_ = 0x4C9370;
 const DWORD getmsg_ = 0x48504C;
@@ -121,7 +110,6 @@ const DWORD GNW_find_ = 0x4D7888;
 const DWORD GNW95_process_message_ = 0x4C9CF0;
 const DWORD gsnd_build_weapon_sfx_name_ = 0x451760;
 const DWORD gsound_play_sfx_file_ = 0x4519A8;
-const DWORD handle_inventory_ = 0x46E7B0;
 const DWORD inc_game_time_ = 0x4A34CC;
 const DWORD insert_withdrawal_ = 0x47A290;
 const DWORD interpret_ = 0x46CCA4;
@@ -167,7 +155,6 @@ const DWORD item_total_cost_ = 0x477DAC;
 const DWORD item_total_weight_ = 0x477E98;
 const DWORD item_w_anim_code_ = 0x478DA8;
 const DWORD item_w_anim_weap_ = 0x47860C;
-const DWORD item_w_compute_ammo_cost_ = 0x4790AC;
 const DWORD item_w_cur_ammo_ = 0x4786A0;
 const DWORD item_w_dam_div_ = 0x479294;
 const DWORD item_w_dam_mult_ = 0x479230;
@@ -175,8 +162,8 @@ const DWORD item_w_damage_ = 0x478448;
 const DWORD item_w_damage_type_ = 0x478570;
 const DWORD item_w_dr_adjust_ = 0x4791E0;
 const DWORD item_w_max_ammo_ = 0x478674;
-const DWORD item_w_mp_cost_ = 0x478B24;
 const DWORD item_w_range_ = 0x478A1C;
+const DWORD item_w_rounds_ = 0x478D80;
 const DWORD item_w_try_reload_ = 0x478768;
 const DWORD item_weight_ = 0x477B88;
 const DWORD light_get_tile_ = 0x47A980;
@@ -184,9 +171,7 @@ const DWORD ListDrvdStats_ = 0x43527C;
 const DWORD ListSkills_ = 0x436154;
 const DWORD ListTraits_ = 0x43B8A8;
 const DWORD loadColorTable_ = 0x4C78E4;
-const DWORD LoadGame_ = 0x47C640;
 const DWORD loadProgram_ = 0x4A3B74;
-const DWORD LoadSlot_ = 0x47DC68;
 const DWORD main_game_loop_ = 0x480E48;
 const DWORD main_menu_hide_ = 0x481A00;
 const DWORD main_menu_loop_ = 0x481AEC;
@@ -258,13 +243,11 @@ const DWORD perks_dialog_ = 0x43C4F0;
 const DWORD pick_death_ = 0x41060C;
 const DWORD pip_back_ = 0x497B64;
 const DWORD pip_print_ = 0x497A40;
-const DWORD pipboy_ = 0x497004;
 const DWORD PipStatus_ = 0x497BD8;
 const DWORD PrintBasicStat_ = 0x434B38;
 const DWORD PrintLevelWin_ = 0x434920;
 const DWORD process_bk_ = 0x4C8BDC;
 const DWORD protinst_use_item_ = 0x49BF38;
-const DWORD protinst_use_item_on_ = 0x49C3CC;
 const DWORD proto_dude_update_gender_ = 0x49F984;
 const DWORD proto_ptr_ = 0x4A2108;
 const DWORD pushLongStack_ = 0x46736C;
@@ -291,7 +274,6 @@ const DWORD report_explosion_ = 0x413144;
 const DWORD RestorePlayer_ = 0x43A8BC;
 const DWORD roll_random_ = 0x4A30C0;
 const DWORD runProgram_ = 0x46E154;
-const DWORD SaveGame_ = 0x47B88C;
 const DWORD SavePlayer_ = 0x43A7DC;
 const DWORD scr_exec_map_update_scripts_ = 0x4A67E4;
 const DWORD scr_find_first_at_ = 0x4A6524;
@@ -304,16 +286,14 @@ const DWORD scr_remove_ = 0x4A61D4;
 const DWORD scr_set_ext_param_ = 0x4A3B34;
 const DWORD scr_set_objs_ = 0x4A3B0C;
 const DWORD scr_write_ScriptNode_ = 0x4A5704;
+const DWORD set_game_time_ = 0x4A347C;
 const DWORD SexWindow_ = 0x437664;
-const DWORD skill_check_stealing_ = 0x4ABBE4;
 const DWORD skill_dec_point_ = 0x4AA8C4;
 const DWORD skill_get_tags_ = 0x4AA508;
 const DWORD skill_inc_point_ = 0x4AA6BC;
 const DWORD skill_level_ = 0x4AA558;
 const DWORD skill_points_ = 0x4AA680;
 const DWORD skill_set_tags_ = 0x4AA4E4;
-const DWORD skill_use_ = 0x4AAD08;
-const DWORD skilldex_select_ = 0x4ABFD0;
 const DWORD sprintf_ = 0x4F0041;
 const DWORD square_num_ = 0x4B1F04;
 const DWORD stat_get_base_direct_ = 0x4AF408;
@@ -323,7 +303,6 @@ const DWORD stat_pc_add_experience_ = 0x4AFAA8;
 const DWORD stat_pc_get_ = 0x4AF8FC;
 const DWORD stat_pc_set_ = 0x4AF910;
 const DWORD strncpy_ = 0x4F014F;
-const DWORD switch_hand_ = 0x4714E0;
 const DWORD talk_to_translucent_trans_buf_to_buf_ = 0x44AC68;
 const DWORD text_font_ = 0x4D58DC;
 const DWORD text_object_create_ = 0x4B036C;
@@ -352,7 +331,6 @@ const DWORD win_register_button_disable_ = 0x4D8674;
 const DWORD win_show_ = 0x4D6DAC;
 const DWORD wmInterfaceScrollTabsStart_ = 0x4C219C;
 const DWORD wmPartyWalkingStep_ = 0x4C1F90;
-const DWORD wmWorldMapFunc_ = 0x4BFE10;
 const DWORD wmWorldMapLoadTempData_ = 0x4BD6B4;
 const DWORD xfclose_ = 0x4DED6C;
 const DWORD xfeof_ = 0x4DF780;
@@ -372,15 +350,8 @@ const DWORD xvfprintf_ = 0x4DF1AC;
 
 int __stdcall ItemGetType(TGameObj* item) {
  __asm {
-  mov eax, item
+  mov  eax, item
   call item_get_type_
- }
-}
-
-void DisplayConsoleMessage(const char* msg) {
- __asm {
-  mov eax, msg
-  call display_print_
  }
 }
 
@@ -389,11 +360,11 @@ const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId) {
  DWORD buf = (DWORD)mesg_buf;
  const char* result;
  __asm {
-  mov eax, fileAddr
-  mov ebx, messageId
-  mov edx, buf
+  mov  eax, fileAddr
+  mov  ebx, messageId
+  mov  edx, buf
   call getmsg_
-  mov result, eax
+  mov  result, eax
  }
  return result;
 }

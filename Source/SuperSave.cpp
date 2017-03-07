@@ -234,7 +234,11 @@ void SetPageNum() {
      RedrawWin(WinRef);
   }
 
-     button=check_buttons();
+ __asm {
+  call get_input_
+  mov button, eax
+ }
+
   if(button>='0' && button<='9') {
   if(numpos<4) {
     Number[numpos]=button;

@@ -554,32 +554,29 @@ static void _stdcall AddFakePerk(DWORD perkID) {
 }
 static void __declspec(naked) AddPerkHook() {
  __asm {
-  cmp edx, PERK_count;
-  jl end;
-  push ecx;
-  push ebx;
-  push edx;
-  call AddFakePerk;
-  pop ebx;
-  pop ecx;
-  xor eax, eax;
-  ret;
-end:
-  push edx;
+  cmp  edx, PERK_count
+  jl   skip
+  pushad
+  push edx
+  call AddFakePerk
+  popad
+  xor  eax, eax
+  retn
+skip:
+  push edx
   call perk_add_
-  mov edx, GainStatFix;
-  test edx, edx;
-  pop edx;
-  jz end2;
-  test eax, eax;
-  jnz end2;
-  cmp edx, 84;
-  jl end2;
-  cmp edx, 90;
-  jg end2;
-  inc ds:[edx*4 + (0x51C394 - 84*4)];
-end2:
-  retn;
+  pop  edx
+  test eax, eax
+  jnz  end
+  cmp  GainStatFix, eax
+  je   end
+  cmp  edx, PERK_gain_strength
+  jl   end
+  cmp  edx, PERK_gain_luck
+  jg   end
+  inc  dword ptr ds:[edx*4 + (_pc_proto + 0x24 - PERK_gain_strength*4)] // base_stat_srength
+end:
+  retn
  }
 }
 
@@ -650,19 +647,19 @@ static void __declspec(naked) perks_dialog_hook() {
   mov  eax, ebx
   mov  edx, PERK_educated
   call perk_level_
-  mov  dword ptr ds:[_Educated], eax
+  mov  ds:[_Educated], eax
   mov  eax, ebx
   mov  edx, PERK_lifegiver
   call perk_level_
-  mov  dword ptr ds:[_Lifegiver], eax
+  mov  ds:[_Lifegiver], eax
   mov  eax, ebx
   mov  edx, PERK_tag
   call perk_level_
-  mov  dword ptr ds:[_Tag_], eax
+  mov  ds:[_Tag_], eax
   mov  eax, ebx
   mov  edx, PERK_mutate
   call perk_level_
-  mov  dword ptr ds:[_Mutate_], eax
+  mov  ds:[_Mutate_], eax
   retn
  }
 }
@@ -671,10 +668,10 @@ static const DWORD perk_can_add_hook_End = 0x496889;
 static const DWORD perk_can_add_hook_End1 = 0x496891;
 static void __declspec(naked) perk_can_add_hook() {
  __asm {
-  mov  esi, dword ptr ds:[_perkLevelDataList]
-  mov  esi, dword ptr [esi+edx*4]
+  mov  esi, ds:[_perkLevelDataList]
+  mov  esi, [esi+edx*4]
   imul esi, esi, 3
-  add  esi, dword ptr [ecx+0x10]
+  add  esi, [ecx+0x10]
   cmp  eax, esi
   jge  end
   jmp  perk_can_add_hook_End
@@ -710,7 +707,7 @@ static void PerkSetup() {
  HookCall(0x43C8D1, GetPerkSDescHook);
  HookCall(0x43C8EF, GetPerkSNameHook);
  HookCall(0x43C90F, GetPerkSImageHook);
- HookCall(0x43C952, AddPerkHook);
+ HookCall(0x43C952, &AddPerkHook);
  //PerkboxSwitchPerk
  HookCall(0x43C3F1, GetPerkSLevelHook);
  HookCall(0x43C41E, GetPerkSLevelHook);
@@ -820,7 +817,7 @@ static int _stdcall stat_get_base_direct(DWORD statID) {
  DWORD result;
  __asm {
   mov edx, statID;
-  mov eax, dword ptr ds:[_obj_dude]
+  mov eax, ds:[_obj_dude]
   call stat_get_base_direct_
   mov result, eax;
  }
@@ -860,8 +857,9 @@ static int _stdcall trait_adjust_stat_override(DWORD statID) {
    break;
   case STAT_ac:
    if(check_trait(TRAIT_kamikaze)) return -stat_get_base_direct(STAT_ac);
+   break;
   case STAT_melee_dmg:
-   if(check_trait(TRAIT_heavy_handed)) result+=2;
+   if(check_trait(TRAIT_heavy_handed)) result+=4;
    break;
   case STAT_carry_amt:
    if(check_trait(TRAIT_small_frame)) {

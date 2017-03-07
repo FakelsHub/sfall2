@@ -20,8 +20,8 @@
 
 //#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include "SafeWrite.h"
 #include "Logging.h"
+#include "SafeWrite.h"
 
 extern char ini[65];
 extern char translationIni[65];
