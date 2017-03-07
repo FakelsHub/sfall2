@@ -20,9 +20,9 @@
 
 void StatsReset();
 void StatsInit();
-void _stdcall SetPCStatMax(int stat, int i);
-void _stdcall SetPCStatMin(int stat, int i);
-void _stdcall SetNPCStatMax(int stat, int i);
-void _stdcall SetNPCStatMin(int stat, int i);
-extern unsigned short StandardApAcBonus;
-extern unsigned short ExtraApAcBonus;
+void _stdcall SetPCStatMax(int stat, int value);
+void _stdcall SetPCStatMin(int stat, int value);
+void _stdcall SetNPCStatMax(int stat, int value);
+void _stdcall SetNPCStatMin(int stat, int value);
+extern DWORD StandardApAcBonus;
+extern DWORD ExtraApAcBonus;

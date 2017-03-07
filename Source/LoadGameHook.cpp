@@ -84,7 +84,7 @@ static void _stdcall ResetState(DWORD onLoad) {
 }
 
 void GetSavePath(char* buf, int type) {
- int saveid = *(int*)_slot_cursor + 1 +LSPageOffset;//add SuperSave Page offset
+ int saveid = *(int*)_slot_cursor + 1 + LSPageOffset;//add SuperSave Page offset
  char buf2[6];
  //Fallout saving is independent of working directory
  struct sPath {
@@ -126,21 +126,28 @@ static void _stdcall _SaveGame() {
   WriteFile(h, &GainStatFix, 4, &unused, 0);
   PerksSave(h);
   SaveArrays(h);
-  CloseHandle(h);
  } else {
   dlogr("ERROR creating sfallgv!", DL_MAIN);
+#ifdef TRACE
+  dlog_f("sfallgv.sav: %d\r\n", DL_MAIN, GetLastError());
+#endif
   __asm {
    mov  eax, offset SaveSfallDataFailMsg
    call display_print_
   }
   PlaySfx("IISXXXX1");
  }
+ CloseHandle(h);                            // Что за фигня?
  GetSavePath(buf, 1);
  h = CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
  if (h != INVALID_HANDLE_VALUE) {
   FileSystemSave(h);
-  CloseHandle(h);
+#ifdef TRACE
+ } else {
+  dlog_f("sfallfs.sav: %d\r\n", DL_MAIN, GetLastError());
+#endif
  }
+ CloseHandle(h);                            // Что за фигня?
 }
 
 static DWORD SaveInCombatFix;

@@ -353,7 +353,7 @@ const DWORD xrewind_ = 0x4DF6E4;
 const DWORD xungetc_ = 0x4DF3F4;
 const DWORD xvfprintf_ = 0x4DF1AC;
 
-int __stdcall ItemGetType(TGameObj* item) {
+int _stdcall ItemGetType(TGameObj* item) {
  __asm {
   mov  eax, item
   call item_get_type_
@@ -372,4 +372,12 @@ const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId) {
   mov  result, eax
  }
  return result;
+}
+
+int _stdcall stat_level(void* critter, int stat) {
+ __asm {
+  mov  eax, critter
+  mov  edx, stat
+  call stat_level_
+ }
 }

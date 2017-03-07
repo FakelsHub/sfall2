@@ -735,23 +735,17 @@ end:
  }
 }
 
-static void __declspec(naked) map_fix_critter_combat_data_hook() {
+static void __declspec(naked) obj_load_func_hook1() {
  __asm {
-  inc  ebx
-  xchg ebx, eax
-  test eax, eax
-  jz   skip
-  cmp  ebx, ds:[_obj_dude]
-  je   end
-  xchg ebx, ds:[_obj_dude]
+  cmp  [eax+0x54], 0                        // pobj.who_hit_me
+  jle  end
+  xchg eax, ds:[_obj_dude]
+  push eax
   call obj_fix_combat_cid_for_dude_
-  xchg ebx, ds:[_obj_dude]
-  jmp  end
-skip:
-  mov  [ebx+0x54], eax                      // pobj.who_hit_me
+  pop  dword ptr ds:[_obj_dude]
 end:
-  mov  ebx, 0x4837B1
-  jmp  ebx
+  mov  eax, ds:[_preload_list_index]
+  retn
  }
 }
 
@@ -832,7 +826,9 @@ void BugsInit() {
  HookCall(0x4A59C1, &scr_save_hook);
 
 // »справление "заправки" не_автомобил€ и использовани€ топливных элементов даже когда бак полный
- MakeCall(0x49C36D, &protinst_default_use_item_hook, true);
+ if (GetPrivateProfileIntA("Misc", "CarChargingFix", 1, ini)) {
+  MakeCall(0x49C36D, &protinst_default_use_item_hook, true);
+ }
  MakeCall(0x49BE70, &obj_use_power_on_car_hook, false);
 
 // »справление проверки наркотической зависимости
@@ -929,8 +925,7 @@ void BugsInit() {
 
 // Fix explosives bugs
  MakeCall(0x422F05, &combat_ctd_init_hook, true);
- SafeWrite8(0x482DE1, 0x0);
- MakeCall(0x4837A2, &map_fix_critter_combat_data_hook, true);
+ MakeCall(0x488E52, &obj_load_func_hook1, false);
  MakeCall(0x4130C3, &action_explode_hook, false);
  MakeCall(0x4130E5, &action_explode_hook1, false);
 

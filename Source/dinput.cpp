@@ -144,18 +144,18 @@ public:
     HRESULT _stdcall Acquire(void) { return RealDevice->Acquire(); }
     HRESULT _stdcall Unacquire(void) { return RealDevice->Unacquire(); }
  //Only called for the mouse
-    HRESULT _stdcall GetDeviceState(DWORD a,LPVOID b) {
-  if(ForcingGraphicsRefresh) RefreshGraphics();
-  if(DeviceType!=kDeviceType_MOUSE) {
+ HRESULT _stdcall GetDeviceState(DWORD a,LPVOID b) {
+  if (ForcingGraphicsRefresh) RefreshGraphics();
+  if (DeviceType != kDeviceType_MOUSE) {
    return RealDevice->GetDeviceState(a,b);
   }
 
   DIMOUSESTATE2 MouseState;
   HRESULT hr;
   int numButtons;
-  if(formatLock) hr=RealDevice->GetDeviceState(sizeof(DIMOUSESTATE2), &MouseState);
-  else hr=RealDevice->GetDeviceState(sizeof(DIMOUSESTATE), &MouseState);
-  if(FAILED(hr)) return hr;
+  if (formatLock) hr = RealDevice->GetDeviceState(sizeof(DIMOUSESTATE2), &MouseState);
+  else hr = RealDevice->GetDeviceState(sizeof(DIMOUSESTATE), &MouseState);
+  if (FAILED(hr)) return hr;
   if(ReverseMouse) {
    BYTE tmp=MouseState.rgbButtons[0];
    MouseState.rgbButtons[0]=MouseState.rgbButtons[1];
@@ -170,13 +170,12 @@ public:
    MouseState.lY=(LONG)d;
   }
   if(UseScrollWheel) {
+   int count;
    if(MouseState.lZ>0) {
-    int count;
     if(WheelMod) count=MouseState.lZ/WheelMod;
     else count=1;
     while(count--) TapKey(DIK_UP);
    } else if(MouseState.lZ<0) {
-    int count;
     if(WheelMod) count=(-MouseState.lZ)/WheelMod;
     else count=1;
     while(count--) TapKey(DIK_DOWN);
@@ -199,8 +198,8 @@ public:
    KeysDown[256+i]=MouseState.rgbButtons[i];
   }
   memcpy(b, &MouseState, sizeof(DIMOUSESTATE));
-        return 0;
-    }
+  return 0;
+ }
  //Only called for the keyboard
  HRESULT _stdcall GetDeviceData(DWORD a,DIDEVICEOBJECTDATA* b,DWORD* c,DWORD d) {
   if(DeviceType!=kDeviceType_KEYBOARD) {

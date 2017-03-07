@@ -95,14 +95,6 @@ static const DWORD EncounterTableSize[] = {
  0x4C0815, 0x4C0D4A, 0x4C0FD4,
 };
 
-static const DWORD AgeMin[] = {
- 0x51D860, 0x4373C9, 0x4373F3, 0x43754C,
-};
-
-static const DWORD AgeMax[] = {
- 0x43731B, 0x437352, 0x437536,
-};
-
 //GetTickCount calls
 static const DWORD offsetsA[] = {
  0x4C8D34, 0x4C9375, 0x4C9384, 0x4C93C0, 0x4C93E8, 0x4C9D2E, 0x4FE01E,
@@ -1442,6 +1434,27 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
+ tmp = GetPrivateProfileIntA("Misc", "TimeLimit", 13, ini);
+ if (tmp < 13 && tmp > -4) {
+  dlog("Applying time limit patch.", DL_INIT);
+  if (tmp < -1) {
+   MakeCall(0x4A33B8, &game_time_date_hook, true);
+  }
+  if (tmp < 0) {
+   SafeWrite32(0x51D864, 99);
+   HookCall(0x4A34F9, &TimerReset);         // inc_game_time_
+   HookCall(0x4A3551, &TimerReset);         // inc_game_time_in_seconds_
+   MakeCall(0x4A3DF5, &script_chk_timed_events_hook, true);
+   for (int i = 0; i < sizeof(TimedRest)/4; i++) {
+    HookCall(TimedRest[i], &TimedRest_hook);
+   }
+  } else {
+   SafeWrite8(0x4A34EC, (BYTE)tmp);
+   SafeWrite8(0x4A3544, (BYTE)tmp);
+  }
+  dlogr(" Done", DL_INIT);
+ }
+
  dlog("Applying script extender patch.", DL_INIT);
  StatsInit();
  dlog(".", DL_INIT);
@@ -1485,27 +1498,6 @@ static void DllMain2() {
    SafeWrite8(0x4C21FC, 0xC2);
   }
   SafeWrite32(0x4C21FD, tmp);
-  dlogr(" Done", DL_INIT);
- }
-
- tmp = GetPrivateProfileIntA("Misc", "TimeLimit", 13, ini);
- if (tmp < 13 && tmp > -4) {
-  dlog("Applying time limit patch.", DL_INIT);
-  if (tmp < -1) {
-   MakeCall(0x4A33B8, &game_time_date_hook, true);
-  }
-  if (tmp < 0) {
-   SafeWrite32(0x51D864, 99);
-   HookCall(0x4A34F9, &TimerReset);         // inc_game_time_
-   HookCall(0x4A3551, &TimerReset);         // inc_game_time_in_seconds_
-   MakeCall(0x4A3DF5, &script_chk_timed_events_hook, true);
-   for (int i = 0; i < sizeof(TimedRest)/4; i++) {
-    HookCall(TimedRest[i], &TimedRest_hook);
-   }
-  } else {
-   SafeWrite8(0x4A34EC, (BYTE)tmp);
-   SafeWrite8(0x4A3544, (BYTE)tmp);
-  }
   dlogr(" Done", DL_INIT);
  }
 
@@ -1658,20 +1650,17 @@ static void DllMain2() {
 
  char xltcodes[512];
  if (GetPrivateProfileStringA("Misc", "XltTable", "", xltcodes, 512, ini) > 0) {
-  char *xltcode;
   int count = 0;
-  xltcode = strtok(xltcodes, ",");
-  while (xltcode) {
+  char *xltcode = strtok(xltcodes, ",");
+  while (xltcode && count < 94) {
    int _xltcode = atoi(xltcode);
    if (_xltcode<32 || _xltcode>255) break;
-   XltTable[count] = byte(_xltcode);
-   if (count == 93) break;
-   count++;
+   XltTable[count++] = (BYTE)_xltcode;
    xltcode = strtok(0, ",");
   }
-  if (count == 93) {
+  if (count == 94) {
    XltKey = GetPrivateProfileIntA("Misc", "XltKey", 4, ini);
-   if (XltKey!=4 && XltKey!=2 && XltKey!=1) XltKey=4;
+   if (XltKey != 4 && XltKey != 2 && XltKey != 1) XltKey = 4;
    MakeCall(0x433F3E, &get_input_str_hook, true);
    SafeWrite8(0x433ED6, 0x7D);
    MakeCall(0x47F364, &get_input_str2_hook, true);
@@ -1883,12 +1872,6 @@ static void DllMain2() {
  addrs[0] = 0x447DF4; addrs[1] = 0x447EB6;
  SimplePatch<BYTE>(addrs, 2, "Misc", "DialogPanelAnimDelay", 33, 0, 255);
 
-// Минимальный возраст игрока
- for (int i = 0; i < sizeof(AgeMin)/4; i++) SafeWrite8(AgeMin[i], 8);
-
-// Максимальный возраст игрока
- for (int i = 0; i < sizeof(AgeMax)/4; i++) SafeWrite8(AgeMax[i], 60);
-
  windowName[64] = 0;
  if (GetPrivateProfileString("Misc", "WindowName", "", windowName, 64, ini)) {
   dlog("Applying window name patch.", DL_INIT);
@@ -1993,9 +1976,6 @@ static void DllMain2() {
   SafeWrite8(0x499DA8, (BYTE)tmp);
   dlogr(" Done", DL_INIT);
  }
-
- tmp = GetPrivateProfileIntA("Misc", "CarryWeightLimit", -1, ini);
- if (tmp > 0) SafeWrite32(0x51D66C, tmp);
 
  dlogr("Leave DllMain2", DL_MAIN);
 }

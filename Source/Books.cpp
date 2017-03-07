@@ -198,17 +198,16 @@ void LoadVanillaBooks() {
 
 void BooksInit() {
  char buf[MAX_PATH-3];
- GetPrivateProfileString("Misc", "BooksFile", "", buf, MAX_PATH, ini);
- if (strlen(buf)>0) {
+ if (GetPrivateProfileString("Misc", "BooksFile", "", buf, MAX_PATH, ini) > 0) {
   sprintf(iniBooks, ".\\%s", buf);
   dlog("Applying books patch... ", DL_INIT);
   memset(books,0,sizeof(sBook)*BooksMax);
 
-  int i, ii, n = 0, count;
+  int i, ii, n = 0;
   if (GetPrivateProfileIntA("main", "overrideVanilla", 0, iniBooks) == 0) {
    LoadVanillaBooks();
   }
-  count = GetPrivateProfileIntA("main", "count", 0, iniBooks);
+  int count = GetPrivateProfileIntA("main", "count", 0, iniBooks);
 
   char section[4];
   for (i=1; i<=count; i++) {
@@ -228,17 +227,12 @@ void BooksInit() {
     books[ii].count = 0;
     books[ii].independent = GetPrivateProfileIntA(section, "Independent", 1, iniBooks);
     char skills[512];
-    if (GetPrivateProfileStringA(section, "Skill", "", skills, 512, iniBooks)>0) {
-     char *skill;
-     skill=strtok(skills, "|");
-     while(skill) {
-      int _skill=atoi(skill);
-      if (_skill>=0&&_skill<18) {
-       books[ii].skill[books[ii].count] = _skill;
-       books[ii].count++;
-      }
-      if (books[ii].count >= 18) break;
-      skill=strtok(0, "|");
+    if (GetPrivateProfileStringA(section, "Skill", "", skills, 512, iniBooks) > 0) {
+     char *skill = strtok(skills, "|");
+     while (skill && books[ii].count < 18) {
+      int _skill = atoi(skill);
+      if (_skill >= 0 && _skill < 18) books[ii].skill[books[ii].count++] = _skill;
+      skill = strtok(0, "|");
      }
     }
     n++;

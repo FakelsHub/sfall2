@@ -1,6 +1,6 @@
 /*
  *    sfall
- *    Copyright (C) 2008, 2009, 2010  The sfall team
+ *    Copyright (C) 2008-2016  The sfall team
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,281 +24,264 @@
 #include "FalloutEngine.h"
 #include "Stats.h"
 
-static DWORD StatMaximumsPC[STAT_max_stat];
-static DWORD StatMinimumsPC[STAT_max_stat];
-static DWORD StatMaximumsNPC[STAT_max_stat];
-static DWORD StatMinimumsNPC[STAT_max_stat];
+static const DWORD AgeMin[] = {
+ 0x51D860, 0x4373C9, 0x4373F3, 0x43754C,
+};
 
-static DWORD cCritter;
+static const DWORD AgeMax[] = {
+ 0x43731B, 0x437352, 0x437536,
+};
+
+struct Stat {
+ int min;
+ int max;
+};
+
+struct StatFormula {
+ int base;
+ int min;
+};
+
+static Stat StatPC[STAT_max_stat];
+static Stat StatNPC[STAT_max_stat];
+
+DWORD StandardApAcBonus = 4;
+DWORD ExtraApAcBonus = 4;
 
 static DWORD xpTable[99];
 
-static void __declspec(naked) GetCurrentStatHook1() {
+static void __declspec(naked) stat_level_hook() {
  __asm {
-  mov cCritter, eax;
-  push ebx;
-  push ecx;
-  push esi;
-  push edi;
-  push ebp;
-  mov ebx, 0x004AEF4D;
-  jmp ebx;
- }
-}
-static void __declspec(naked) GetCurrentStatHook2() {
- __asm {
-  shl esi, 2;
-  mov eax, cCritter;
-  cmp eax, ds:[_obj_dude]
-  je pc;
-  cmp ecx, StatMinimumsNPC[esi];
-  jg npc1;
-  mov eax, StatMinimumsNPC[esi];
-  jmp end;
-npc1:
-  cmp ecx, StatMaximumsNPC[esi];
-  jl npc2;
-  mov eax, StatMaximumsNPC[esi];
-  jmp end;
-npc2:
-  mov eax, ecx;
-  jmp end;
-pc:
-  cmp ecx, StatMinimumsPC[esi];
-  jge pc1;
-  mov eax, StatMinimumsPC[esi];
-  jmp end;
-pc1:
-  cmp ecx, StatMaximumsPC[esi];
-  jle pc2;
-  mov eax, StatMaximumsPC[esi];
-  jmp end;
-pc2:
-  mov eax, ecx;
+  shl  esi, 3                               // esi*8
+  cmp  ebx, ds:[_obj_dude]
+  je   player
+  mov  ebx, StatNPC[esi].min
+  cmp  ecx, ebx
+  jl   change
+  mov  ebx, StatNPC[esi].max
+  cmp  ecx, ebx
+  jle  end
+  jmp  change
+player:
+  mov  ebx, StatPC[esi].min
+  cmp  ecx, ebx
+  jl   change
+  mov  ebx, StatPC[esi].max
+  cmp  ecx, ebx
+  jle  end
+change:
+  mov  ecx, ebx
 end:
-  mov ebx, 0x004AF3D7;
-  jmp ebx;
+  mov  ebx, 0x4AF3D5
+  jmp  ebx
  }
 }
 
-static void __declspec(naked) SetCurrentStatHook() {
+static void __declspec(naked) stat_set_base_hook() {
  __asm {
-  cmp esi, ds:[_obj_dude]
-  je pc;
-  cmp ebx, StatMinimumsNPC[ecx*4];
-  jl fail;
-  cmp ebx, StatMaximumsNPC[ecx*4];
-  jg fail;
-  jmp end;
-pc:
-  cmp ebx, StatMinimumsPC[ecx*4];
-  jl fail;
-  cmp ebx, StatMaximumsPC[ecx*4];
-  jg fail;
-  jmp end;
-fail:
-  mov eax, 0x004AF57E;
-  jmp eax;
+  mov  eax, 0x4AF59C
+  cmp  esi, ds:[_obj_dude]
+  je   player
+  cmp  ebx, StatNPC[ecx*8].min
+  jge  skip
+failMin:
+  mov  eax, 0x4AF57E
+  jmp  eax
+skip:
+  cmp  ebx, StatNPC[ecx*8].max
+  jg   failMax
+  jmp  eax
+player:
+  cmp  ebx, StatPC[ecx*8].min
+  jl   failMin
+  cmp  ebx, StatPC[ecx*8].max
+  jle  end
+failMax:
+  mov  eax, 0x4AF591
 end:
-  mov edx, 0x004AF59C;
-  jmp edx;
+  jmp  eax
  }
 }
 
-static void __declspec(naked) GetLevelXPHook() {
- __asm {
-  dec eax;
-  mov eax, [xpTable+eax*4];
-  ret;
- }
-}
-static void __declspec(naked) GetNextLevelXPHook() {
- __asm {
-  mov eax, ds:[_Level_]
-  jmp GetLevelXPHook;
- }
+void _stdcall SetPCStatMin(int stat, int value) {
+ if (stat >= STAT_st && stat < STAT_max_stat) StatPC[stat].min = value;
 }
 
-unsigned short StandardApAcBonus=4;
-unsigned short ExtraApAcBonus=4;
-static const DWORD ApAcRetAddr=0x4AF0A4;
-static void __declspec(naked) ApplyApAcBonus() {
- __asm {
-  push edi;
-  push edx;
-  cmp [esp+12], 2;
-  jge h2hEvade;
-  xor edi, edi;
-  jmp standard;
-h2hEvade:
-  mov edx, PERK_hth_evade
-  mov eax, ds:[_obj_dude]
-  call perk_level_
-  imul ax, ExtraApAcBonus;
-  imul ax, [ebx+0x40];
-  mov edi, eax;
-standard:
-  mov eax, [ebx+0x40];
-  imul ax, StandardApAcBonus;
-  add eax, edi;
-  shr eax, 2;
-  pop edx;
-  pop edi;
-  jmp ApAcRetAddr;
- }
+void _stdcall SetPCStatMax(int stat, int value) {
+ if (stat >= STAT_st && stat < STAT_max_stat) StatPC[stat].max = value;
 }
 
-static int StatFormulas[33*2];
-static int StatShifts[33*7];
-static double StatMulti[33*7];
-static int __declspec(naked) _stdcall StatLevel(void* critter, int id) {
- __asm {
-  mov eax, [esp+4];
-  mov edx, [esp+8];
-  call stat_level_
-  retn 8;
- }
-}
-static void __declspec(naked) _stdcall ProtoPtr(DWORD pid, int** proto) {
- __asm {
-  mov eax, [esp+4];
-  mov edx, [esp+8];
-  call proto_ptr_
-  retn 8;
- }
-}
-static void _stdcall StatRecalcDerived(DWORD* critter) {
- int basestats[7];
- for(int i=0;i<7;i++) basestats[i]=StatLevel(critter, i);
- int* proto;
- ProtoPtr(critter[25], &proto);
-
- for(int i=7;i<=32;i++) {
-  if(i>=17&&i<=30) continue;
-  
-  double sum=0;
-  for(int j=0;j<7;j++) {
-   sum+=(basestats[j]+StatShifts[i*7+j])*StatMulti[i*7+j];
-  }
-  proto[i+9]=StatFormulas[i*2] + (int)floor(sum);
-  if(proto[i+9]<StatFormulas[i*2+1]) proto[i+9]=StatFormulas[i*2+1];
- }
+void _stdcall SetNPCStatMin(int stat, int value) {
+ if (stat >= STAT_st && stat < STAT_max_stat) StatNPC[stat].min = value;
 }
 
-static void __declspec(naked) stat_recalc_derived() {
- __asm {
-  push edx;
-  push ecx;
-  push eax;
-  call StatRecalcDerived;
-  pop ecx;
-  pop edx;
-  retn;
- }
+void _stdcall SetNPCStatMax(int stat, int value) {
+ if (stat >= STAT_st && stat < STAT_max_stat) StatNPC[stat].max = value;
 }
 
 void StatsReset() {
- for(int i=0;i<STAT_max_stat;i++) {
-  StatMaximumsPC[i]=StatMaximumsNPC[i]=*(DWORD*)(0x0051D54C + i*24);
-  StatMinimumsPC[i]=StatMinimumsNPC[i]=*(DWORD*)(0x0051D548 + i*24);
+ for (int stat = STAT_st; stat < STAT_max_stat; stat++) {
+  StatPC[stat].min = StatNPC[stat].min = *(DWORD*)(stat_data + stat*24);
+  StatPC[stat].max = StatNPC[stat].max = *(DWORD*)(stat_data + 4 + stat*24);
  }
- StandardApAcBonus=4;
- ExtraApAcBonus=4;
+ StandardApAcBonus = 4;
+ ExtraApAcBonus = 4;
 }
+
+static void __declspec(naked) stat_level_hook1() {
+ __asm {
+  mov  edx, [ebx+0x40]                      // pobj.curr_mp
+  test edi, edi
+  jz   skip
+  mov  eax, ExtraApAcBonus
+  push edx
+  imul eax, edx
+  pop  edx
+  xchg edi, eax
+skip:
+  mov  eax, StandardApAcBonus
+  imul eax, edx
+  add  eax, edi
+  shr  eax, 2                               // eax/4
+  mov  edi, 0x4AF0A4
+  jmp  edi
+ }
+}
+
+static void __declspec(naked) statPcMinExpForLevel_hook() {
+ __asm {
+  dec  eax
+  mov  eax, [xpTable+eax*4]
+  retn
+ }
+}
+
+static StatFormula StatFormulas[STAT_max_derived+1];
+static int StatShifts[STAT_max_derived+1][STAT_lu+1];
+static double StatMulti[STAT_max_derived+1][STAT_lu+1];
+
+static void _stdcall StatRecalcDerived(int* proto, DWORD* critter) {
+ int basestats[STAT_lu+1];
+ for (int stat = STAT_st; stat <= STAT_lu; stat++) {
+  basestats[stat] = stat_level(critter, stat);
+ }
+ for (int i = STAT_max_hit_points; i <= STAT_max_derived; i++) {
+  if (i >= STAT_dmg_thresh && i <= STAT_dmg_resist_explosion) continue;
+  double sum = 0;
+  for (int j = STAT_st; j <= STAT_lu; j++) {
+   sum += (basestats[j] + StatShifts[i][j]) * StatMulti[i][j];
+  }
+  proto[i+9] = StatFormulas[i].base + (int)floor(sum);
+  if (proto[i+9] < StatFormulas[i].min) proto[i+9] = StatFormulas[i].min;
+ }
+}
+
+static void __declspec(naked) stat_recalc_derived_hook() {
+ __asm {
+  pushad
+  sub  esp, 4
+  mov  edx, esp
+  push eax
+  mov  eax, [eax+0x64]                      // eax = pid
+  call proto_ptr_
+  push [edx]
+  call StatRecalcDerived
+  add  esp, 4
+  popad
+  retn
+ }
+}
+
 void StatsInit() {
+
+// Минимальный возраст игрока
+ for (int i = 0; i < sizeof(AgeMin)/4; i++) SafeWrite8(AgeMin[i], 8);
+
+// Максимальный возраст игрока
+ for (int i = 0; i < sizeof(AgeMax)/4; i++) SafeWrite8(AgeMax[i], 60);
+
+ int tmp = GetPrivateProfileIntA("Misc", "CarryWeightLimit", -1, ini);
+ if (tmp > 0) SafeWrite32(0x51D66C, tmp);
+
  StatsReset();
- SafeWrite8(0x004AEF48, 0xe9);
- HookCall(0x004AEF48, GetCurrentStatHook1);
- SafeWrite8(0x004AF3AF, 0xe9);
- HookCall(0x004AF3AF, GetCurrentStatHook2);
- SafeWrite8(0x004AF56A, 0xe9);
- HookCall(0x004AF56A, SetCurrentStatHook);
- SafeWrite8(0x4AF09C, 0xe9);
- HookCall(0x4AF09C, ApplyApAcBonus);
+
+ MakeCall(0x4AF3AF, &stat_level_hook, true);
+ MakeCall(0x4AF56A, &stat_set_base_hook, true);
+
+ MakeCall(0x4AF09C, &stat_level_hook1, true);
 
  char table[2048];
- GetPrivateProfileString("Misc", "XPTable", "", table, 2048, ini);
- if(strlen(table)>0) {
-  char *ptr=table, *ptr2;
-  DWORD level=0;
-  
-  HookCall(0x434AA7, GetNextLevelXPHook);
-  HookCall(0x439642, GetNextLevelXPHook);
-  HookCall(0x4AFB22, GetNextLevelXPHook);
-  HookCall(0x496C8D, GetLevelXPHook);
-  HookCall(0x4AFC53, GetLevelXPHook);
-
-  while((ptr2=strstr(ptr, ","))&&level<99) {
-   ptr2[0]='\0';
-   xpTable[level++]=atoi(ptr);
-   ptr=ptr2+1;
+ if (GetPrivateProfileStringA("Misc", "XPTable", "", table, 2048, ini) > 0) {
+  DWORD level = 0;
+  char *xpStr = strtok(table, ",");
+  while (xpStr && level < 99) {
+   xpTable[level++] = atoi(xpStr);
+   xpStr = strtok(0, ",");
   }
-  if(level<99&&ptr[0]!='\0') {
-   xpTable[level++]=atoi(ptr);
-  }
-  for(int i=level;i<99;i++) xpTable[i]=-1;
+  for (int i = level; i < 99; i++) xpTable[i] = -1;
   SafeWrite8(0x4AFB1B, (BYTE)(level+1));
+  MakeCall(0x4AF9A8, &statPcMinExpForLevel_hook, true);  
  }
 
- GetPrivateProfileStringA("Misc", "DerivedStats", "", table, 2048, ini);
- if(strlen(table)) {
-  MakeCall(0x4AF6FC, &stat_recalc_derived, true);
+ if (GetPrivateProfileStringA("Misc", "DerivedStats", "", table, 2048, ini) > 0) {
   memset(StatFormulas, 0, sizeof(StatFormulas));
   memset(StatShifts, 0, sizeof(StatShifts));
   memset(StatMulti, 0, sizeof(StatMulti));
 
-  StatFormulas[7*2]=15; //max hp
-  StatMulti[7*7+0]=1;
-  StatMulti[7*7+2]=2;
-  StatFormulas[8*2]=5; //max ap
-  StatMulti[8*7+5]=0.5;
-  StatMulti[9*7+5]=1; //ac
-  StatFormulas[11*2+1]=1; //melee damage
-  StatShifts[11*7+0]=-5;
-  StatMulti[11*7+0]=1;
-  StatFormulas[12*2]=25; //carry weight
-  StatMulti[12*7+0]=25;
-  StatMulti[13*7+1]=2; //sequence
-  StatFormulas[14*2+1]=1; //heal rate
-  StatMulti[14*7+2]=1.0/3.0;
-  StatMulti[15*7+6]=1; //critical chance
-  StatMulti[31*7+2]=2; //rad resist
-  StatMulti[32*7+2]=5; //poison resist
+// STAT_st + STAT_en * 2 + 15
+  StatFormulas[STAT_max_hit_points].base = 15;// max hp
+  StatMulti[STAT_max_hit_points][STAT_st] = 1;
+  StatMulti[STAT_max_hit_points][STAT_en] = 2;
+
+// STAT_ag / 2 + 5
+  StatFormulas[STAT_max_move_points].base = 5;// max ap
+  StatMulti[STAT_max_move_points][STAT_ag] = 0.5;
+
+// STAT_ag
+  StatMulti[STAT_ac][STAT_ag] = 1;          // ac
+
+// STAT_st - 5
+  StatFormulas[STAT_melee_dmg].min = 1;     // melee damage
+  StatShifts[STAT_melee_dmg][STAT_st] = -5;
+  StatMulti[STAT_melee_dmg][STAT_st] = 1;
+
+// STAT_st * 25 + 25
+  StatFormulas[STAT_carry_amt].base = 25;   // carry weight
+  StatMulti[STAT_carry_amt][STAT_st] = 25;
+
+// STAT_pe * 2
+  StatMulti[STAT_sequence][STAT_pe] = 2;    // sequence
+
+// STAT_en / 3
+  StatFormulas[STAT_heal_rate].min = 1;     // heal rate
+  StatMulti[STAT_heal_rate][STAT_en] = 1.0/3.0;
+
+// STAT_lu
+  StatMulti[STAT_crit_chance][STAT_lu] = 1; // critical chance
+
+// STAT_en * 2
+  StatMulti[STAT_rad_resist][STAT_en] = 2;  // rad resist
+
+// STAT_en * 5
+  StatMulti[STAT_poison_resist][STAT_en] = 5;// poison resist
 
   char key[6], buf2[256], buf3[256];
   strcpy(buf3, table);
   sprintf(table, ".\\%s", buf3);
-  for(int i=7;i<=32;i++) {
-   if(i>=17&&i<=30) continue;
-
+  for (int i = STAT_max_hit_points; i <= STAT_max_derived; i++) {
+   if (i >= STAT_dmg_thresh && i <= STAT_dmg_resist_explosion) continue;
    _itoa(i, key, 10);
-   StatFormulas[i*2]=GetPrivateProfileInt(key, "base", StatFormulas[i*2], table);
-   StatFormulas[i*2+1]=GetPrivateProfileInt(key, "min", StatFormulas[i*2+1], table);
-   for(int j=0;j<7;j++) {
+   StatFormulas[i].base = GetPrivateProfileInt(key, "base", StatFormulas[i].base, table);
+   StatFormulas[i].min = GetPrivateProfileInt(key, "min", StatFormulas[i].min, table);
+   for (int j = STAT_st; j <= STAT_lu; j++) {
     sprintf(buf2, "shift%d", j);
-    StatShifts[i*7+j]=GetPrivateProfileInt(key, buf2, StatShifts[i*7+0], table);
+    StatShifts[i][j] = GetPrivateProfileInt(key, buf2, StatShifts[i][j], table);
     sprintf(buf2, "multi%d", j);
-    _gcvt(StatMulti[i*7+j], 16, buf3);
+    _gcvt(StatMulti[i][j], 16, buf3);
     GetPrivateProfileStringA(key, buf2, buf3, buf2, 256, table);
-    StatMulti[i*7+j]=atof(buf2);
+    StatMulti[i][j] = atof(buf2);
    }
   }
+  MakeCall(0x4AF6FC, &stat_recalc_derived_hook, true);
  }
-}
-
-void _stdcall SetPCStatMax(int stat, int i) {
- if(stat<0||stat>=STAT_max_stat) return;
- StatMaximumsPC[stat]=i;
-}
-void _stdcall SetPCStatMin(int stat, int i) {
- if(stat<0||stat>=STAT_max_stat) return;
- StatMinimumsPC[stat]=i;
-}
-void _stdcall SetNPCStatMax(int stat, int i) {
- if(stat<0||stat>=STAT_max_stat) return;
- StatMaximumsNPC[stat]=i;
-}
-void _stdcall SetNPCStatMin(int stat, int i) {
- if(stat<0||stat>=STAT_max_stat) return;
- StatMinimumsNPC[stat]=i;
 }

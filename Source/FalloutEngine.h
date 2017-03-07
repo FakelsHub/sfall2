@@ -465,6 +465,7 @@ extern const DWORD xvfprintf_;
 #define _pip_win                    0x6644C4
 #define _pipboy_message_file        0x664348
 #define _pipmesg                    0x664338
+#define _preload_list_index         0x519640
 #define _procTableStrs              0x51C758
 #define _proto_main_msg_file        0x6647FC
 #define _ptable                     0x59E934
@@ -481,6 +482,7 @@ extern const DWORD xvfprintf_;
 #define _squares                    0x66BE08
 #define _stack                      0x59E86C
 #define _stack_offset               0x59E844
+#define stat_data                   0x51D548
 #define _stat_flag                  0x66452A
 #define _Tag_                       0x5708B0
 #define _tag_skill                  0x668070
@@ -542,5 +544,6 @@ struct sFile {
 };
 
 // WRAPPERS:
-int __stdcall ItemGetType(TGameObj* item);
+int _stdcall ItemGetType(TGameObj* item);
 const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId);
+int _stdcall stat_level(void* critter, int stat);

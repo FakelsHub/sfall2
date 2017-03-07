@@ -1027,7 +1027,7 @@ static void __declspec(naked) SetApAcBonus() {
   call interpretPopLong_
   cmp dx, 0xc001;
   jnz end;
-  mov StandardApAcBonus, ax;
+  mov StandardApAcBonus, eax;
 end:
   pop edx;
   pop ecx;
@@ -1039,7 +1039,7 @@ static void __declspec(naked) GetApAcBonus() {
   push ecx;
   push edx;
   mov ecx, eax;
-  movzx edx, StandardApAcBonus;
+  mov  edx, StandardApAcBonus;
   call interpretPushLong_
   mov eax, ecx;
   mov edx, 0xc001;
@@ -1060,7 +1060,7 @@ static void __declspec(naked) SetApAcEBonus() {
   call interpretPopLong_
   cmp dx, 0xc001;
   jnz end;
-  mov ExtraApAcBonus, ax;
+  mov ExtraApAcBonus, eax;
 end:
   pop edx;
   pop ecx;
@@ -1072,7 +1072,7 @@ static void __declspec(naked) GetApAcEBonus() {
   push ecx;
   push edx;
   mov ecx, eax;
-  movzx edx, ExtraApAcBonus;
+  mov  edx, ExtraApAcBonus;
   call interpretPushLong_
   mov eax, ecx;
   mov edx, 0xc001;
