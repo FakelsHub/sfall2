@@ -24,13 +24,13 @@
 #include "DebugEditor.h"
 #include "graphics.h"
 #include "HookScripts.h"
+#include "Inventory.h"
 #include "Logging.h"
 #include "queue9x.cpp"
 #include "ScriptExtender.h"
 
 typedef HRESULT (_stdcall *DInputCreateProc)(HINSTANCE a, DWORD b, IDirectInputA** c, IUnknown* d);
 
-static bool UseScrollWheel;
 static DWORD WheelMod;
 
 static bool ReverseMouse;
@@ -311,7 +311,6 @@ HRESULT _stdcall FakeDirectInputCreate(HINSTANCE a,DWORD b,IDirectInputA** c,IUn
 
  ReverseMouse=GetPrivateProfileInt("Input", "ReverseMouseButtons", 0, ini)!=0;
 
- UseScrollWheel=GetPrivateProfileInt("Input", "UseScrollWheel", 1, ini)!=0;
  WheelMod=GetPrivateProfileInt("Input", "ScrollMod", 0, ini);
  LONG MouseSpeed=GetPrivateProfileInt("Input", "MouseSensitivity", 100, ini);
  if(MouseSpeed!=100) {

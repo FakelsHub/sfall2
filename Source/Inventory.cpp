@@ -28,6 +28,8 @@
 #include "LoadGameHook.h"
 #include "PartyControl.h"
 
+bool UseScrollWheel = false;
+
 static DWORD InvSizeLimitMode = 0;
 static int InvSizeLimit = 0;
 static DWORD ReloadWeaponKey = 0;
@@ -1202,30 +1204,29 @@ static void __declspec(naked) item_add_mult_hook2() {
 
 static void __declspec(naked) inven_pickup_hook2() {
  __asm {
-  mov  eax, 246                             // x_start
-  mov  ebx, 306                             // x_end
-//  mov  edx, 37                              // y_start
-//  mov  ecx, 137                             // y_end
-  push edi
-  mov  edi, cs:[0x471146]
-  add  edi, 0x47114A
-  call edi                                  // mouse_click_in или процедура из F2_RES
-  pop  edi
+  mov  eax, ds:[_i_wid]
+  call GNW_find_
+  mov  ebx, [eax+0x8+0x0]                   // ebx = _i_wid.rect.x
+  mov  ecx, [eax+0x8+0x4]                   // ecx = _i_wid.rect.y
+  mov  eax, 176
+  add  eax, ebx                             // x_start
+  add  ebx, 176+60                          // x_end
+  mov  edx, 37
+  add  edx, ecx                             // y_start
+  add  ecx, 37+100                          // y_end
+  call mouse_click_in_
   test eax, eax
   jz   end
   mov  edx, ds:[_curr_stack]
   test edx, edx
-  jz   useOnPlayer
-  mov  ecx, 0x47146A
-  jmp  ecx
-useOnPlayer:
+  jnz  end
   cmp  edi, 1006                            // Руки?
-  jge  end                                  // Да
-  mov  edx, [esp+0x18]                      // item
+  jae  skip                                 // Да
+  mov  edx, [esp+0x18+0x4]                  // item
   mov  eax, edx
   call item_get_type_
   cmp  eax, item_type_drug
-  jne  end
+  jne  skip
   mov  eax, ds:[_stack]
   push eax
   push edx
@@ -1250,9 +1251,10 @@ useOnPlayer:
 notUsed:
   mov  eax, 1
   call intface_update_hit_points_
+skip:
+  xor  eax, eax
 end:
-  mov  eax, 0x471481
-  jmp  eax
+  retn
  }
 }
 
@@ -1437,6 +1439,126 @@ end:
  }
 }
 
+static void __declspec(naked) loot_container_hook1() {
+ __asm {
+  cmp  esi, 0x150                           // source_down
+  je   scroll
+  cmp  esi, 0x148                           // source_up
+  jne  end
+scroll:
+  push edx
+  push ecx
+  push ebx
+  mov  eax, ds:[_i_wid]
+  call GNW_find_
+  mov  ebx, [eax+0x8+0x0]                   // ebx = _i_wid.rect.x
+  mov  ecx, [eax+0x8+0x4]                   // ecx = _i_wid.rect.y
+  mov  eax, 297
+  add  eax, ebx                             // x_start
+  add  ebx, 297+64                          // x_end
+  mov  edx, 37
+  add  edx, ecx                             // y_start
+  add  ecx, 37+6*48                         // y_end
+  call mouse_click_in_
+  pop  ebx
+  pop  ecx
+  pop  edx
+  test eax, eax
+  jz   end
+  cmp  esi, 0x150                           // source_down
+  je   targetDown
+  mov  esi, 0x18D                           // target_up
+  jmp  end
+targetDown:
+  mov  esi, 0x191                           // target_down
+end:
+  mov  eax, ds:[_curr_stack]
+  retn
+ }
+}
+
+static void __declspec(naked) barter_inventory_hook() {
+ __asm {
+  push edx
+  push ecx
+  push ebx
+  xchg esi, eax
+  cmp  esi, 0x150                           // source_down
+  je   scroll
+  cmp  esi, 0x148                           // source_up
+  jne  end
+scroll:
+  mov  eax, ds:[_i_wid]
+  call GNW_find_
+  mov  ebx, [eax+0x8+0x0]                   // ebx = _i_wid.rect.x
+  mov  ecx, [eax+0x8+0x4]                   // ecx = _i_wid.rect.y
+  push ebx
+  push ecx
+  mov  eax, 395
+  add  eax, ebx                             // x_start
+  add  ebx, 395+64                          // x_end
+  mov  edx, 35
+  add  edx, ecx                             // y_start
+  add  ecx, 35+3*48                         // y_end
+  call mouse_click_in_
+  pop  ecx
+  pop  ebx
+  test eax, eax
+  jz   notTargetScroll
+  cmp  esi, 0x150                           // source_down
+  je   targetDown
+  mov  esi, 0x18D                           // target_up
+  jmp  end
+targetDown:
+  mov  esi, 0x191                           // target_down
+  jmp  end
+notTargetScroll:
+  push ebx
+  push ecx
+  mov  eax, 250
+  add  eax, ebx                             // x_start
+  add  ebx, 250+64                          // x_end
+  mov  edx, 20
+  add  edx, ecx                             // y_start
+  add  ecx, 20+3*48                         // y_end
+  call mouse_click_in_
+  pop  ecx
+  pop  ebx
+  test eax, eax
+  jz   notTargetBarter
+  cmp  esi, 0x150                           // source_down
+  je   barterTargetDown
+  mov  esi, 0x184                           // target_barter_up
+  jmp  end
+barterTargetDown:
+  mov  esi, 0x176                           // target_barter_down
+  jmp  end
+notTargetBarter:
+  mov  eax, 165
+  add  eax, ebx                             // x_start
+  add  ebx, 165+64                          // x_end
+  mov  edx, 20
+  add  edx, ecx                             // y_start
+  add  ecx, 20+3*48                         // y_end
+  call mouse_click_in_
+  test eax, eax
+  jz   end
+  cmp  esi, 0x150                           // source_down
+  je   barterSourceDown
+  mov  esi, 0x149                           // source_barter_up
+  jmp  end
+barterSourceDown:
+  mov  esi, 0x151                           // source_barter_down
+end:
+  pop  ebx
+  pop  ecx
+  pop  edx
+  mov  eax, esi
+  cmp  eax, 0x11
+  retn
+ }
+}
+
 void InventoryInit() {
  // Теперь STAT_unused при включённом InvSizeLimitMode является STAT_size для заданных персонажей
  MakeCall(0x4AF0CB, &stat_level_hook, true);
@@ -1526,11 +1648,11 @@ void InventoryInit() {
  int i, count;
  memset(armors,0,sizeof(npcArmor)*PartyMax);
  GetPrivateProfileString("Misc", "ArmorFile", "", buf, MAX_PATH, ini);
- if (strlen(buf)>0) {
+ if (strlen(buf) > 0) {
   sprintf(iniArmor, ".\\%s", buf);
   count = GetPrivateProfileIntA("Main", "Count", 0, iniArmor);
   char section[4];
-  for (i=1; i<=count; i++) {
+  for (i = 1; i <= count; i++) {
    _itoa_s(i, section, 10);
    armors[npcCount].Pid = GetPrivateProfileIntA(section, "PID", 0, iniArmor);
    armors[npcCount].Default = GetPrivateProfileIntA(section, "Default", 0, iniArmor);
@@ -1543,7 +1665,7 @@ void InventoryInit() {
    armors[npcCount].Robe = GetPrivateProfileIntA(section, "Robe", 0, iniArmor);
    npcCount++;
   }
-  if (npcCount>0) HookCall(0x472833, &invenWieldFunc_hook);
+  if (npcCount > 0) HookCall(0x472833, &invenWieldFunc_hook);
  }
 
  if (GetPrivateProfileIntA("Misc", "StackEmptyWeapons", 0, ini)) {
@@ -1561,12 +1683,18 @@ void InventoryInit() {
  };
 
 // Использование химии из инвентаря на картинке игрока
- MakeCall(0x471457, &inven_pickup_hook2, true);
+ HookCall(0x471457, &inven_pickup_hook2);
 
 // Кнопка "Положить всё"
  MakeCall(0x46FA7A, &make_drop_button, false);
  MakeCall(0x473EFC, &drop_all_, true);
  GetPrivateProfileString("sfall", "OverloadedDrop", "Sorry, there is no space left.", OverloadedDrop, 48, translationIni);
+
+ UseScrollWheel = GetPrivateProfileIntA("Input", "UseScrollWheel", 1, ini) != 0;
+ if (UseScrollWheel) {
+  MakeCall(0x473E66, &loot_container_hook1, false);
+  MakeCall(0x4759F1, &barter_inventory_hook, false);
+ };
 
 }
 

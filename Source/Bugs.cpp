@@ -436,37 +436,43 @@ static void __declspec(naked) inven_pickup_hook() {
  }
 }
 
-static DWORD inven_pickup_loop = -1;
 static void __declspec(naked) inven_pickup_hook1() {
  __asm {
-  cmp  inven_pickup_loop, -1
-  jne  inLoop
   test eax, eax
-  jnz  startLoop
-  mov  eax, 0x47125C
-  jmp  eax
-startLoop:
+  jz   end
+  mov  eax, ds:[_i_wid]
+  call GNW_find_
+  mov  ecx, [eax+0x8+0x4]                   // ecx = _i_wid.rect.y
+  mov  eax, [eax+0x8+0x0]                   // eax = _i_wid.rect.x
+  add  eax, 44                              // x_start
+  mov  ebx, 64
+  add  ebx, eax                             // x_end
   xor  edx, edx
-  mov  inven_pickup_loop, edx
-nextLoop:
-  mov  ebx, 188                             // x_end
-  add  edx, 35                              // y_start
+next:
+  push eax
+  push edx
+  push ecx
+  push ebx
+  imul edx, edx, 48
+  add  edx, 35
+  add  edx, ecx                             // y_start
   mov  ecx, edx
   add  ecx, 48                              // y_end
-  mov  eax, 0x471140
-  jmp  eax
-inLoop:
+  call mouse_click_in_
+  pop  ebx
+  pop  ecx
+  pop  edx
   test eax, eax
-  mov  eax, inven_pickup_loop
-  jnz  foundRect
-  inc  eax
-  mov  inven_pickup_loop, eax
-  imul edx, eax, 48
-  jmp  nextLoop
-foundRect:
-  mov  inven_pickup_loop, -1
-  mov  edx, [esp+0x40]                      // inventory_offset
-  add  edx, eax
+  pop  eax
+  jnz  found
+  inc  edx
+  cmp  edx, 6
+  jb   next
+end:
+  mov  eax, 0x47125C
+  jmp  eax
+found:
+  add  edx, [esp+0x40]                      // inventory_offset
   mov  eax, ds:[_pud]
   push eax
   mov  eax, [eax]                           // itemsCount
@@ -474,7 +480,7 @@ foundRect:
   jz   skip
   dec  eax
   cmp  edx, eax
-  jle  inRange
+  jbe  inRange
 skip:
   pop  eax
   mov  ebx, 0x4711DF
@@ -726,7 +732,6 @@ static void __declspec(naked) combat_ctd_init_hook() {
   mov  [esi+0x24], eax                      // ctd.targetTile
   mov  eax, [ebx+0x54]                      // pobj.who_hit_me
   inc  eax
-  test eax, eax
   jnz  end
   mov  [ebx+0x54], eax                      // pobj.who_hit_me
 end:
@@ -794,6 +799,23 @@ static void __declspec(naked) use_inventory_on_hook() {
   mov  edx, [eax]                           // Inventory.inv_size
 end:
   retn
+ }
+}
+
+static void __declspec(naked) op_obj_can_see_obj_hook() {
+ __asm {
+  mov  ebx, 0x456BDC
+  mov  eax, [esp+4]                         // source
+  mov  ecx, [eax+0x28]                      // source.elev
+  cmp  ecx, [edx+0x28]                      // target.elev
+  jne  end
+  cmp  dword ptr [eax+0x4], -1              // source.tile_num
+  je   end
+  cmp  dword ptr [edx+0x4], -1              // target.tile_num
+  je   end
+  mov  ebx, 0x456BA2
+end:
+  jmp  ebx
  }
 }
 
@@ -894,9 +916,7 @@ void BugsInit() {
 
 // Исправление ошибки в инвентаре игрока связанной с IFACE_BAR_MODE=1 из f2_res.ini, ну
 // и ошибки обратного порядка
- if (*((DWORD*)0x471140) == 0x00007CB8) {   // костыль для проверки старой версии f2_res
-  MakeCall(0x47114A, &inven_pickup_hook1, true);
- }
+ MakeCall(0x47114A, &inven_pickup_hook1, true);
 
 // Исправление ошибки использования только одной пачки патронов когда оружие находится перед
 // патронами
@@ -967,12 +987,13 @@ void BugsInit() {
  MakeCall(0x471A94, &use_inventory_on_hook, false);
 
 #ifdef TRACE
-// Исправление видимости предмета только в активной руке игрока для critter_inven_obj
+// Исправление видимости предмета только в активной руке игрока для op_critter_inven_obj_
  SafeWrite8(0x458FF6, 0xEB);
  SafeWrite8(0x459023, 0xEB);
 #endif
 
-// Исправление op_obj_can_hear_obj_
+// Исправление op_obj_can_see_obj_ и op_obj_can_hear_obj_
+ MakeCall(0x456B63, &op_obj_can_see_obj_hook, true);
  MakeCall(0x4583D3, &op_obj_can_hear_obj_hook, true);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину

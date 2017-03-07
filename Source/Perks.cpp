@@ -78,7 +78,6 @@ vector<FakePerk> fakeTraits;
 vector<FakePerk> fakePerks;
 vector<FakePerk> fakeSelectablePerks;
 
-extern DWORD GainStatFix;
 static DWORD RemoveTraitID;
 static DWORD RemovePerkID;
 static DWORD RemoveSelectableID;
@@ -90,6 +89,14 @@ static DWORD IgnoringDefaultPerks=0;
 static char PerkBoxTitle[64];
 
 static DWORD PerkFreqOverride;
+
+static const DWORD GainPerksC9[] = {
+ 0x4AF122, 0x4AF184, 0x4AF1C0, 0x4AF217,
+};
+
+static const DWORD GainPerks90[] = {
+ 0x4AF19F, 0x4AF232, 0x4AF24D,
+};
 
 void _stdcall SetPerkFreq(int i) {
  PerkFreqOverride=i;
@@ -568,8 +575,6 @@ skip:
   pop  edx
   test eax, eax
   jnz  end
-  cmp  GainStatFix, eax
-  je   end
   cmp  edx, PERK_gain_strength
   jl   end
   cmp  edx, PERK_gain_luck
@@ -1063,7 +1068,17 @@ void _stdcall SetPerkDesc(int id, char* value) {
  strcpy_s(&Desc[id*1024], 1024, value);
  Perks[id].Desc=&Desc[1024*id];
 }
+
 void PerksInit() {
+
+ for (int i = 0; i < sizeof(GainPerksC9)/4; i++) {
+  SafeWrite8(GainPerksC9[i], 0xC9);         // mov  ecx, ecx
+ }
+
+ for (int i = 0; i < sizeof(GainPerks90)/4; i++) {
+  SafeWrite8(GainPerks90[i], 0x90);         // nop
+ }
+
  HookCall(0x442729, &PerkInitWrapper);
  if(GetPrivateProfileString("Misc", "PerksFile", "", &perksFile[2], 257, ini)) {
   perksFile[0]='.';

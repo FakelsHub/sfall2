@@ -965,7 +965,6 @@ void ScriptExtenderSetup() {
  }
 
  idle = GetPrivateProfileIntA("Misc", "ProcessorIdle", -1, ini);
- modifiedIni=GetPrivateProfileIntA("Main", "ModifiedIni", 0, ini);
 
  dlogr("Adding additional opcodes", DL_SCRIPT);
  if(AllowUnsafeScripting) dlogr("  Unsafe opcodes enabled", DL_SCRIPT);
@@ -1375,7 +1374,6 @@ void LoadGlobalScripts() {
   FindClose(h);
  }
  dlogr("Finished loading global scripts", DL_SCRIPT); 
- //ButtonsReload();
 }
 
 static DWORD _stdcall ScriptHasLoaded(DWORD script) {
@@ -1458,7 +1456,7 @@ static void RunScript(sGlobalScript* script) {
 */
 static void ResetStateAfterFrame() {
  if (tempArrays.size()) {
-   for (std::set<DWORD>::iterator it = tempArrays.begin(); it != tempArrays.end(); ++it) 
+  for (std::set<DWORD>::iterator it = tempArrays.begin(); it != tempArrays.end(); ++it) 
    FreeArray(*it);
   tempArrays.clear();
  }
@@ -1538,15 +1536,15 @@ void LoadGlobals(HANDLE h) {
 }
 
 void SaveGlobals(HANDLE h) {
- DWORD count, unused;
- count=globalVars.size();
- WriteFile(h, &count, 4, &unused, 0);
+ DWORD size;
+ DWORD count = globalVars.size();
+ WriteFile(h, &count, 4, &size, 0);
  sGlobalVar var;
- glob_citr itr=globalVars.begin();
- while(itr!=globalVars.end()) {
-  var.id=itr->first;
-  var.val=itr->second;
-  WriteFile(h, &var, sizeof(sGlobalVar), &unused, 0);
+ glob_citr itr = globalVars.begin();
+ while (itr != globalVars.end()) {
+  var.id = itr->first;
+  var.val = itr->second;
+  WriteFile(h, &var, sizeof(sGlobalVar), &size, 0);
   itr++;
  }
 }

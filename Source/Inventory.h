@@ -18,6 +18,8 @@
 
 #pragma once
 
+extern bool UseScrollWheel;
+
 void _stdcall SetInvenApCost(int a);
 void InventoryInit();
 void InventoryReset();

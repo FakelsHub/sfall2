@@ -24,8 +24,7 @@
 #define DATATYPE_FLOAT (2)
 #define DATATYPE_STR   (3)
 
-struct sGlobalVar 
-{
+struct sGlobalVar {
  __int64 id;
  int val;
 };

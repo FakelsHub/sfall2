@@ -44,25 +44,8 @@
 #define MAX_GLOBAL_SIZE (MaxGlobalVars*12 + 4)
 
 static DWORD InLoop = 0;
-DWORD GainStatFix = 0;
 
 DWORD GetCurrentLoops() {return InLoop;}
-
-static const DWORD GainPerks[] = {
- 0x4AF11F, 0x4AF181, 0x4AF19D, 0x4AF1BD, 0x4AF214, 0x4AF230, 0x4AF24B,
-};
-
-static void ModifyGainXXXPerks() {
- for (int i = 0; i < sizeof(GainPerks)/4; i++) {
-  SafeWrite8(GainPerks[i], 0xEB);           // jmps
- }
-}
-
-static void RestoreGainXXXPerks() {
- for (int i = 0; i < sizeof(GainPerks)/4; i++) {
-  SafeWrite8(GainPerks[i], 0x74);           // jz
- }
-}
 
 static void _stdcall ResetState(DWORD onLoad) {
  if (!onLoad) FileSystemReset();
@@ -74,8 +57,6 @@ static void _stdcall ResetState(DWORD onLoad) {
  Knockback_OnGameLoad();
  Skills_OnGameLoad();
  InLoop=0;
- GainStatFix=0;
- RestoreGainXXXPerks();
  PerksReset();
  InventoryReset();
  RegAnimCombatCheck(1);
@@ -96,13 +77,13 @@ static void _stdcall _SaveGame() {
  dlog_f("Saving game: %s\r\n", DL_MAIN, buf);
 #endif
 
- DWORD unused;
- DWORD unused2 = 0;
+ DWORD size, unused = 0;
  HANDLE h = CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
  if (h != INVALID_HANDLE_VALUE) {
   SaveGlobals(h);
-  WriteFile(h, &unused2, 4, &unused, 0);
-  WriteFile(h, &GainStatFix, 4, &unused, 0);
+  WriteFile(h, &unused, 4, &size, 0);
+  unused++;
+  WriteFile(h, &unused, 4, &size, 0);
   PerksSave(h);
   SaveArrays(h);
   CloseHandle(h);
@@ -195,27 +176,20 @@ static void _stdcall LoadGame2_After() {
  ClearGlobals();
  HANDLE h = CreateFileA(buf, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, 0, 0);
  if (h != INVALID_HANDLE_VALUE) {
-  DWORD size = 0;
-  DWORD unused;
+  DWORD size, unused[2];
   LoadGlobals(h);
-  ReadFile(h, (&unused), 4, &size, 0);
-  ReadFile(h, &GainStatFix, 4, &size, 0);
-  if (!size) GainStatFix = 0;
-  else {
+  ReadFile(h, &unused, 8, &size, 0);
+  if (size == 8) {
    PerksLoad(h);
    LoadArrays(h);
   }
   CloseHandle(h);
  } else {
-  GainStatFix = 0;
   dlogr("Cannot read sfallgv.sav - assuming non-sfall save.", DL_MAIN);
 #ifdef TRACE
   dlog_f("sfallgv.sav: %d\r\n", DL_MAIN, GetLastError());
 #endif
  }
-
- if (GainStatFix) ModifyGainXXXPerks();
- else RestoreGainXXXPerks();
 
  LoadGlobalScripts();
  CritLoad();
@@ -268,14 +242,6 @@ static void NewGame2() {
  dlogr("Starting new game", DL_MAIN);
 
  SetNewCharAppearanceGlobals();
-
- if (GetPrivateProfileInt("Misc", "GainStatPerkFix", 1, ini)) {
-  ModifyGainXXXPerks();
-  GainStatFix = 1;
- } else {
-  RestoreGainXXXPerks();
-  GainStatFix = 0;
- }
 
  if (GetPrivateProfileInt("Misc", "PipBoyAvailableAtGameStart", 0, ini)) {
   SafeWrite8(_gmovie_played_list + 0x3, 1);

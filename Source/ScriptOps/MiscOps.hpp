@@ -1422,20 +1422,21 @@ end:
   retn;
  }
 }
-static DWORD modifiedIni;
+
 static void __declspec(naked) modified_ini() {
  __asm {
-  pushad;
-  mov edx, modifiedIni;
-  mov ebp, eax;
+  push edx
+  push eax
+  xor  edx, edx
   call interpretPushLong_
-  mov eax, ebp;
-  mov edx, 0xc001;
+  pop  eax
+  mov  edx, VAR_TYPE_INT
   call interpretPushShort_
-  popad;
-  retn;
+  pop  edx
+  retn
  }
 }
+
 static void __declspec(naked) force_aimed_shots() {
  __asm {
   push ecx;
