@@ -503,7 +503,6 @@ static void _declspec(naked) combat_add_noncoms_hook() {
  __asm {
   call CombatWrapper_v2
   inc  eax
-  test eax, eax
   jnz  end
   mov  ds:[_list_com], eax
   mov  ecx, [esp+0x4]

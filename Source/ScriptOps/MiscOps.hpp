@@ -491,7 +491,6 @@ end:
 
 static void __declspec(naked) GetActiveHand() {
  __asm {
-  push ebx;
   push ecx;
   push edx;
   mov ecx, eax;
@@ -502,7 +501,6 @@ static void __declspec(naked) GetActiveHand() {
   call interpretPushShort_
   pop edx;
   pop ecx;
-  pop ebx;
   retn;
  }
 }

@@ -518,12 +518,10 @@ static void __declspec(naked) InitHook() {
 }
 
 static void _stdcall set_self2(DWORD script, TGameObj* obj) {
- if (obj) {
-  selfOverrideMap[script] = obj;
- } else {
+ if (obj) selfOverrideMap[script] = obj;
+ else {
   stdext::hash_map<DWORD, TGameObj*>::iterator it = selfOverrideMap.find(script);
-  if (it != selfOverrideMap.end())
-   selfOverrideMap.erase(it);
+  if (it != selfOverrideMap.end()) selfOverrideMap.erase(it);
  }
 }
 
@@ -581,57 +579,45 @@ static void __declspec(naked) register_hook_proc() {
  _OP_END
 }
 
+static void __declspec(naked) sfall_ver() {
+ __asm {
+  call interpretPushLong_
+  pop  eax
+  mov  edx, VAR_TYPE_INT
+  call interpretPushShort_
+  pop  edx
+  retn
+ }
+}
+
 static void __declspec(naked) sfall_ver_major() {
  __asm {
-  push edx;
-  push ecx;
-  mov edx, VERSION_MAJOR;
-  mov eax, ecx;
-  call interpretPushLong_
-  mov eax, ecx;
-  mov edx, 0xc001;
-  call interpretPushShort_
-  pop ecx;
-  pop edx;
-  retn;
+  push edx
+  push eax
+  mov  edx, VERSION_MAJOR
+  jmp  sfall_ver
  }
 }
+
 static void __declspec(naked) sfall_ver_minor() {
  __asm {
-  push edx;
-  push ecx;
-  mov edx, VERSION_MINOR;
-  mov eax, ecx;
-  call interpretPushLong_
-  mov eax, ecx;
-  mov edx, 0xc001;
-  call interpretPushShort_
-  pop ecx;
-  pop edx;
-  retn;
+  push edx
+  push eax
+  mov  edx, VERSION_MINOR
+  jmp  sfall_ver
  }
 }
+
 static void __declspec(naked) sfall_ver_build() {
  __asm {
-  push edx;
-  push ecx;
-  mov edx, VERSION_BUILD;
-  mov eax, ecx;
-  call interpretPushLong_
-  mov eax, ecx;
-  mov edx, 0xc001;
-  call interpretPushShort_
-  pop ecx;
-  pop edx;
-  retn;
+  push edx
+  push eax
+  mov  edx, VERSION_BUILD
+  jmp  sfall_ver
  }
 }
 
-
 //END OF SCRIPT FUNCTIONS
-static const DWORD scr_find_sid_from_program=scr_find_sid_from_program_ + 5;
-static const DWORD scr_ptr=scr_ptr_ + 5;
-static const DWORD scr_find_obj_from_program=scr_find_obj_from_program_ + 7;
 
 DWORD _stdcall FindSidHook2(DWORD script) {
  stdext::hash_map<DWORD, TGameObj*>::iterator overrideIt = selfOverrideMap.find(script);
@@ -682,7 +668,8 @@ end:
   push edx;
   push esi;
   push ebp;
-  jmp scr_find_sid_from_program;
+  mov  ecx, 0x4A3911
+  jmp  ecx
  }
 }
 static void __declspec(naked) ScrPtrHook() {
@@ -697,7 +684,8 @@ end:
   push esi;
   push edi;
   push ebp;
-  jmp scr_ptr;
+  mov  ecx, 0x4A5E39
+  jmp  ecx
  }
 }
 
@@ -1049,7 +1037,7 @@ void ScriptExtenderSetup() {
  opcodes[0x16d]=funcSetShaderInt;
  opcodes[0x16e]=funcSetShaderFloat;
  opcodes[0x16f]=funcSetShaderVector;
- opcodes[0x170]=funcInWorldMap;
+ opcodes[0x170]=in_world_map;
  opcodes[0x171]=ForceEncounter;
  opcodes[0x172]=SetWorldMapPos;
  opcodes[0x173]=GetWorldMapXPos;
@@ -1102,7 +1090,7 @@ void ScriptExtenderSetup() {
  opcodes[0x1ac]=GetIniSetting;
  opcodes[0x1ad]=funcGetShaderVersion;
  opcodes[0x1ae]=funcSetShaderMode;
- opcodes[0x1af]=GetGameMode;
+ opcodes[0x1af]=get_game_mode;
  opcodes[0x1b0]=funcForceGraphicsRefresh;
  opcodes[0x1b1]=funcGetShaderTexture;
  opcodes[0x1b2]=funcSetShaderTexture;

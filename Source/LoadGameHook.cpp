@@ -46,8 +46,7 @@
 static DWORD InLoop = 0;
 DWORD GainStatFix = 0;
 
-DWORD InWorldMap() { return (InLoop&WORLDMAP)?1:0; }
-DWORD GetCurrentLoops() { return InLoop; }
+DWORD GetCurrentLoops() {return InLoop;}
 
 static const DWORD GainPerks[] = {
  0x4AF11F, 0x4AF181, 0x4AF19D, 0x4AF1BD, 0x4AF214, 0x4AF230, 0x4AF24B,

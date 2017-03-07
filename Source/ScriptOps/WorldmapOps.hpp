@@ -23,6 +23,7 @@
 #include "ScriptExtender.h"
 
 static DWORD EncounteredHorrigan;
+
 static void _stdcall ForceEncounter4() {
  *(DWORD*)0x00672E04=EncounteredHorrigan;
  SafeWrite32(0x004C070E, 0x95);
@@ -31,6 +32,7 @@ static void _stdcall ForceEncounter4() {
  SafeWrite32(0x004C071D, 0xFFFC2413);
  SafeWrite8(0x4C0706, 0x75);
 }
+
 static void __declspec(naked) ForceEncounter3() {
  __asm {
   push eax;
@@ -48,6 +50,7 @@ static void __declspec(naked) ForceEncounter3() {
   retn;
  }
 }
+
 static void _stdcall ForceEncounter2(DWORD mapID, DWORD flags) {
  EncounteredHorrigan=*(DWORD*)0x00672E04;
  SafeWrite32(0x004C070E, mapID);
@@ -56,6 +59,7 @@ static void _stdcall ForceEncounter2(DWORD mapID, DWORD flags) {
  SafeWrite32(0x004C071D, ((DWORD)&ForceEncounter3) - 0x004C0721);
  if(flags&1) SafeWrite8(0x4C0706, 0xeb);
 }
+
 static void __declspec(naked) ForceEncounter() {
  __asm {
   push ebx;
@@ -78,6 +82,7 @@ end:
   retn;
  }
 }
+
 static void __declspec(naked) ForceEncounterWithFlags() {
  __asm {
   pushad
@@ -106,42 +111,43 @@ end:
 }
 
 // world_map_functions
-static void __declspec(naked) funcInWorldMap() {
+static void __declspec(naked) in_world_map() {
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-  push esi;
-  mov esi, eax;
-  call InWorldMap;
-  mov edx, eax;
-  mov eax, esi;
+  push edx
+  push eax
+  call GetCurrentLoops
+  xor  edx, edx
+  test eax, 0x1
+  jz   skip
+  inc  edx
+skip:
+  pop  eax
+  push eax
   call interpretPushLong_
-  mov edx, 0xc001;
-  mov eax, esi;
+  mov  edx, VAR_TYPE_INT
+  pop  eax
   call interpretPushShort_
-  pop esi;
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  pop  edx
+  retn
  }
 }
-static void __declspec(naked) GetGameMode() {
+
+static void __declspec(naked) get_game_mode() {
  __asm {
-  pushad;
-  mov edi, eax;
-  call GetCurrentLoops;
-  mov edx, eax;
-  mov eax, edi;
+  push edx
+  xchg edx, eax
+  call GetCurrentLoops
+  xchg edx, eax
+  push eax
   call interpretPushLong_
-  mov edx, 0xc001;
-  mov eax, edi;
+  mov  edx, VAR_TYPE_INT
+  pop  eax
   call interpretPushShort_
-  popad;
-  retn;
+  pop  edx
+  retn
  }
 }
+
 static void __declspec(naked) GetWorldMapXPos() {
  __asm {
   push ebx;
@@ -159,6 +165,7 @@ static void __declspec(naked) GetWorldMapXPos() {
   retn;
  }
 }
+
 static void __declspec(naked) GetWorldMapYPos() {
  __asm {
   push ebx;
@@ -176,6 +183,7 @@ static void __declspec(naked) GetWorldMapYPos() {
   retn;
  }
 }
+
 static void __declspec(naked) SetWorldMapPos() {
  __asm {
   push ebx;

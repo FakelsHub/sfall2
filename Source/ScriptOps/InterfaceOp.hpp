@@ -26,21 +26,19 @@
 // input_functions
 static void __declspec(naked) InputFuncsAvailable() {
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-  mov ecx, eax;
-  mov edx, 1; //They're always available from 2.9 on
+  push edx
+  push eax
+  xor  edx, edx
+  inc  edx                                  // They're always available from 2.9 on
   call interpretPushLong_
-  mov edx, 0xc001;
-  mov eax, ecx;
+  mov  edx, VAR_TYPE_INT
+  pop  eax
   call interpretPushShort_
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  pop  edx
+  retn
  }
 }
+
 static void __declspec(naked) KeyPressed() {
  __asm {
   push ebx;
@@ -200,20 +198,6 @@ static void __declspec(naked) get_screen_height() {
    retn;
    }
 }
-
-/*//Stop game, the same effect as open charsscreen or inventory
-static void __declspec(naked) stop_game() {
- __asm {
-  jmp  map_disable_bk_processes_
- }
-}
-
-//Resume the game when it is stopped
-static void __declspec(naked) resume_game() {
- __asm {
-  jmp  map_enable_bk_processes_
- }
-}*/
 
 //Create a message window with given string
 static void __declspec(naked) create_message_window() {

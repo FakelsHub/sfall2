@@ -373,14 +373,3 @@ const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId) {
  }
  return result;
 }
-
-const char* _stdcall MsgSearch(int msgno, DWORD file) {
- if (!file) return 0;
- sMessage msg = {msgno, 0, 0, 0};
- __asm {
-  lea  edx, msg
-  mov  eax, file
-  call message_search_
- }
- return msg.message;
-}

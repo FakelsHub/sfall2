@@ -81,9 +81,3 @@ char* _stdcall mysubstr(char* str, int pos, int length);
 // variables
 static char reg_anim_combat_check = 1;
 extern DWORD isGlobalScriptLoading;
-
-// types for script variables
-#define VAR_TYPE_INT (0xC001)
-#define VAR_TYPE_FLOAT (0xA001)
-#define VAR_TYPE_STR (0x9801)
-#define VAR_TYPE_STR2 (0x9001)

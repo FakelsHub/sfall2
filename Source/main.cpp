@@ -1884,14 +1884,10 @@ static void DllMain2() {
  SimplePatch<BYTE>(addrs, 2, "Misc", "DialogPanelAnimDelay", 33, 0, 255);
 
 // Минимальный возраст игрока
- for (int i = 0; i < sizeof(AgeMin)/4; i++) {
-  SafeWrite8(AgeMin[i], 8);
- }
+ for (int i = 0; i < sizeof(AgeMin)/4; i++) SafeWrite8(AgeMin[i], 8);
 
 // Максимальный возраст игрока
- for (int i = 0; i < sizeof(AgeMax)/4; i++) {
-  SafeWrite8(AgeMax[i], 60);
- }
+ for (int i = 0; i < sizeof(AgeMax)/4; i++) SafeWrite8(AgeMax[i], 60);
 
  windowName[64] = 0;
  if (GetPrivateProfileString("Misc", "WindowName", "", windowName, 64, ini)) {
@@ -1901,9 +1897,7 @@ static void DllMain2() {
  }
 
 // Уменьшение дистанции переключения на ходьбу при клике на предмет
- for (int i = 0; i < sizeof(WalkDistance)/4; i++) {
-  SafeWrite8(WalkDistance[i], 1);
- }
+ for (int i = 0; i < sizeof(WalkDistance)/4; i++) SafeWrite8(WalkDistance[i], 1);
 
 // fix "Pressing A to enter combat before anything else happens, thus getting infinite free running"
  if (GetPrivateProfileIntA("Misc", "FakeCombatFix", 0, ini)) {
@@ -1936,9 +1930,7 @@ static void DllMain2() {
   MakeCall(0x47B984, &SaveGame_hook, true);
  }
 
- if (GetPrivateProfileIntA("Misc", "DontTurnOffSneakIfYouRun", 0, ini)) {
-  SafeWrite8(0x418135, 0xEB);
- }
+ if (GetPrivateProfileIntA("Misc", "DontTurnOffSneakIfYouRun", 0, ini)) SafeWrite8(0x418135, 0xEB);
 
 // Показывать в окне настроек сопартийца в поле "Здоровье" в скобках уровень
  GetPrivateProfileString("sfall", "LvlMsg", "Lvl", LvlMsg, 6, translationIni);
@@ -2003,9 +1995,7 @@ static void DllMain2() {
  }
 
  tmp = GetPrivateProfileIntA("Misc", "CarryWeightLimit", -1, ini);
- if (tmp > 0) {
-  SafeWrite32(0x51D66C, tmp);
- }
+ if (tmp > 0) SafeWrite32(0x51D66C, tmp);
 
  dlogr("Leave DllMain2", DL_MAIN);
 }

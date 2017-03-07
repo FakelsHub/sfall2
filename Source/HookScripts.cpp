@@ -1227,16 +1227,21 @@ static void _declspec(naked) invenUnwieldFunc_hook() {
   hookbegin(4)
   pushad
   mov  args[0], eax                         // source
-  mov  args[8], edx                         // slot
   test edx, edx                             // INVEN_TYPE_RIGHT_HAND?
   jnz  skip                                 // Да
   inc  edx
-  inc  edx
-  mov  args[8], edx                         // INVEN_TYPE_LEFT_HAND
-  dec  edx
+  inc  edx                                  // INVEN_TYPE_LEFT_HAND
 skip:
+  mov  args[8], edx                         // slot
   dec  edx
-  mov  args[4], edx                         // item
+  jz   rightHand
+  dec  edx
+  call inven_left_hand_
+  jmp  saveItem
+rightHand:
+  call inven_right_hand_
+saveItem:
+  mov  args[4], eax                         // item
   mov  args[12], edx                        // unwield flag
   push HOOK_INVENWIELD
   call RunHookScript

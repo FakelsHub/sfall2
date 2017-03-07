@@ -1,6 +1,7 @@
 #include <set>
 #include <algorithm>
 #include "Arrays.h"
+#include "Define.h"
 #include "ScriptExtender.h"
 
 /*

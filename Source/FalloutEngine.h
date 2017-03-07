@@ -544,4 +544,3 @@ struct sFile {
 // WRAPPERS:
 int __stdcall ItemGetType(TGameObj* item);
 const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId);
-const char* _stdcall MsgSearch(int msgno, DWORD file);

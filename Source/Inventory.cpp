@@ -141,6 +141,25 @@ static void __declspec(naked) stat_level_hook() {
   je   end
   cmp  esi, STAT_unused
   jne  skip
+  mov  edx, InvSizeLimitMode
+  dec  edx
+  jz   PlayerOnly
+  dec  edx
+  jz   PartyAndPlayer
+  dec  edx
+  jz   run                                  // Все персонажи
+  jmp  skip
+PartyAndPlayer:
+  push eax
+  mov  eax, ebx
+  call isPartyMember_
+  test eax, eax                             // Собутыльник?
+  pop  eax
+  jnz  run                                  // Да
+PlayerOnly:
+  cmp  ebx, edi                             // source == _obj_dude?
+  jne  skip
+run:
   xchg edx, eax                             // edx = bonus
   mov  eax, InvSizeLimit
   cmp  edx, eax                             // bonus == InvSizeLimit?
@@ -242,10 +261,8 @@ static void __declspec(naked) item_add_mult_hook1() {
   mov  edi, 0x4772A6
   mov  eax, ecx
   call obj_top_environment_
-  push eax
   mov  edx, eax
   call critter_max_size
-  pop  edx
   inc  eax
   jz   end
   dec  eax
@@ -332,7 +349,6 @@ end:
  }
 }
 
-//static char InvenFmt[20]="W: %d/%d  S: %d/%d";
 static char InvenFmt[20]="%d/%d  %d/%d";
 static void __declspec(naked) display_stats_hook() {
  __asm {
@@ -398,7 +414,7 @@ nextChar:
   inc  eax
   add  edx, eax
   inc  edi
-  cmp  word ptr [edi], '  '
+  cmp  word ptr [edi-1], '  '
   jne  nextChar
   mov  ebx, 150                             // TxtWidth
   mov  ecx, 499                             // ToWidth
@@ -447,31 +463,25 @@ end:
  }
 }
 
-static const char* _stdcall FmtSizeMsg(int size) {
- if (size == 1) {
-  const char* tmp = MsgSearch(543, _proto_main_msg_file);
-  if (!tmp) strcpy(MsgBuf, "It occupies 1 unit.");
-  else sprintf(MsgBuf, tmp, size);
- } else {
-  const char* tmp = MsgSearch(542, _proto_main_msg_file);
-  if (!tmp) sprintf(MsgBuf, "It occupies %d units.", size);
-  else sprintf(MsgBuf, tmp, size);
- }
- return MsgBuf;
-}
-
+static char ItemSizeMsg[32];
 static void __declspec(naked) inven_obj_examine_func_hook() {
  __asm {
-  call inven_display_msg_
-  push edx
-  push ecx
-  mov  eax, esi
+  xchg esi, eax
   call item_size_
+  test eax, eax
+  jz   end
+  push eax                                  // Размер вещи
+  mov  eax, offset ItemSizeMsg
   push eax
-  call FmtSizeMsg
-  pop  ecx
-  pop  edx
-  jmp  inven_display_msg_
+  mov  edx, offset MsgBuf
+  push edx
+  call sprintf_
+  add  esp, 3*4
+  xchg edx, eax
+  call inven_display_msg_
+end:
+  xchg esi, eax
+  jmp  text_font_
  }
 }
 
@@ -1464,7 +1474,8 @@ void InventoryInit() {
    HookCall(0x449136, &gdControlUpdateInfo_hook);
 
    //Display item weight when examening
-   HookCall(0x472FFE, &inven_obj_examine_func_hook);
+   GetPrivateProfileString("sfall", "ItemSizeMsg", "It occupies %d unit(s).", ItemSizeMsg, 32, translationIni);
+   HookCall(0x473007, &inven_obj_examine_func_hook);
   }
  } else InvSizeLimitMode = 0;
 

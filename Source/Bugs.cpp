@@ -436,7 +436,7 @@ static void __declspec(naked) inven_pickup_hook() {
  }
 }
 
-static DWORD inven_pickup_loop=-1;
+static DWORD inven_pickup_loop = -1;
 static void __declspec(naked) inven_pickup_hook1() {
  __asm {
   cmp  inven_pickup_loop, -1
@@ -953,9 +953,11 @@ void BugsInit() {
 // Исправление краша при клике по пустому месту в инвентаре при курсорном использовании предмета из рюкзака
  MakeCall(0x471A94, &use_inventory_on_hook, false);
 
-// Исправление видимости только активного предмета в руке игрока
+#ifdef TRACE
+// Исправление видимости предмета только в активной руке игрока для critter_inven_obj
  SafeWrite8(0x458FF6, 0xEB);
  SafeWrite8(0x459023, 0xEB);
+#endif
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook);
