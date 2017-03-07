@@ -26,13 +26,14 @@
 #include "input.h"
 #include "Inventory.h"
 #include "LoadGameHook.h"
+#include "PartyControl.h"
 
-static DWORD mode;
-static DWORD MaxItemSize;
+static DWORD InvSizeLimitMode = 0;
+static int InvSizeLimit = 0;
 static DWORD ReloadWeaponKey = 0;
 
-static const int PartyMax=15;
-static int npcCount=0;
+static const int PartyMax = 15;
+static int npcCount = 0;
 static char iniArmor[MAX_PATH];
 
 struct npcArmor {
@@ -48,358 +49,429 @@ struct npcArmor {
 };
 
 static npcArmor armors[PartyMax];
+static char MsgBuf[32];
 
-static const char* MsgSearch(int msgno, DWORD file) {
- if(!file) return 0;
- sMessage msg = { msgno, 0, 0, 0 };
+static void __declspec(naked) critter_max_size() {
  __asm {
-  lea edx, msg;
-  mov eax, file;
-  call message_search_
- }
- return msg.message;
-}
-
-/*static DWORD _stdcall item_total_size(void* critter) {
- //TODO: Don't really want to be overwriting stuff like this after init. Rewrite properly.
- HookCall(0x477EBD, (void*)0x477B68);
- HookCall(0x477EF6, (void*)0x477B68);
- HookCall(0x477F12, (void*)0x477B68);
- HookCall(0x477F2A, (void*)0x477B68);
-
- DWORD result;
- __asm {
-  mov eax, critter;
-  call item_total_weight_
-  mov result, eax;
- }
-
- HookCall(0x477EBD, (void*)0x477B88);
- HookCall(0x477EF6, (void*)0x477B88);
- HookCall(0x477F12, (void*)0x477B88);
- HookCall(0x477F2A, (void*)0x477B88);
-
- return result;
-}*/
-
-//TODO: Do we actually want to include this in the limit anyway?
-static __declspec(naked) DWORD item_total_size(void* critter) {
- __asm {
-  push    ebx;
-  push    ecx;
-  push    edx;
-  push    esi;
-  push    edi;
-  push    ebp;
-  mov     ebp, eax;
-  test    eax, eax;
-  jz      loc_477F33;
-  lea     edi, [eax+2Ch];
-  xor     edx, edx;
-  mov     ebx, [edi];
-  xor     esi, esi;
-  test    ebx, ebx;
-  jle     loc_477ED3;
-  xor     ebx, ebx;
-loc_477EB7:
-  mov     ecx, [edi+8];
-  mov     eax, [ecx+ebx];
-  call    item_size_
-  imul    eax, [ecx+ebx+4];
-  add     ebx, 8;
-  inc     edx;
-  mov     ecx, [edi];
-  add     esi, eax;
-  cmp     edx, ecx;
-  jl      loc_477EB7;
-loc_477ED3:
-  mov     eax, [ebp+20h];
-  and     eax, 0F000000h;
-  sar     eax, 18h;
-  cmp     eax, 1;
-  jnz     loc_477F31;
-  mov     eax, ebp;
-  call    inven_right_hand_
-  mov     edx, eax;
-  test    eax, eax;
-  jz      loc_477EFD;
-  test    byte ptr [eax+27h], 2;
-  jnz     loc_477EFD;
-  call    item_size_
-  add     esi, eax;
-loc_477EFD:
-  mov     eax, ebp;
-  call    inven_left_hand_
-  test    eax, eax;
-  jz      loc_477F19;
-  cmp     edx, eax;
-  jz      loc_477F19;
-  test    byte ptr [eax+27h], 1;
-  jnz     loc_477F19;
-  call    item_size_
-  add     esi, eax;
-loc_477F19:
-  mov     eax, ebp;
-  call    inven_worn_
-  test    eax, eax;
-  jz      loc_477F31;
-  test    byte ptr [eax+27h], 4;
-  jnz     loc_477F31;
-  call    item_size_
-  add     esi, eax;
-loc_477F31:
-  mov     eax, esi;
-loc_477F33:
-  pop     ebp;
-  pop     edi;
-  pop     esi;
-  pop     edx;
-  pop     ecx;
-  pop     ebx;
-  retn;
- }
-}
-
-/*static const DWORD ObjPickupFail=0x49B70D;
-static const DWORD ObjPickupEnd=0x49B6F8;
-static const DWORD size_limit;
-static __declspec(naked) void  ObjPickupHook() {
- __asm {
-  cmp edi, ds:[_obj_dude]
-  jnz end;
-end:
-  lea edx, [esp+0x10];
-  mov eax, ecx;
-  jmp ObjPickupEnd;
- }
-}*/
-
-static __declspec(naked) int CritterCheck() {
- __asm {
-  push ebx;
-  push edx;
-  sub esp, 4;
-  mov ebx, eax;
-
-  cmp eax, ds:[_obj_dude]
-  je single;
-  test mode, 3;
-  jnz run;
-  test mode, 2;
-  jz fail;
+  push edx
+  mov  edx, InvSizeLimitMode
+  dec  edx
+  jz   PlayerOnly
+  dec  edx
+  jz   PartyAndPlayer
+  dec  edx
+  jz   run                                  // Все персонажи
+fail:
+  xor  eax, eax
+  dec  eax
+  jmp  end
+PartyAndPlayer:
+  push eax
   call isPartyMember_
-  test eax, eax;
-  jz end;
+  test eax, eax                             // Собутыльник?
+  pop  eax
+  jnz  run                                  // Да
+PlayerOnly:
+  cmp  eax, ds:[_obj_dude]
+  jne  fail
 run:
-  test mode, 8;
-  jz single;
-  mov edx, esp;
-  mov eax, ebx;
-  call proto_ptr_
-  mov eax, [esp];
-  mov eax, [eax + 0xB0 + 40]; //The unused stat in the extra block
-  jmp end;
-single:
-  mov eax, MaxItemSize;
-  jmp end;
-fail:
-  xor eax, eax;
+  mov  edx, STAT_unused
+  call stat_level_
 end:
-  add esp, 4;
-  pop edx;
-  pop ebx;
-  retn;
+  pop  edx
+  retn
  }
 }
 
-static const DWORD IsOverloadedEnd=0x42E68D;
-static __declspec(naked) void CritterIsOverloadedHook() {
+static void __declspec(naked) critter_curr_size() {
  __asm {
-  and eax, 0xff;
-  jnz end;
-  mov eax, ebx;
-  call CritterCheck;
-  test eax, eax;
-  jz end;
-  xchg eax, ebx;
-  call item_total_size;
-  cmp eax, ebx;
-  setg al;
-  and eax, 0xff;
-end:
-  jmp IsOverloadedEnd;
- }
-}
-
-static const DWORD ItemAddMultiRet=0x4772A6;
-static const DWORD ItemAddMultiFail=0x4771C7;
-static __declspec(naked) void ItemAddMultiHook1() {
- __asm {
-  push ebp;
-  mov eax, ecx;
-  call CritterCheck;
-  test eax, eax;
-  jz end;
-  mov ebp, eax;
-  mov eax, esi;
+  push esi
+  push edi
+  push edx
+  mov  edi, eax
+  call item_c_curr_size_
+  xchg esi, eax
+  mov  eax, [edi+0x20]                      // pobj.fid
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  cmp  eax, ObjType_Critter
+  jne  end
+  mov  eax, edi
+  call inven_right_hand_
+  mov  edx, eax
+  test eax, eax
+  jz   noRightItem
+  test byte ptr [eax+0x27], 2               // iobj.flags4 & Right_Hand_?
+  jnz  noRightItem
   call item_size_
-  mov edx, eax;
-  imul edx, ebx;
-  mov eax, ecx;
-  call item_total_size;
-  add edx, eax;
-  cmp edx, ebp;
-  jle end;
-  mov eax, -6; //TODO: Switch this to a lower number, and add custom error messages.
-  pop ebp;
-  jmp ItemAddMultiFail;
+  add  esi, eax
+noRightItem:
+  mov  eax, edi
+  call inven_left_hand_
+  test eax, eax
+  jz   noLeftItem
+  cmp  edx, eax
+  je   noLeftItem
+  test byte ptr [eax+0x27], 1               // iobj.flags4 & Left_Hand_?
+  jnz  noLeftItem
+  call item_size_
+  add  esi, eax
+noLeftItem:
+  xchg edi, eax
+  call inven_worn_
+  test eax, eax
+  jz   end
+  test byte ptr [eax+0x27], 4               // iobj.flags4 & Worn_?
+  jnz  end
+  call item_size_
+  add  esi, eax
 end:
-  pop ebp;
-  jmp ItemAddMultiRet;
+  xchg esi, eax
+  pop  edx
+  pop  edi
+  pop  esi
+  retn
  }
 }
 
-static __declspec(naked) void ItemAddMultiHook2() {
+static void __declspec(naked) stat_level_hook() {
  __asm {
-  cmp eax, edi;
-  jl fail;
-  jmp ItemAddMultiHook1;
-fail:
-  mov eax, -6;
-  jmp ItemAddMultiFail;
- }
-}
-
-static const DWORD BarterAttemptTransactionHook1Fail=0x474C81;
-static const DWORD BarterAttemptTransactionHook1End=0x474CA8;
-static __declspec(naked) void BarterAttemptTransactionHook1() {
- __asm {
-  cmp eax, edx;
-  jg fail;
-  mov eax, edi;
-  call CritterCheck;
-  test eax, eax;
-  jz end;
-  mov edx, eax;
-  mov eax, edi;
-  call item_total_size;
-  sub edx, eax;
-  mov eax, ebp;
-  call item_total_size;
-  cmp eax, edx;
-  jle end;
-fail:
-  mov esi, 0x1f;
-  jmp BarterAttemptTransactionHook1Fail;
+  mov  edx, 0x4AF0D0
+  cmp  esi, STAT_max_move_points
+  je   end
+  cmp  esi, STAT_unused
+  jne  skip
+  xchg edx, eax                             // edx = bonus
+  mov  eax, InvSizeLimit
+  cmp  edx, eax                             // bonus == InvSizeLimit?
+  je   skip                                 // Да
+  push ebx
+  push eax
+  sub  ecx, edx                             // Вычитаем старый бонус
+  add  ecx, eax                             // Добавляем новый бонус
+  xchg ebx, eax                             // eax = source, ebx = InvSizeLimit
+  mov  edx, esi
+  call stat_set_bonus_
+  pop  eax
+  pop  ebx
+skip:
+  mov  edx, 0x4AF0FC
 end:
-  jmp BarterAttemptTransactionHook1End;
+  jmp  edx
  }
 }
 
-static const DWORD BarterAttemptTransactionHook2Fail=0x474CD8;
-static const DWORD BarterAttemptTransactionHook2End=0x474D01;
-static __declspec(naked) void BarterAttemptTransactionHook2() {
+static void __declspec(naked) op_set_critter_stat_hook() {
  __asm {
-  cmp eax, edx;
-  jg fail;
-  mov eax, ebx;
-  call CritterCheck;
-  test eax, eax;
-  jz end;
-  mov edx, eax;
-  mov eax, ebx;
-  call item_total_size;
-  sub edx, eax;
-  mov eax, esi;
-  call item_total_size;
-  cmp eax, edx;
-  jle end;
-fail:
-  mov ecx, 0x20;
-  jmp BarterAttemptTransactionHook2Fail;
+  cmp  dword ptr [esp+4+4], STAT_unused
+  jne  end
+  pop  ebx                                  // Уничтожаем адрес возврата
+  mov  ebx, 0x455D8A
+  push ebx
 end:
-  jmp BarterAttemptTransactionHook2End;
+  mov  ebx, 3
+  retn
  }
 }
 
-static char SizeStr[16];
-static char InvenFmt[32];
-static const char* InvenFmt1="%s %d/%d  %s %d/%d";
-static const char* InvenFmt2="%s %d/%d";
-
-static const char* _stdcall GetInvenMsg() {
- const char* tmp=MsgSearch(35, _inventry_message_file);
- if(!tmp) return "S:";
- else return tmp;
-}
-
-static void _stdcall strcpy_wrapper(char* buf, const char* str) {
- strcpy(buf, str);
-}
-
-static const DWORD DisplayStatsEnd=0x4725E5;
-static __declspec(naked) void DisplayStatsHook() {
+static void __declspec(naked) stat_set_base_hook() {
  __asm {
-  call CritterCheck;
-  jz nolimit;
-  push eax;
-  mov eax, ds:[_stack];
-  push ecx;
-  push InvenFmt1;
-  push offset InvenFmt;
-  call strcpy_wrapper;
-  pop ecx;
-  mov eax, ds:[_stack];
-  call item_total_size;
-  push eax;
-  push ecx;
-  call GetInvenMsg;
-  pop ecx;
-  push eax;
-  jmp end;
-nolimit:
-  push ecx;
-  push InvenFmt2;
-  push offset InvenFmt;
-  call strcpy_wrapper;
-  pop ecx;
-  push eax;
-  push eax;
-  push eax;
+  cmp  ecx, STAT_unused
+  jne  end
+  pop  eax                                  // Уничтожаем адрес возврата
+  mov  eax, 0x4AF559
+  push eax
 end:
-  mov eax, ds:[_stack];
-  mov edx, 0xc;
-  jmp DisplayStatsEnd;
+  xor  eax, eax
+  dec  eax
+  retn
  }
 }
 
-static char SizeMsgBuf[32];
+static void __declspec(naked) critterIsOverloaded_hook() {
+ __asm {
+  call item_total_weight_
+  cmp  edx, eax                             // максимальный вес < общего веса?
+  jl   end                                  // Да
+  mov  eax, ebx                             // source
+  call critter_max_size
+  inc  eax
+  jz   end
+  dec  eax
+  xchg edx, eax                             // edx = макс.размер
+  mov  eax, ebx                             // source
+  call critter_curr_size
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) item_add_mult_hook() {
+ __asm {
+  mov  edi, 0x4772A6
+  mov  eax, ecx
+  call critter_max_size
+  inc  eax
+  jz   end
+  dec  eax
+  cmp  Looting, 0
+  je   skip
+  sub  eax, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
+skip:
+  push eax                                  // макс.размер
+  mov  eax, esi
+  call item_size_
+  xchg edx, eax
+  imul edx, ebx                             // edx = размер вещи * количество
+  mov  eax, ecx
+  call critter_curr_size
+  add  eax, edx
+  pop  edx
+  cmp  eax, edx                             // общий размер <= макс.размера?
+  jle  end                                  // Да
+  mov  edi, 0x4771C2                        // С вещами на выход
+end:
+  jmp  edi
+ }
+}
+
+static void __declspec(naked) item_add_mult_hook1() {
+ __asm {
+  cmp  eax, edi                             // максимальный вес < общего веса?
+  jl   skip                                 // Да
+  mov  edi, 0x4772A6
+  mov  eax, ecx
+  call obj_top_environment_
+  push eax
+  mov  edx, eax
+  call critter_max_size
+  pop  edx
+  inc  eax
+  jz   end
+  dec  eax
+  push eax                                  // макс.размер
+  push edx                                  // source
+  mov  eax, esi                             // item
+  call item_size_
+  xchg edx, eax
+  imul edx, ebx                             // edx = размер вещи * количество
+  pop  eax                                  // source
+  call critter_curr_size
+  add  eax, edx
+  pop  edx
+  cmp  eax, edx                             // общий размер <= макс.размера?
+  jle  end                                  // Да
+skip:
+  mov  edi, 0x4771C2                        // С вещами на выход
+end:
+  jmp  edi
+ }
+}
+
+static void __declspec(naked) barter_attempt_transaction_peon() {
+ __asm {
+  call item_total_weight_
+  cmp  eax, edx                             // добавляемый вес > свободного веса?
+  jg   end                                  // Да
+  mov  eax, edi                             // source
+  call critter_max_size
+  inc  eax
+  jz   end
+  dec  eax
+  xchg edx, eax
+  mov  eax, edi                             // source
+  call critter_curr_size
+  sub  edx, eax
+  mov  eax, ecx                             // _barterer_table_obj
+  call critter_curr_size
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) barter_attempt_transaction_barterer() {
+ __asm {
+  call item_total_weight_
+  cmp  eax, edx                             // добавляемый вес > свободного веса?
+  jg   end                                  // Да
+  mov  eax, ebx                             // source
+  call critter_max_size
+  inc  eax
+  jz   end
+  dec  eax
+  sub  eax, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
+  xchg edx, eax
+  mov  eax, ebx                             // source
+  call critter_curr_size
+  sub  edx, eax
+  mov  eax, esi                             // _peon_table_obj
+  call critter_curr_size
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) loot_container_hook() {
+ __asm {
+  call item_total_weight_
+  cmp  eax, edx                             // добавляемый вес > свободного веса?
+  jg   end                                  // Да
+  mov  eax, [esp+0x134+4]                   // source
+  call critter_max_size
+  inc  eax
+  jz   end
+  dec  eax
+  xchg edx, eax
+  mov  eax, [esp+0x134+4]                   // source
+  call critter_curr_size
+  sub  edx, eax
+  mov  eax, ebp
+  call critter_curr_size
+end:
+  retn
+ }
+}
+
+//static char InvenFmt[20]="W: %d/%d  S: %d/%d";
+static char InvenFmt[20]="%d/%d  %d/%d";
+static void __declspec(naked) display_stats_hook() {
+ __asm {
+  mov  eax, ds:[_stack]
+  mov  edi, eax
+  call critter_max_size
+  inc  eax
+  jz   end
+  dec  eax
+  push eax                                  // макс.размер
+  mov  eax, edi                             // source
+  call critter_curr_size
+  xchg edx, eax                             // edx = размер вещей
+  xor  eax, eax
+  cmp  IsControllingNPC, eax                // Контролируемый персонаж?
+  je   noHiddenSize                         // Нет
+  mov  eax, HiddenArmor
+  test eax, eax                             // У него есть броня?
+  jz   noHiddenSize                         // Нет
+  call item_size_
+noHiddenSize:
+  add  eax, edx
+  push eax                                  // общий размер
+  mov  edx, STAT_carry_amt
+  mov  eax, edi                             // source
+  call stat_level_
+  push eax                                  // Макс.груз
+  mov  eax, edi                             // source
+  call item_total_weight_
+  xchg edx, eax                             // edx = вес вещей
+  xor  eax, eax
+  cmp  IsControllingNPC, eax                // Контролируемый персонаж?
+  je   noHiddenWeight                       // Нет
+  mov  eax, HiddenArmor
+  test eax, eax                             // У него есть броня?
+  jz   noHiddenWeight                       // Нет
+  call item_weight_
+noHiddenWeight:
+  add  eax, edx
+  push eax                                  // общий вес
+  mov  eax, offset InvenFmt
+  push eax
+  mov  eax, offset MsgBuf
+  push eax
+  call sprintf_
+  add  esp, 6*4
+  movzx ebx, byte ptr ds:[_GreenColor]
+  mov  eax, edi                             // source
+  call critterIsOverloaded_
+  test eax, eax
+  jz   noRed
+  mov  bl, ds:[_RedColor]
+noRed:
+  pop  edi                                  // Уничтожаем адрес возврата
+  push ebx                                  // ColorIndex
+  mov  edi, offset MsgBuf
+  push edi
+  xor  edx, edx
+nextChar:
+  xor  eax, eax
+  mov  al, [edi]
+  call dword ptr ds:[_text_char_width]
+  inc  eax
+  add  edx, eax
+  inc  edi
+  cmp  word ptr [edi], '  '
+  jne  nextChar
+  mov  ebx, 150                             // TxtWidth
+  mov  ecx, 499                             // ToWidth
+  lea  eax, [esi+ebp+75]                    // ToSurface
+  sub  eax, edx
+  pop  edx                                  // DisplayText
+  mov  edi, 0x472677
+  jmp  edi
+end:
+  mov  edi, 20
+  retn
+ }
+}
+
+static void __declspec(naked) gdControlUpdateInfo_hook() {
+ __asm {
+  push eax                                  // _dialog_target
+  call stat_level_
+  xchg ecx, eax                             // ecx = Carry Weight|Макс. груз
+  pop  eax
+  push eax
+  call critter_max_size
+  xchg edi, eax                             // edi = макс.размер
+  pop  eax
+  inc  edi
+  jz   end
+  dec  edi
+  push edi                                  // макс.размер
+  call critter_curr_size
+  push eax                                  // общий размер
+  push ecx                                  // Макс. груз
+  push ebx                                  // Общий вес
+  mov  eax, offset InvenFmt
+  push eax
+  lea  eax, [esp+0xC+12]
+  push eax
+  call sprintf_
+  add  esp, 6*4
+  pop  edx                                  // Уничтожаем адрес возврата
+  mov  edx, 0x449151
+  push edx
+  xor  edx, edx
+end:
+  xchg ecx, eax
+  retn
+ }
+}
+
 static const char* _stdcall FmtSizeMsg(int size) {
- if(size==1) {
-  const char* tmp=MsgSearch(543, _proto_main_msg_file);
-  if(!tmp) strcpy(SizeMsgBuf, "It occupies 1 unit.");
-  else sprintf(SizeMsgBuf, tmp, size);
+ if (size == 1) {
+  const char* tmp = MsgSearch(543, _proto_main_msg_file);
+  if (!tmp) strcpy(MsgBuf, "It occupies 1 unit.");
+  else sprintf(MsgBuf, tmp, size);
  } else {
-  const char* tmp=MsgSearch(542, _proto_main_msg_file);
-  if(!tmp) sprintf(SizeMsgBuf, "It occupies %d units.", size);
-  else sprintf(SizeMsgBuf, tmp, size);
+  const char* tmp = MsgSearch(542, _proto_main_msg_file);
+  if (!tmp) sprintf(MsgBuf, "It occupies %d units.", size);
+  else sprintf(MsgBuf, tmp, size);
  }
- return SizeMsgBuf;
+ return MsgBuf;
 }
 
-static __declspec(naked) void InvenObjExamineFuncHook() {
+static void __declspec(naked) inven_obj_examine_func_hook() {
  __asm {
   call inven_display_msg_
-  push edx;
-  push ecx;
-  mov eax, esi;
+  push edx
+  push ecx
+  mov  eax, esi
   call item_size_
-  push eax;
-  call FmtSizeMsg;
-  pop ecx;
-  pop edx;
-  call inven_display_msg_
-  retn;
+  push eax
+  call FmtSizeMsg
+  pop  ecx
+  pop  edx
+  jmp  inven_display_msg_
  }
 }
 
@@ -441,13 +513,14 @@ static void __declspec(naked) handle_inventory_hook() {
  }
 }
 
-// adds check for weapons which require more than 1 ammo for single shot (super cattle prod & mega power fist)
+// adds check for weapons which require more than 1 ammo for single shot (super cattle prod & mega power fist), or burst
 static void __declspec(naked) combat_check_bad_shot_hook() {
  __asm {
   push edx
   push ebx
-  sub  esp, 4
   call item_w_cur_ammo_
+  cmp  esi, ds:[_obj_dude]
+  jne  end
   xchg ebx, eax                             // ebx = current ammo
   mov  eax, ecx                             // weapon
   mov  edx, edi                             // hit_mode
@@ -456,46 +529,27 @@ static void __declspec(naked) combat_check_bad_shot_hook() {
   je   itsBurst
   cmp  eax, ANIM_fire_continuous
   je   itsBurst
+  sub  esp, 4
   xor  eax, eax
   inc  eax
+  mov  [esp], eax
+  mov  eax, ecx                             // weapon
+  mov  edx, esp
+  call item_w_compute_ammo_cost_
+  mov  eax, [esp]
+  add  esp, 4
   jmp  skip
 itsBurst:
   mov  eax, ecx                             // weapon
   call item_w_rounds_
 skip:
-  mov  [esp], eax
-  mov  eax, ecx                             // weapon
-  mov  edx, esp
-  push 1                                    // hook type
-  call AmmoCostHookWrapper
-  add  esp, 4
-  xor  edx, edx
-  mov  eax, [esp]
-  cmp  eax, ebx
-  ja   end                                  // this will force "Out of ammo"
-  inc  edx                                  // this will force success
-end:
   xchg edx, eax
-  add  esp, 4
+  xor  eax, eax
+  cmp  edx, ebx
+  ja   end                                  // this will force "Out of ammo"
+  inc  eax                                  // this will force success
+end:
   pop  ebx
-  pop  edx
-  retn
- }
-}
-
-static void __declspec(naked) compute_spray_hook() {
- __asm {
-  push edx
-  sub  esp, 4
-  call item_w_rounds_
-  mov  [esp], eax
-  xchg edx, eax                             // eax = weapon
-  mov  edx, esp                             // *rounds
-  push 2                                    // hook type
-  call AmmoCostHookWrapper
-  add  esp, 4
-  mov  eax, [esp]                           // rounds in burst
-  add  esp, 4
   pop  edx
   retn
  }
@@ -837,9 +891,9 @@ static void __declspec(naked) fontHeight() {
  }
 }
 
-static void __declspec(naked) printFreeMaxWeight() {
+static void __declspec(naked) printFreeMaxWeightSize() {
  __asm {
-// ebx = source, ecx = ToWidth, edi = posOffset, esi = extraWeight
+// ebx = source, ecx = ToWidth, edi = posOffset, esi = extraWeight, ebp = extraSize
   mov  eax, ds:[_curr_font_num]
   push eax
   mov  eax, 101
@@ -855,10 +909,55 @@ static void __declspec(naked) printFreeMaxWeight() {
   cmp  eax, ObjType_Critter                 // Это ObjType_Critter?
   jne  noWeight                             // Нет
   mov  eax, ebx
-  call item_total_weight_                   // eax = общий вес груза
-  xchg ebx, eax                             // ebx = общий вес груза, eax = кто
   mov  edx, STAT_carry_amt
   call stat_level_                          // eax = макс. вес груза
+  xchg ebx, eax                             // ebx = макс. вес груза, eax = source
+  push eax
+  call critter_max_size
+  xchg edx, eax                             // edx = макс. размер груза
+  pop  eax
+  inc  edx
+  jnz  WeightAndSize
+  call item_total_weight_                   // eax = общий вес груза
+  jmp  printFree
+WeightAndSize:
+  dec  edx
+  sub  edx, ebp                             // edx = макс. размер груза - extraSize
+  push eax
+  call critter_curr_size
+  sub  edx, eax                             // edx = свободный размер
+  pop  eax
+  push edx
+  call item_total_weight_                   // eax = общий вес груза
+  sub  ebx, esi
+  sub  ebx, eax                             // eax = свободный вес
+  push ebx
+  push 0x503180                             // '%d/%d'
+  mov  esi, offset MsgBuf
+  push esi
+  call sprintf_
+  add  esp, 4*4
+  movzx eax, byte ptr ds:[_GreenColor]
+  cmp  ebx, 0
+  jl   Red
+  cmp  dword ptr [esp-4], 0
+  jge  noRed
+Red:
+  mov  al, ds:[_RedColor]
+noRed:
+  push eax
+  push esi
+  xor  edx, edx
+nextChar:
+  movzx eax, byte ptr [esi]
+  call ds:[_text_char_width]
+  inc  eax
+  add  edx, eax
+  inc  esi
+  cmp  byte ptr [esi-1], '/'
+  jne  nextChar
+  sub  edi, edx
+  pop  edx                                  // DisplayText
   jmp  print
 itsItem:
   mov  eax, ebx
@@ -866,47 +965,36 @@ itsItem:
   cmp  eax, item_type_container             // Это item_type_container?
   jne  noWeight                             // Нет
   mov  eax, ebx
+  call item_c_max_size_                     // eax = макс. размер груза
+  xchg ebx, eax                             // ebx = макс. размер груза, eax = source
   call item_c_curr_size_
-  xchg ebx, eax
-  call item_c_max_size_
-print:
-  push eax                                  // eax = макс. вес/объём груза
-  add  ebx, esi
-  sub  eax, ebx                             // eax = свободный вес/размер
-  push eax
-  xchg ebx, eax
-  push 0x503180                             // '%d/%d'
-  lea  eax, SizeMsgBuf
-  push eax
+printFree:
+  sub  ebx, esi
+  sub  ebx, eax                             // ebx = свободный вес/размер
+  push ebx
+  push 0x503190                             // '%d'
+  mov  edx, offset MsgBuf
+  push edx
   call sprintf_
-  add  esp, 0x10
+  add  esp, 3*4
   movzx eax, byte ptr ds:[_GreenColor]
   cmp  ebx, 0
-  jge  noRed
+  jge  skipColor
   mov  al, ds:[_RedColor]
-noRed:
+skipColor:
   push eax
-  lea  esi, SizeMsgBuf
-  push esi
-  xor  edx, edx
-nextChar:
-  xor  eax, eax
-  mov  al, [esi]
-  call dword ptr ds:[_text_char_width]
+  mov  eax, edx
+  call ds:[_text_width]
+  shr  eax, 1
   inc  eax
-  add  edx, eax
-  inc  esi
-  cmp  byte ptr [esi-1], '/'
-  jne  nextChar
-  sub  edi, edx
+  sub  edi, eax
+print:
   xchg edi, eax                             // ToSurface+posOffset (Ypos*ToWidth+Xpos)
   mov  ebx, 64                              // TxtWidth
-  pop  edx                                  // DisplayText
-  call dword ptr ds:[_text_to_buf]
+  call ds:[_text_to_buf]
 noWeight:
   pop  eax
-  call text_font_
-  retn
+  jmp  text_font_
  }
 }
 
@@ -924,7 +1012,8 @@ static void __declspec(naked) display_inventory_hook() {
   mov  ecx, 537
   mov  edi, 325*537+180+32                  // Xpos=180, Ypos=325, max text width/2=32
   xor  esi, esi
-  call printFreeMaxWeight
+  xor  ebp, ebp
+  call printFreeMaxWeightSize
   popad
   mov  ecx, 0x4700C5
   jmp  ecx
@@ -945,7 +1034,8 @@ static void __declspec(naked) display_target_inventory_hook() {
   mov  ecx, 537
   mov  edi, 325*537+301+32                  // Xpos=301, Ypos=325, max text width/2=32
   mov  esi, WeightOnBody                    // Учитываем вес одетой на цели брони и оружия
-  call printFreeMaxWeight
+  mov  ebp, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
+  call printFreeMaxWeightSize
   popad
   mov  eax, 0x470468
   jmp  eax
@@ -971,12 +1061,16 @@ static void __declspec(naked) display_table_inventories_hook1() {
   add  esp, 0x18
   pushad
   mov  eax, ds:[_btable]
+  push eax
   call item_total_weight_                   // eax = вес вещей цели в окне бартера
   xchg esi, eax
+  pop  eax
+  call critter_curr_size                    // eax = размер вещей цели в окне бартера
+  xchg ebp, eax
   mov  ebx, ds:[_stack]
   mov  ecx, 480
   mov  edi, 10*480+169+32                   // Xpos=169, Ypos=10, max text width/2=32
-  call printFreeMaxWeight
+  call printFreeMaxWeightSize
   popad
   mov  eax, 0x47548C
   jmp  eax
@@ -1003,13 +1097,18 @@ static void __declspec(naked) display_table_inventories_hook3() {
 #endif
   pushad
   mov  eax, ds:[_ptable]
+  push eax
   call item_total_weight_                   // eax = вес вещей игрока в окне бартера
   xchg esi, eax
   add  esi, WeightOnBody                    // Учитываем вес одетой на цели брони и оружия
+  pop  eax
+  call critter_curr_size
+  add  eax, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
+  xchg ebp, eax
   mov  ebx, ds:[_target_stack]
   mov  ecx, 480
   mov  edi, 10*480+254+32                   // Xpos=254, Ypos=10, max text width/2=32
-  call printFreeMaxWeight
+  call printFreeMaxWeightSize
   popad
 #ifndef TRACE
 end:
@@ -1084,7 +1183,7 @@ static void __declspec(naked) inven_action_cursor_hook() {
  }
 }
 
-static void __declspec(naked) item_add_mult_hook() {
+static void __declspec(naked) item_add_mult_hook2() {
  __asm {
   call SetDefaultAmmo
   jmp  item_add_force_
@@ -1255,6 +1354,20 @@ dropKey:
   sub  edx, eax
   mov  eax, ecx
   call item_total_weight_
+  cmp  eax, edx
+  jg   compareSizeWeight
+  mov  eax, ebp
+  call critter_max_size
+  inc  eax
+  jz   cont
+  dec  eax
+  xchg edx, eax
+  sub  edx, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
+  mov  eax, ebp                             // source
+  call critter_curr_size
+  sub  edx, eax
+  mov  eax, ecx
+  call critter_curr_size
   jmp  compareSizeWeight
 itsItem:
   mov  eax, ebp
@@ -1272,6 +1385,7 @@ itsItem:
 compareSizeWeight:
   cmp  eax, edx
   jg   cantDrop
+cont:
   mov  eax, 0x503E14                        // 'ib1p1xx1'
   call gsound_play_sfx_file_
   mov  edx, ebp
@@ -1314,48 +1428,57 @@ end:
 }
 
 void InventoryInit() {
- mode=GetPrivateProfileInt("Misc", "CritterInvSizeLimitMode", 0, ini);
- invenapcost = GetPrivateProfileInt("Misc", "InventoryApCost", 4, ini);
- invenapqpreduction = GetPrivateProfileInt("Misc", "QuickPocketsApCostReduction", 2, ini);
- MakeCall(0x46E80B, &handle_inventory_hook, true);
- if(mode>7) mode=0;
- if(mode>=4) {
-  mode-=4;
-  SafeWrite8(0x477EB3, 0xeb);
- }
- if(mode) {
-  MaxItemSize=GetPrivateProfileInt("Misc", "CritterInvSizeLimit", 100, ini);
+ // Теперь STAT_unused при включённом InvSizeLimitMode является STAT_size для заданных персонажей
+ MakeCall(0x4AF0CB, &stat_level_hook, true);
+ // Чтобы можно было менять STAT_unused не только у игрока
+ MakeCall(0x455D65, &op_set_critter_stat_hook, false);
+ // Чтобы можно было менять STAT_unused
+ MakeCall(0x4AF54E, &stat_set_base_hook, false);
 
-  //Check item_add_multi (picking stuff from the floor, etc.)
-  HookCall(0x4771BD, &ItemAddMultiHook1);
-  MakeCall(0x47726D, &ItemAddMultiHook2, true);
-  MakeCall(0x42E688, &CritterIsOverloadedHook, true);
+ InvSizeLimitMode = GetPrivateProfileInt("Misc", "CritterInvSizeLimitMode", 0, ini);
+ if (InvSizeLimitMode >= 1 && InvSizeLimitMode <= 7) {
+  if (InvSizeLimitMode >= 4) {
+   InvSizeLimitMode -= 4;
+   SafeWrite8(0x477EB3, 0xEB);
+  }
+  if (InvSizeLimitMode) {
+   InvSizeLimit = GetPrivateProfileInt("Misc", "CritterInvSizeLimit", 100, ini);
 
-  //Check capacity of player and barteree when bartering
-  MakeCall(0x474C78, &BarterAttemptTransactionHook1, true);
-  MakeCall(0x474CCF, &BarterAttemptTransactionHook2, true);
+   HookCall(0x42E67E, &critterIsOverloaded_hook);
 
-  //Display total weight on the inventory screen
-  SafeWrite32(0x4725FF, (DWORD)&InvenFmt);
-  MakeCall(0x4725E0, &DisplayStatsHook, true);
-  SafeWrite8(0x47260F, 0x20);
-  SafeWrite32(0x4725F9, 0x9c+0xc);
-  SafeWrite8(0x472606, 0x10+0xc);
-  SafeWrite32(0x472632, 150);
-  SafeWrite8(0x472638, 0);
+   //Check item_add_mult_ (picking stuff from the floor, etc.)
+   HookCall(0x4771BD, &item_add_mult_hook);
+   MakeCall(0x47726D, &item_add_mult_hook1, true);
 
-  //Display item weight when examening
-  HookCall(0x472FFE, &InvenObjExamineFuncHook);
- }
+   //Check capacity of player and barteree when bartering
+   HookCall(0x474C73, &barter_attempt_transaction_peon);
+   HookCall(0x474CCA, &barter_attempt_transaction_barterer);
+
+   // Кнопка "Take all"
+   HookCall(0x47410B, &loot_container_hook);
+
+   //Display total weight on the inventory screen
+   MakeCall(0x4725A2, &display_stats_hook, false);
+
+   // Показывать в окне настроек сопартийца в поле "Несёт" размеры
+   HookCall(0x449136, &gdControlUpdateInfo_hook);
+
+   //Display item weight when examening
+   HookCall(0x472FFE, &inven_obj_examine_func_hook);
+  }
+ } else InvSizeLimitMode = 0;
 
  if (GetPrivateProfileInt("Misc", "SuperStimExploitFix", 0, ini)) {
   GetPrivateProfileString("sfall", "SuperStimExploitMsg", "You cannot use a super stim on someone who is not injured!", SuperStimMsg, 128, translationIni);
   MakeCall(0x49C3DE, &protinst_use_item_on_hook, false);
  }
 
+ invenapcost = GetPrivateProfileInt("Misc", "InventoryApCost", 4, ini);
+ invenapqpreduction = GetPrivateProfileInt("Misc", "QuickPocketsApCostReduction", 2, ini);
+ MakeCall(0x46E80B, &handle_inventory_hook, true);
+
  if (GetPrivateProfileInt("Misc", "CheckWeaponAmmoCost", 0, ini)) {
   HookCall(0x4266E9, &combat_check_bad_shot_hook);
-  HookCall(0x4234AE, &compute_spray_hook);
  }
 
  ReloadWeaponKey = GetPrivateProfileIntA("Input", "ReloadWeaponKey", 0, ini);
@@ -1369,7 +1492,7 @@ void InventoryInit() {
  MakeCall(0x4494F5, &ControlWeapon_hook, true);
  HookCall(0x449570, &ControlArmor_hook);
 
- if (!mode && GetPrivateProfileInt("Misc", "FreeWeight", 0, ini)) {
+ if (GetPrivateProfileInt("Misc", "FreeWeight", 0, ini)) {
   MakeCall(0x47002D, &display_inventory_hook, true);
   MakeCall(0x4703E9, &display_target_inventory_hook, true);
 
@@ -1414,7 +1537,7 @@ void InventoryInit() {
 
  if (GetPrivateProfileIntA("Misc", "StackEmptyWeapons", 0, ini)) {
   MakeCall(0x4736C6, &inven_action_cursor_hook, true);
-  HookCall(0x4772AA, &item_add_mult_hook);
+  HookCall(0x4772AA, &item_add_mult_hook2);
  }
 
 // Не вызывать окошко выбора количества при перетаскивании патронов в оружие

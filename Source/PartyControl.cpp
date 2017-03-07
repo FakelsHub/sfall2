@@ -24,7 +24,7 @@
 #include "PartyControl.h"
 
 DWORD IsControllingNPC = 0;
-static DWORD HiddenArmor = 0;
+DWORD HiddenArmor = 0;
 
 static DWORD Mode;
 static std::vector<WORD> Chars;

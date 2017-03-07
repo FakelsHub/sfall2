@@ -164,7 +164,7 @@ roll:
   mov  eax, rets[0]
 end:
   hookend
-  mov  ebx, eax
+  xchg ebx, eax
   cmp  ebx, ROLL_FAILURE
   retn
  }
@@ -579,7 +579,7 @@ static void __declspec(naked) item_remove_mult_hook() {
   push ebp
   sub  esp, 0xC
   mov  ecx, 0x477497
-  jmp  ecx
+  jmp  ecx                                  // item_remove_mult_
  }
 }
 
@@ -793,17 +793,18 @@ end:
  }
 }
 
-static void __declspec(naked) AmmoCostHook_internal() {
+static void __declspec(naked) item_w_compute_ammo_cost_hook() {
  __asm {
+  hookbegin(4)
   push offset return
   push ebx
   push esi
   push edi
   mov  args[0], eax                         // weapon
   test edx, edx
-  jz   fail
+  jz   skip
   mov  ebx, [edx]
-fail:
+skip:
   mov  args[4], ebx                         // rounds in attack
   mov  ebx, 0x4790B1
   jmp  ebx
@@ -811,44 +812,72 @@ return:
   cmp  eax, -1
   je   end
   pushad
-  mov  ebx, [edx]
-  mov  args[8], ebx                         // rounds as computed by game
+  mov  args[12], eax                        // type of hook (0)
+  mov  eax, [edx]
+  mov  args[8], eax                         // rounds as computed by game
   push HOOK_AMMOCOST
   call RunHookScript
   popad
   cmp  cRet, eax
   je   end
-  push eax
   mov  eax, rets[0]
   mov  [edx], eax                           // override result
-  pop  eax
+  xor  eax, eax
 end:
   hookend
   retn
  }
 }
 
-static void __declspec(naked) item_w_compute_ammo_cost_hook() {
+static void __declspec(naked) item_w_rounds_hook() {
  __asm {
   hookbegin(4)
-  mov  args[12], 0                          // type of hook
-  jmp  AmmoCostHook_internal
+  push offset return
+  push edx
+  sub  esp, 4
+  mov  args[0], eax                         // weapon
+  xor  edx, edx
+  inc  edx
+  mov  args[4], edx                         // rounds in attack
+  inc  edx
+  mov  args[12], edx                        // type of hook (2)
+  test eax, eax
+  mov  edx, 0x478D86
+  jmp  edx
+return:
+  cmp  eax, -1
+  je   end
+  pushad
+  mov  args[8], eax                         // rounds as computed by game
+  push HOOK_AMMOCOST
+  call RunHookScript
+  popad
+  cmp  cRet, 0
+  je   end
+  mov  eax, rets[0]                         // override result
+end:
+  hookend
+  retn
  }
 }
 
-void __declspec(naked) AmmoCostHookWrapper() {
+// Заглушка для отключения повторного вызова HOOK_AMMOCOST если это стрельба очередью
+static void __declspec(naked) item_w_compute_ammo_cost_call() {
  __asm {
-  hookbegin(4)
-  push eax
-  mov  eax, [esp+8]                         // hook type
-  mov  args[12], eax
-  pop  eax
-  jmp  AmmoCostHook_internal
+  mov  eax, [esp+0x1C+4]                    // animation
+  cmp  eax, ANIM_fire_burst
+  je   end
+  cmp  eax, ANIM_fire_continuous
+  je   end
+  mov  eax, [esi+0x8]                       // ctd.weapon
+  jmp  item_w_compute_ammo_cost_
+end:
+  xor  eax, eax                             // можно обойтись и без этого
+  retn
  }
 }
 
-void _stdcall KeyPressHook( DWORD dxKey, bool pressed, DWORD vKey )
-{
+void _stdcall KeyPressHook( DWORD dxKey, bool pressed, DWORD vKey ) {
  BeginHook();
  ArgCount = 3;
  args[0] = (DWORD)pressed;
@@ -1122,6 +1151,35 @@ end:
 
 static void _declspec(naked) invenWieldFunc_hook() {
  __asm {
+  pushad
+  xchg esi, eax                             // esi = source
+  mov  eax, edx                             // eax = item
+  call item_get_type_
+  test eax, eax                             // item_type_armor?
+  mov  eax, esi
+  jnz  notArmor                             // Нет
+  mov  ebx, 0x4000000                       // Worn
+  call inven_worn_
+  jmp  UnwieldOld
+notArmor:
+  test ebx, ebx
+  jz   leftHand
+  mov  ebx, 0x2000000                       // Right_Hand
+  call inven_right_hand_
+  jmp  UnwieldOld
+leftHand:
+  mov  ebx, 0x1000000                       // Left_Hand
+  call inven_left_hand_
+UnwieldOld:
+  test eax, eax                             // Есть броня/вещь в руке?
+  jz   skipUnwield                          // Нет
+  xchg edx, eax                             // edx = снимаемая броня/вещь в руке
+  xchg esi, eax                             // eax = source
+  call correctFidForRemovedItem_
+  test eax, eax                             // Удачно сняли?
+skipUnwield:
+  popad
+  jnz  skipWield                            // Нет
   hookbegin(4)
   pushad
   mov  args[0], eax                         // source
@@ -1159,6 +1217,7 @@ end:
   dec  eax
 return:
   hookend
+skipWield:
   retn
  }
 }
@@ -1378,6 +1437,8 @@ static void HookScriptInit2() {
 
  LoadHookScript("ammocost", HOOK_AMMOCOST);
  MakeCall(0x4790AC, &item_w_compute_ammo_cost_hook, true);
+ MakeCall(0x478D80, &item_w_rounds_hook, true);
+ HookCall(0x423A7C, &item_w_compute_ammo_cost_call);
 
  LoadHookScript("keypress", HOOK_KEYPRESS);
  LoadHookScript("mouseclick", HOOK_MOUSECLICK);

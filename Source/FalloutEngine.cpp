@@ -58,6 +58,7 @@ const DWORD critter_kill_count_type_ = 0x42D920;
 const DWORD critter_name_ = 0x42D0A8;
 const DWORD critter_pc_set_name_ = 0x42D138;
 const DWORD critterClearObjDrugs_ = 0x42DA54;
+const DWORD critterIsOverloaded_ = 0x42E66C;
 const DWORD db_dir_entry_ = 0x4C5D68;
 const DWORD db_fclose_ = 0x4C5EB4;
 const DWORD db_fgetc_ = 0x4C5F24;
@@ -155,6 +156,7 @@ const DWORD item_total_cost_ = 0x477DAC;
 const DWORD item_total_weight_ = 0x477E98;
 const DWORD item_w_anim_code_ = 0x478DA8;
 const DWORD item_w_anim_weap_ = 0x47860C;
+const DWORD item_w_compute_ammo_cost_ = 0x4790AC;
 const DWORD item_w_cur_ammo_ = 0x4786A0;
 const DWORD item_w_dam_div_ = 0x479294;
 const DWORD item_w_dam_mult_ = 0x479230;
@@ -165,6 +167,7 @@ const DWORD item_w_max_ammo_ = 0x478674;
 const DWORD item_w_range_ = 0x478A1C;
 const DWORD item_w_rounds_ = 0x478D80;
 const DWORD item_w_try_reload_ = 0x478768;
+const DWORD item_w_unload_ = 0x478F80;
 const DWORD item_weight_ = 0x477B88;
 const DWORD light_get_tile_ = 0x47A980;
 const DWORD ListDrvdStats_ = 0x43527C;
@@ -217,6 +220,7 @@ const DWORD obj_scroll_blocking_at_ = 0x48BB44;
 const DWORD obj_set_light_ = 0x48AC90;
 const DWORD obj_shoot_blocking_at_ = 0x48B930;
 const DWORD obj_sight_blocking_at_ = 0x48BB88;
+const DWORD obj_top_environment_ = 0x48B304;
 const DWORD obj_use_book_ = 0x49B9F0;
 const DWORD obj_use_power_on_car_ = 0x49BDE8;
 const DWORD OptionWindow_ = 0x437C08;
@@ -302,6 +306,7 @@ const DWORD stat_level_ = 0x4AEF48;
 const DWORD stat_pc_add_experience_ = 0x4AFAA8;
 const DWORD stat_pc_get_ = 0x4AF8FC;
 const DWORD stat_pc_set_ = 0x4AF910;
+const DWORD stat_set_bonus_ = 0x4AF63C;
 const DWORD strncpy_ = 0x4F014F;
 const DWORD talk_to_translucent_trans_buf_to_buf_ = 0x44AC68;
 const DWORD text_font_ = 0x4D58DC;
@@ -367,4 +372,15 @@ const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId) {
   mov  result, eax
  }
  return result;
+}
+
+const char* _stdcall MsgSearch(int msgno, DWORD file) {
+ if (!file) return 0;
+ sMessage msg = {msgno, 0, 0, 0};
+ __asm {
+  lea  edx, msg
+  mov  eax, file
+  call message_search_
+ }
+ return msg.message;
 }

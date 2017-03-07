@@ -5,6 +5,8 @@
 #include "FalloutEngine.h"
 
 DWORD WeightOnBody = 0;
+DWORD SizeOnBody = 0;
+DWORD Looting = 0;
 
 static void __declspec(naked) determine_to_hit_func_hook() {
  __asm {
@@ -323,23 +325,36 @@ noWeapon:
 static void __declspec(naked) loot_container_hook() {
  __asm {
   mov  eax, [esp+0x114+0x4]
+  mov  SizeOnBody, eax
   test eax, eax
   jz   noLeftWeapon
+  push eax
+  call item_size_
+  mov  SizeOnBody, eax
+  pop  eax
   call item_weight_
 noLeftWeapon:
   mov  WeightOnBody, eax
   mov  eax, [esp+0x118+0x4]
   test eax, eax
   jz   noRightWeapon
+  push eax
+  call item_size_
+  add  SizeOnBody, eax
+  pop  eax
   call item_weight_
-noRightWeapon:
   add  WeightOnBody, eax
+noRightWeapon:
   mov  eax, [esp+0x11C+0x4]
   test eax, eax
   jz   noArmor
+  push eax
+  call item_size_
+  add  SizeOnBody, eax
+  pop  eax
   call item_weight_
-noArmor:
   add  WeightOnBody, eax
+noArmor:
   xor  eax, eax
   inc  eax
   inc  eax
@@ -350,8 +365,13 @@ noArmor:
 static void __declspec(naked) barter_inventory_hook() {
  __asm {
   mov  eax, [esp+0x20+0x4]
+  mov  SizeOnBody, eax
   test eax, eax
   jz   noArmor
+  push eax
+  call item_size_
+  mov  SizeOnBody, eax
+  pop  eax
   call item_weight_
 noArmor:
   mov  WeightOnBody, eax
@@ -364,6 +384,10 @@ noArmor:
   test eax, eax
   jz   end
 haveWeapon:
+  push eax
+  call item_size_
+  add  SizeOnBody, eax
+  pop  eax
   call item_weight_
   add  WeightOnBody, eax
 end:
@@ -380,7 +404,6 @@ static void __declspec(naked) barter_attempt_transaction_hook() {
  }
 }
 
-static DWORD Looting = 0;
 static void __declspec(naked) move_inventory_hook() {
  __asm {
   inc  Looting

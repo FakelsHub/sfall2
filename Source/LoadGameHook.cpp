@@ -43,8 +43,8 @@
 
 #define MAX_GLOBAL_SIZE (MaxGlobalVars*12 + 4)
 
-static DWORD InLoop=0;
-DWORD GainStatFix=0;
+static DWORD InLoop = 0;
+DWORD GainStatFix = 0;
 
 DWORD InWorldMap() { return (InLoop&WORLDMAP)?1:0; }
 DWORD InCombat()   { return (InLoop&COMBAT)?1:0;   }
@@ -67,7 +67,7 @@ static void RestoreGainXXXPerks() {
 }
 
 static void _stdcall ResetState(DWORD onLoad) {
- if(!onLoad) FileSystemReset();
+ if (!onLoad) FileSystemReset();
  ClearGlobalScripts();
  ClearGlobals();
  ForceGraphicsRefresh(0);
@@ -105,12 +105,8 @@ void GetSavePath(char* buf, int type) {
  if(strlen(buf2)==1) strcat_s(buf, MAX_PATH, "0");
  strcat_s(buf, MAX_PATH, buf2);
  switch(type) {
-  case 0:
-   strcat_s(buf, MAX_PATH, "\\sfallgv.sav");
-   break;
-  case 1:
-   strcat_s(buf, MAX_PATH, "\\sfallfs.sav");
-   break;
+  case 0: strcat_s(buf, MAX_PATH, "\\sfallgv.sav"); break;
+  case 1: strcat_s(buf, MAX_PATH, "\\sfallfs.sav"); break;
  }
 }
 
@@ -124,9 +120,9 @@ static void _stdcall _SaveGame() {
 #endif
 
  DWORD unused;
- DWORD unused2=0;
- HANDLE h=CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
- if(h!=INVALID_HANDLE_VALUE) {
+ DWORD unused2 = 0;
+ HANDLE h = CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+ if (h != INVALID_HANDLE_VALUE) {
   SaveGlobals(h);
   WriteFile(h, &unused2, 4, &unused, 0);
   WriteFile(h, &GainStatFix, 4, &unused, 0);
@@ -142,11 +138,11 @@ static void _stdcall _SaveGame() {
   PlaySfx("IISXXXX1");
  }
  GetSavePath(buf, 1);
- h=CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
- if(h!=INVALID_HANDLE_VALUE) {
+ h = CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
+ if (h != INVALID_HANDLE_VALUE) {
   FileSystemSave(h);
+  CloseHandle(h);
  }
- CloseHandle(h);
 }
 
 static DWORD SaveInCombatFix;
@@ -579,6 +575,23 @@ return:
  }
 }
 
+static void __declspec(naked) barter_inventory_hook() {
+ __asm {
+  or   InLoop, BARTER
+  push [esp+4]
+  push offset return
+  push esi
+  push edi
+  push ebp
+  sub  esp, 0x34
+  mov  edi, 0x4757F6
+  jmp  edi
+return:
+  and  InLoop, (-1^BARTER)
+  retn 4
+ }
+}
+
 void LoadGameHookInit() {
  GetPrivateProfileString("sfall", "SaveInCombat", "Cannot save at this time", SaveFailMsg, 128, translationIni);
  SaveInCombatFix = GetPrivateProfileInt("Misc", "SaveInCombatFix", 1, ini);
@@ -605,4 +618,5 @@ void LoadGameHookInit() {
  MakeCall(0x41B8BC, &automap_hook, true);   // AUTOMAP
  MakeCall(0x4717E4, &use_inventory_on_hook, true);// INTFACEUSE
  MakeCall(0x473904, &loot_container_hook, true);// INTFACELOOT
+ MakeCall(0x4757F0, &barter_inventory_hook, true);// BARTER
 }

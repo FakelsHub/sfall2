@@ -1994,12 +1994,17 @@ static void DllMain2() {
   MakeCall(0x415238, &register_object_take_out_hook, true);
  }
 
- tmp = GetPrivateProfileIntA("Misc", "PipboyTimeAnimDelay", 50, ini);
+ tmp = GetPrivateProfileIntA("Misc", "PipboyTimeAnimDelay", -1, ini);
  if (tmp >= 0 && tmp <= 127) {
   dlog("Applying PipboyTimeAnimDelay patch.", DL_INIT);
   SafeWrite8(0x499B99, (BYTE)tmp);
   SafeWrite8(0x499DA8, (BYTE)tmp);
   dlogr(" Done", DL_INIT);
+ }
+
+ tmp = GetPrivateProfileIntA("Misc", "CarryWeightLimit", -1, ini);
+ if (tmp > 0) {
+  SafeWrite32(0x51D66C, tmp);
  }
 
  dlogr("Leave DllMain2", DL_MAIN);

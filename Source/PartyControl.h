@@ -18,6 +18,7 @@
 #pragma once
 
 extern DWORD IsControllingNPC;
+extern DWORD HiddenArmor;
 
 void PartyControl_CanUseWeapon();
 void PartyControl_PrintWarning();
