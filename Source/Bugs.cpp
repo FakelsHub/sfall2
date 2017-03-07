@@ -737,8 +737,11 @@ end:
 
 static void __declspec(naked) obj_load_func_hook1() {
  __asm {
-  cmp  [eax+0x54], 0                        // pobj.who_hit_me
+  xor  edi, edi
+  cmp  [eax+0x54], edi                      // pobj.who_hit_me
   jle  end
+  cmp  ds:[_loadingGame], edi
+  jnz  end
   xchg eax, ds:[_obj_dude]
   push eax
   call obj_fix_combat_cid_for_dude_

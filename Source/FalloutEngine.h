@@ -423,6 +423,7 @@ extern const DWORD xvfprintf_;
 #define _Lifegiver                  0x570854
 #define _list_com                   0x56D394
 #define _list_total                 0x56D37C
+#define _loadingGame                0x5194C4
 #define _LSData                     0x613D30
 #define _lsgwin                     0x6142C4
 #define _main_ctd                   0x56D2B0
