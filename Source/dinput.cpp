@@ -28,7 +28,7 @@
 #include "queue9x.cpp"
 #include "ScriptExtender.h"
 
-typedef HRESULT (_stdcall *DInputCreateProc)(HINSTANCE a,DWORD b,IDirectInputA** c,IUnknown* d);
+typedef HRESULT (_stdcall *DInputCreateProc)(HINSTANCE a, DWORD b, IDirectInputA** c, IUnknown* d);
 
 static bool UseScrollWheel;
 static DWORD WheelMod;
@@ -111,44 +111,45 @@ void _stdcall TapKey(DWORD key) {
 
 class FakeDirectInputDevice : public IDirectInputDeviceA {
 private:
-    IDirectInputDeviceA* RealDevice;
-    DWORD DeviceType;
+ IDirectInputDeviceA* RealDevice;
+ DWORD DeviceType;
  ULONG Refs;
  bool formatLock;
  DIDATAFORMAT oldFormat;
 public:
-    /*** Constructor and misc functions ***/
-    FakeDirectInputDevice(IDirectInputDevice* device,DWORD type) {
-        RealDevice=device;
-        DeviceType=type;
-  Refs=1;
+
+ /*** Constructor and misc functions ***/
+ FakeDirectInputDevice(IDirectInputDevice* device,DWORD type) {
+  RealDevice = device;
+  DeviceType = type;
+  Refs = 1;
   formatLock = false;
-  oldFormat.dwDataSize=0;
-    }
-    /*** IUnknown methods ***/
-    HRESULT _stdcall QueryInterface (REFIID riid, LPVOID * ppvObj) { return RealDevice->QueryInterface(riid,ppvObj); }
-    ULONG _stdcall AddRef(void) { return ++Refs; }
-    ULONG _stdcall Release(void) {
-  if(--Refs==0) {
+  oldFormat.dwDataSize = 0;
+ }
+
+ /*** IUnknown methods ***/
+ HRESULT _stdcall QueryInterface(REFIID riid, LPVOID * ppvObj) {return RealDevice->QueryInterface(riid,ppvObj);}
+ ULONG _stdcall AddRef(void) {return ++Refs;}
+ ULONG _stdcall Release(void) {
+  if (--Refs == 0) {
    RealDevice->Release();
    delete this;
    return 0;
-  } else { return Refs; }
+  } else return Refs;
  }
 
-    /*** IDirectInputDevice8A methods ***/
-    HRESULT _stdcall GetCapabilities(LPDIDEVCAPS a) { return RealDevice->GetCapabilities(a); }
-    HRESULT _stdcall EnumObjects(LPDIENUMDEVICEOBJECTSCALLBACKA a,LPVOID b,DWORD c) { return RealDevice->EnumObjects(a,b,c); }
-    HRESULT _stdcall GetProperty(REFGUID a,DIPROPHEADER* b) { return RealDevice->GetProperty(a,b); }
-    HRESULT _stdcall SetProperty(REFGUID a,const DIPROPHEADER* b) { return RealDevice->SetProperty(a,b); }
-    HRESULT _stdcall Acquire(void) { return RealDevice->Acquire(); }
-    HRESULT _stdcall Unacquire(void) { return RealDevice->Unacquire(); }
+ /*** IDirectInputDevice8A methods ***/
+ HRESULT _stdcall GetCapabilities(LPDIDEVCAPS a) {return RealDevice->GetCapabilities(a);}
+ HRESULT _stdcall EnumObjects(LPDIENUMDEVICEOBJECTSCALLBACKA a,LPVOID b,DWORD c) {return RealDevice->EnumObjects(a,b,c);}
+ HRESULT _stdcall GetProperty(REFGUID a,DIPROPHEADER* b) {return RealDevice->GetProperty(a,b);}
+ HRESULT _stdcall SetProperty(REFGUID a,const DIPROPHEADER* b) {return RealDevice->SetProperty(a,b);}
+ HRESULT _stdcall Acquire(void) {return RealDevice->Acquire();}
+ HRESULT _stdcall Unacquire(void) {return RealDevice->Unacquire();}
+
  //Only called for the mouse
  HRESULT _stdcall GetDeviceState(DWORD a,LPVOID b) {
   if (ForcingGraphicsRefresh) RefreshGraphics();
-  if (DeviceType != kDeviceType_MOUSE) {
-   return RealDevice->GetDeviceState(a,b);
-  }
+  if (DeviceType != kDeviceType_MOUSE) return RealDevice->GetDeviceState(a,b);
 
   DIMOUSESTATE2 MouseState;
   HRESULT hr;
@@ -156,50 +157,53 @@ public:
   if (formatLock) hr = RealDevice->GetDeviceState(sizeof(DIMOUSESTATE2), &MouseState);
   else hr = RealDevice->GetDeviceState(sizeof(DIMOUSESTATE), &MouseState);
   if (FAILED(hr)) return hr;
-  if(ReverseMouse) {
-   BYTE tmp=MouseState.rgbButtons[0];
-   MouseState.rgbButtons[0]=MouseState.rgbButtons[1];
-   MouseState.rgbButtons[1]=tmp;
+  if (ReverseMouse) {
+   BYTE tmp = MouseState.rgbButtons[0];
+   MouseState.rgbButtons[0] = MouseState.rgbButtons[1];
+   MouseState.rgbButtons[1] = tmp;
   }
-  if(AdjustMouseSpeed) {
-   double d=((double)MouseState.lX)*MouseSpeedMod + MousePartX;
+
+  if (AdjustMouseSpeed) {
+   double d = ((double)MouseState.lX)*MouseSpeedMod + MousePartX;
    MousePartX = modf(d, &d);
-   MouseState.lX=(LONG)d;
-   d=((double)MouseState.lY)*MouseSpeedMod + MousePartY;
+   MouseState.lX = (LONG)d;
+   d = ((double)MouseState.lY)*MouseSpeedMod + MousePartY;
    MousePartY = modf(d, &d);
-   MouseState.lY=(LONG)d;
+   MouseState.lY = (LONG)d;
   }
-  if(UseScrollWheel) {
-   int count;
-   if(MouseState.lZ>0) {
-    if(WheelMod) count=MouseState.lZ/WheelMod;
-    else count=1;
-    while(count--) TapKey(DIK_UP);
-   } else if(MouseState.lZ<0) {
-    if(WheelMod) count=(-MouseState.lZ)/WheelMod;
-    else count=1;
-    while(count--) TapKey(DIK_DOWN);
+
+  if (UseScrollWheel) {
+   int count = 1;
+   if (MouseState.lZ > 0) {
+    if (WheelMod) count = MouseState.lZ/WheelMod;
+    while (count--) TapKey(DIK_UP);
+   } else if (MouseState.lZ < 0) {
+    if (WheelMod) count = (-MouseState.lZ)/WheelMod;
+    while (count--) TapKey(DIK_DOWN);
    }
   }
-  if(MiddleMouseKey&&MouseState.rgbButtons[2]) {
-   if(!MiddleMouseDown) {
+
+  if (MiddleMouseKey && MouseState.rgbButtons[2]) {
+   if (!MiddleMouseDown) {
     TapKey(MiddleMouseKey);
-    MiddleMouseDown=true;
+    MiddleMouseDown = true;
    }
-  } else MiddleMouseDown=false;
-  mouseX=MouseState.lX;
-  mouseY=MouseState.lY;
+  } else MiddleMouseDown = false;
+
+  mouseX = MouseState.lX;
+  mouseY = MouseState.lY;
 
   numButtons = formatLock ? 8 : 4;
-  for(int i=0;i<numButtons;i++) {
+  for (int i = 0; i < numButtons; i++) {
    if ((MouseState.rgbButtons[i] & 0x80) != (KeysDown[256+i] & 0x80)) { // state changed
     MouseClickHook(i, (MouseState.rgbButtons[i] & 0x80) > 0);
    }
-   KeysDown[256+i]=MouseState.rgbButtons[i];
+   KeysDown[256+i] = MouseState.rgbButtons[i];
   }
   memcpy(b, &MouseState, sizeof(DIMOUSESTATE));
   return 0;
  }
+
  //Only called for the keyboard
  HRESULT _stdcall GetDeviceData(DWORD a,DIDEVICEOBJECTDATA* b,DWORD* c,DWORD d) {
   if(DeviceType!=kDeviceType_KEYBOARD) {

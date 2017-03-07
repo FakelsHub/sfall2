@@ -83,35 +83,14 @@ static void _stdcall ResetState(DWORD onLoad) {
  PartyControlReset();
 }
 
-void GetSavePath(char* buf, int type) {
- int saveid = *(int*)_slot_cursor + 1 + LSPageOffset;//add SuperSave Page offset
- char buf2[6];
- //Fallout saving is independent of working directory
- struct sPath {
-  char* path;
-  int a;
-  int b;
-  sPath* next;
- };
- sPath* spath=*(sPath**)_paths;
- while(spath->a&&spath->next) spath=spath->next;
-
- //strcpy_s(buf, MAX_PATH, **(char***)_paths);
- strcpy_s(buf, MAX_PATH, spath->path);
- strcat_s(buf, MAX_PATH, "\\savegame\\slot");
- _itoa_s(saveid, buf2, 10);
- if(strlen(buf2)==1) strcat_s(buf, MAX_PATH, "0");
- strcat_s(buf, MAX_PATH, buf2);
- switch(type) {
-  case 0: strcat_s(buf, MAX_PATH, "\\sfallgv.sav"); break;
-  case 1: strcat_s(buf, MAX_PATH, "\\sfallfs.sav"); break;
- }
+void GetSavePath(char* buf, char* ftype) {
+ sprintf(buf, "%s\\savegame\\slot%.2d\\sfall%s.sav", *(char**)_patches, *(int*)_slot_cursor + 1 + LSPageOffset, ftype);
 }
 
 static char SaveSfallDataFailMsg[128];
 static void _stdcall _SaveGame() {
  char buf[MAX_PATH];
- GetSavePath(buf, 0);
+ GetSavePath(buf, "gv");
 
 #ifdef TRACE
  dlog_f("Saving game: %s\r\n", DL_MAIN, buf);
@@ -138,7 +117,7 @@ static void _stdcall _SaveGame() {
   }
   PlaySfx("IISXXXX1");
  }
- GetSavePath(buf, 1);
+ GetSavePath(buf, "fs");
  h = CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);
  if (h != INVALID_HANDLE_VALUE) {
   FileSystemSave(h);
@@ -207,7 +186,7 @@ end:
 
 static void _stdcall LoadGame2_After() {
  char buf[MAX_PATH];
- GetSavePath(buf, 0);
+ GetSavePath(buf, "gv");
 
 #ifdef TRACE
  dlog_f("Loading save game: %s\r\n", DL_MAIN, buf);
@@ -230,6 +209,9 @@ static void _stdcall LoadGame2_After() {
  } else {
   GainStatFix = 0;
   dlogr("Cannot read sfallgv.sav - assuming non-sfall save.", DL_MAIN);
+#ifdef TRACE
+  dlog_f("sfallgv.sav: %d\r\n", DL_MAIN, GetLastError());
+#endif
  }
 
  if (GainStatFix) ModifyGainXXXPerks();

@@ -741,7 +741,7 @@ static void __declspec(naked) obj_load_func_hook1() {
   cmp  [eax+0x54], edi                      // pobj.who_hit_me
   jle  end
   cmp  ds:[_loadingGame], edi
-  jnz  end
+  jne  end
   xchg eax, ds:[_obj_dude]
   push eax
   call obj_fix_combat_cid_for_dude_
@@ -794,6 +794,21 @@ static void __declspec(naked) use_inventory_on_hook() {
   mov  edx, [eax]                           // Inventory.inv_size
 end:
   retn
+ }
+}
+
+static void __declspec(naked) op_obj_can_hear_obj_hook() {
+ __asm {
+  mov  edi, 0x458414
+  mov  eax, [esp]                           // target
+  test eax, eax
+  jz   end
+  mov  edx, [esp+4]                         // source
+  test edx, edx
+  jz   end
+  mov  edi, 0x4583E6
+end:
+  jmp  edi
  }
 }
 
@@ -956,6 +971,9 @@ void BugsInit() {
  SafeWrite8(0x458FF6, 0xEB);
  SafeWrite8(0x459023, 0xEB);
 #endif
+
+// Исправление op_obj_can_hear_obj_
+ MakeCall(0x4583D3, &op_obj_can_hear_obj_hook, true);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook);

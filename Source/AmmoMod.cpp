@@ -565,7 +565,7 @@ static void __declspec(naked) display_stats_hook1() {
   lea  eax, [esp+0xC+0x4]
   push eax
   call sprintf_
-  add  esp, 4*5
+  add  esp, 5*4
   mov  eax, 0x472569
   jmp  eax
  }
