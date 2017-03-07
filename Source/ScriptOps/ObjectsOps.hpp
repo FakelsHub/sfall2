@@ -104,7 +104,7 @@ notCritter:
   cmp esi, 1; // run map enter?
   jnz end;
   mov eax, [ecx+0x78];
-  mov edx, 0xf; // map_enter_p_proc
+  mov edx, map_enter_p_proc
   call exec_script_proc_
 end:
   popad;

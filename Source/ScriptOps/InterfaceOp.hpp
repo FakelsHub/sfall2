@@ -200,7 +200,8 @@ static void __declspec(naked) get_screen_height() {
    retn;
    }
 }
-//Stop game, the same effect as open charsscreen or inventory
+
+/*//Stop game, the same effect as open charsscreen or inventory
 static void __declspec(naked) stop_game() {
  __asm {
   jmp  map_disable_bk_processes_
@@ -212,7 +213,7 @@ static void __declspec(naked) resume_game() {
  __asm {
   jmp  map_enable_bk_processes_
  }
-}
+}*/
 
 //Create a message window with given string
 static void __declspec(naked) create_message_window() {
@@ -407,7 +408,8 @@ falloutfunc:
   mov edx, esp;
   mov eax, [eax+0x64];
   call proto_ptr_
-  mov edx, 1;
+  xor  edx, edx
+  inc  edx
   shl edx, cl;
   mov ecx, [esp];
   mov eax, [ecx+0x20];

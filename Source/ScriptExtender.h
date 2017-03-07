@@ -31,8 +31,7 @@ struct sGlobalVar
 };
 
 #define SCRIPT_PROC_MAX  (27)
-typedef struct  
-{
+typedef struct {
  DWORD ptr;
  DWORD procLookup[SCRIPT_PROC_MAX+1];
  char initialized;
@@ -55,7 +54,6 @@ void ClearGlobals();
 int GetNumGlobals();
 void GetGlobals(sGlobalVar* globals);
 void SetGlobals(sGlobalVar* globals);
-
 
 extern DWORD AvailableGlobalScriptTypes;
 
@@ -89,8 +87,3 @@ extern DWORD isGlobalScriptLoading;
 #define VAR_TYPE_FLOAT (0xA001)
 #define VAR_TYPE_STR (0x9801)
 #define VAR_TYPE_STR2 (0x9001)
-
-// script procs
-#define start_proc    (1)
-#define map_enter_p_proc (15)
-#define map_update_proc  (23)

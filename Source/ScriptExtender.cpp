@@ -1213,8 +1213,8 @@ void ScriptExtenderSetup() {
  opcodes[0x21f]=get_window_under_mouse;
  opcodes[0x220]=get_screen_width;
  opcodes[0x221]=get_screen_height;
- opcodes[0x222]=stop_game;
- opcodes[0x223]=resume_game;
+ opcodes[0x222] = (void*)map_disable_bk_processes_;// Stop game
+ opcodes[0x223] = (void*)map_enable_bk_processes_; // Resume the game when it is stopped
  opcodes[0x224]=create_message_window;
  opcodes[0x225]=remove_trait;
  opcodes[0x226]=get_light_level;
@@ -1460,7 +1460,7 @@ void RunScriptProc(sScriptProgram* prog, DWORD procId) {
 }
 static void RunScript(sGlobalScript* script) {
  script->count=0;
- RunScriptProc(&script->prog, start_proc); // run "start"
+ RunScriptProc(&script->prog, start); // run "start"
 }
 
 /**

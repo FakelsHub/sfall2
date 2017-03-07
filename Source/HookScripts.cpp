@@ -81,10 +81,8 @@ static void _stdcall EndHook() {
 static void _stdcall RunSpecificHookScript(sHookScript *hook) {
  cArg = 0;
  cRetTmp = 0;
- if (hook->callback != -1)
-  RunScriptProcByNum(hook->prog.ptr, hook->callback);
- else
-  RunScriptProc(&hook->prog, start_proc);
+ if (hook->callback != -1) RunScriptProcByNum(hook->prog.ptr, hook->callback);
+ else RunScriptProc(&hook->prog, start);
 }
 
 static void _stdcall RunHookScript(DWORD hook) {
@@ -1096,10 +1094,11 @@ end:
 static void _declspec(naked) item_add_force_call() {
  __asm {
   hookbegin(3)
-  mov  args[0], 0                           // target slot (0 - main backpack)
-  mov  args[4], edx                         // item being moved
-  mov  args[8], 0                           // no item being replaced here..
   pushad
+  mov  args[4], edx                         // item being moved
+  xor  edx, edx
+  mov  args[0], edx                         // target slot (0 - main backpack)
+  mov  args[8], edx                         // no item being replaced here..
   push HOOK_INVENTORYMOVE
   call RunHookScript
   popad
@@ -1307,23 +1306,26 @@ return:
 DWORD _stdcall GetHSArgCount() {
  return ArgCount;
 }
+
 DWORD _stdcall GetHSArg() {
- if(cArg==ArgCount) return 0;
+ if (cArg == ArgCount) return 0;
  else return args[cArg++];
 }
+
 void _stdcall SetHSArg(DWORD id, DWORD value) {
- if(id<ArgCount) args[id]=value;
+ if (id < ArgCount) args[id] = value;
 }
+
 DWORD* _stdcall GetHSArgs() {
  return args;
 }
+
 void _stdcall SetHSReturn(DWORD d) {
- if (cRetTmp < 8) rets[cRetTmp++]=d;
- if (cRetTmp > cRet)
-  cRet = cRetTmp;
+ if (cRetTmp < 8) rets[cRetTmp++] = d;
+ if (cRetTmp > cRet) cRet = cRetTmp;
 }
-void _stdcall RegisterHook( DWORD script, DWORD id, DWORD procNum )
-{
+
+void _stdcall RegisterHook( DWORD script, DWORD id, DWORD procNum ) {
  if (id >= numHooks) return;
  for (std::vector<sHookScript>::iterator it = hooks[id].begin(); it != hooks[id].end(); ++it) {
   if (it->prog.ptr == script) {
@@ -1343,6 +1345,7 @@ void _stdcall RegisterHook( DWORD script, DWORD id, DWORD procNum )
   hooks[id].push_back(hook);
  }
 }
+
 #define LoadHookScript(a,b) _LoadHookScript("data\\scripts\\hs_" a ".int", b)
 static void _LoadHookScript(const char* path, int id) {
  if (id >= numHooks) return;
@@ -1469,9 +1472,7 @@ static void HookScriptInit2() {
 }
 
 void HookScriptClear() {
- for (int i = 0; i < numHooks; i++) {
-  hooks[i].clear();
- }
+ for (int i = 0; i < numHooks; i++) hooks[i].clear();
 }
 
 void HookScriptInit() {
@@ -1479,9 +1480,7 @@ void HookScriptInit() {
  HookScriptInit2();
  InitingHookScripts = 1;
  for (int i = 0; i < numHooks; i++) {
-  if (hooks[i].size()) {
-   InitScriptProgram(hooks[i][0].prog);// zero hook is always hs_*.int script because Hook scripts are loaded BEFORE global scripts
-  }
+  if (hooks[i].size()) InitScriptProgram(hooks[i][0].prog);// zero hook is always hs_*.int script because Hook scripts are loaded BEFORE global scripts
  }
  isGlobalScriptLoading = 0;
  InitingHookScripts = 0;
@@ -1490,8 +1489,6 @@ void HookScriptInit() {
 // run specific event procedure for all hook scripts
 void _stdcall RunHookScriptsAtProc(DWORD procId) {
  for (int i = 0; i < numHooks; i++) {
-  if (hooks[i].size() > 0 && !hooks[i][0].isGlobalScript) {
-   RunScriptProc(&hooks[i][0].prog, procId);
-  }
+  if (hooks[i].size() > 0 && !hooks[i][0].isGlobalScript) RunScriptProc(&hooks[i][0].prog, procId);
  }
 }

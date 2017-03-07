@@ -38,7 +38,7 @@ static void __declspec(naked) ReadByte() {
   movzx edx, byte ptr ds:[eax];
   jmp result;
 error:
-  mov edx, 0;
+  xor  edx, edx
 result:
   mov eax, ecx;
   call interpretPushLong_
@@ -66,7 +66,7 @@ static void __declspec(naked) ReadShort() {
   movzx edx, word ptr ds:[eax];
   jmp result;
 error:
-  mov edx, 0;
+  xor  edx, edx
 result:
   mov eax, ecx;
   call interpretPushLong_
@@ -91,10 +91,10 @@ static void __declspec(naked) ReadInt() {
   call interpretPopLong_
   cmp dx, 0xC001;
   jnz error;
-  mov edx, dword ptr ds:[eax];
+  mov edx, [eax]
   jmp result;
 error:
-  mov edx, 0;
+  xor  edx, edx
 result:
   mov eax, ecx;
   call interpretPushLong_
@@ -122,7 +122,7 @@ static void __declspec(naked) ReadString() {
   mov edx, eax;
   jmp result;
 error:
-  mov edx, 0;
+  xor  edx, edx
 result:
   mov eax, ecx;
   call interpretPushLong_

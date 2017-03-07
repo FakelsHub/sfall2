@@ -175,7 +175,7 @@ itsJet:
   mov  ecx, dword ptr [ebx+0x4]             // ecx=drug_pid
   push ecx
   mov  ecx, esi                             // ecx=perk
-  mov  ebx, 2880                            // ebx=time
+  mov  ebx, 10080                           // ebx=время в минутах (10080 минут = 168 часов = 7 дней)
   call insert_withdrawal_
   mov  eax, 0x47A3FB
   jmp  eax
@@ -788,6 +788,18 @@ end:
  }
 }
 
+static void __declspec(naked) use_inventory_on_hook() {
+ __asm {
+  inc  ecx
+  mov  edx, [eax]                           // Inventory.inv_size
+  sub  edx, ecx
+  jge  end
+  mov  edx, [eax]                           // Inventory.inv_size
+end:
+  retn
+ }
+}
+
 static void __declspec(naked) combat_display_hook() {
  __asm {
   mov  ecx, [eax+0x20]                      // pobj.fid
@@ -937,6 +949,13 @@ void BugsInit() {
  dlog("Applying NPCLevelFix.", DL_INIT);
  HookCall(0x495BC9, (void*)0x495E51);
  dlogr(" Done", DL_INIT);
+
+// Исправление краша при клике по пустому месту в инвентаре при курсорном использовании предмета из рюкзака
+ MakeCall(0x471A94, &use_inventory_on_hook, false);
+
+// Исправление видимости только активного предмета в руке игрока
+ SafeWrite8(0x458FF6, 0xEB);
+ SafeWrite8(0x459023, 0xEB);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook);
