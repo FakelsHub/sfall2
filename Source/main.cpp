@@ -133,8 +133,7 @@ static void __declspec(naked) game_time_date_hook() {
  __asm {
   test edi, edi
   jz   end
-  mov  ecx, ds:[_pc_proto+0x134]            // _pc_proto.bonus_age
-  add  esi, ecx
+  add  esi, ds:[_pc_proto+0x134]            // _pc_proto.bonus_age
   mov  [edi], esi
 end:
   mov  esi, 0x4A33BE
@@ -503,27 +502,21 @@ end:
  }
 }
 
-static DWORD SpeedInterfaceCounterAnims;
 static void __declspec(naked) intface_rotate_numbers_hook() {
  __asm {
   push edi
   push ebp
   sub  esp, 0x54
-  mov  edi, SpeedInterfaceCounterAnims
 // ebx=old value, ecx=new value
   cmp  ebx, ecx
   je   end
   mov  ebx, ecx
   jg   decrease
-  test edi, edi
-  jnz  end
   dec  ebx
   jmp  end
 decrease:
-  cmp  ecx, 0
+  test ecx, ecx
   jl   negative
-  test edi, edi
-  jnz  end
   inc  ebx
   jmp  end
 negative:
@@ -546,17 +539,17 @@ static DWORD _stdcall DrawCardHook2() {
 }
 static void __declspec(naked) DrawCardHook() {
  __asm {
-  cmp dword ptr ds:[_info_line], 10;
-  jne skip;
-  cmp eax, 0x30;
-  jne skip;
-  push ecx;
-  push edx;
-  call DrawCardHook2;
-  pop edx;
-  pop ecx;
+  cmp  dword ptr ds:[_info_line], 10
+  jne  skip
+  cmp  eax, 0x30
+  jne  skip
+  push ecx
+  push edx
+  call DrawCardHook2
+  pop  edx
+  pop  ecx
 skip:
-  jmp DrawCard_
+  jmp  DrawCard_
  }
 }
 
@@ -1694,12 +1687,9 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
- SpeedInterfaceCounterAnims = GetPrivateProfileIntA("Misc", "SpeedInterfaceCounterAnims", 0, ini);
- if (SpeedInterfaceCounterAnims == 1 || SpeedInterfaceCounterAnims == 2) {
-  SpeedInterfaceCounterAnims--;
-  dlog("Applying SpeedInterfaceCounterAnims patch.", DL_INIT);
-  MakeCall(0x460BA1, &intface_rotate_numbers_hook, true);
-  dlogr(" Done", DL_INIT);
+ switch (GetPrivateProfileIntA("Misc", "SpeedInterfaceCounterAnims", 0, ini)) {
+  case 1: MakeCall(0x460BA1, &intface_rotate_numbers_hook, true); break;
+  case 2: SafeWrite32(0x460BB6, 0x90DB3190); break;
  }
 
  KarmaFrmCount=GetPrivateProfileIntA("Misc", "KarmaFRMsCount", 0, ini);

@@ -73,7 +73,7 @@ skip:
 
 static void __declspec(naked) protinst_default_use_item_hook() {
  __asm {
-  mov  eax, dword ptr [edx+0x64]            // eax = target pid
+  mov  eax, [edx+0x64]                      // eax = target pid
   cmp  eax, PID_DRIVABLE_CAR
   je   itsCar
   cmp  eax, PID_CAR_TRUNK
@@ -173,7 +173,7 @@ static void __declspec(naked) item_wd_process_hook() {
 itsJet:
   pop  edx                                  // Уничтожаем адрес возврата
   xor  edx, edx                             // edx=init
-  mov  ecx, dword ptr [ebx+0x4]             // ecx=drug_pid
+  mov  ecx, [ebx+0x4]                       // ecx=drug_pid
   push ecx
   mov  ecx, esi                             // ecx=perk
   mov  ebx, 10080                           // ebx=время в минутах (10080 минут = 168 часов = 7 дней)
@@ -960,6 +960,27 @@ end:
  }
 }
 
+static void __declspec(naked) wmTeleportToArea_hook() {
+ __asm {
+  cmp  ebx, ds:[_WorldMapCurrArea]
+  je   end
+  mov  ds:[_WorldMapCurrArea], ebx
+  sub  eax, edx
+  add  eax, ds:[_wmAreaInfoList]
+  mov  edx, [eax+0x30]                      // wmAreaInfoList.world_posy
+  mov  ds:[_world_ypos], edx
+  mov  edx, [eax+0x2C]                      // wmAreaInfoList.world_posx
+  mov  ds:[_world_xpos], edx
+end:
+  xor  eax, eax
+  mov  ds:[_target_xpos], eax
+  mov  ds:[_target_ypos], eax
+  mov  ds:[_In_WorldMap], eax
+  mov  eax, 0x4C5A77
+  jmp  eax
+ }
+}
+
 static void __declspec(naked) combat_display_hook1() {
  __asm {
   mov  ecx, [eax+0x20]                      // pobj.fid
@@ -1144,6 +1165,9 @@ void BugsInit() {
 // Исправление неправильной инициализации очков действия в начале каждого хода
  BlockCall(0x422E02);
  MakeCall(0x422E1B, &combat_hook, false);
+
+// 
+ MakeCall(0x4C5A41, &wmTeleportToArea_hook, true);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);

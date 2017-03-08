@@ -60,7 +60,7 @@ static void __declspec(naked) isRealParty() {
   mov  ebx, [eax+0x64]                      // pid
 loopPid:
   add  edx, 4
-  cmp  ebx, dword ptr [edx]
+  cmp  ebx, [edx]
   je   end
   loop loopPid
 skip:
@@ -119,9 +119,7 @@ static bool _stdcall IsInPidList(DWORD* npc) {
  if (Chars.size() == 0) return true;
  int pid = npc[0x64/4] & 0xFFFFFF;
  for (std::vector<WORD>::iterator it = Chars.begin(); it != Chars.end(); it++) {
-  if (*it == pid) {
-   return true;
-  }
+  if (*it == pid) return true;
  }
  return false;
 }
@@ -228,30 +226,30 @@ skipPerks:
   rep  movsd
   pop  ecx
   pop  edi
-  mov  eax, dword ptr [edi+296*4-21*4]      // eax = GVAR_ADDICT_JET
+  mov  eax, [edi+296*4-21*4]                // eax = GVAR_ADDICT_JET
   mov  real_jet_gvar, eax
   push edi
   mov  edx, _drugInfoList
   mov  esi, ebx                             // _obj_dude
 loopDrug:
-  mov  eax, dword ptr [edx]                 // eax = drug_pid
+  mov  eax, [edx]                           // eax = drug_pid
   call item_d_check_addict_
   test eax, eax                             // Есть зависимость?
   jz   noAddict                             // Нет
   xor  eax, eax
   inc  eax
 noAddict:
-  mov  dword ptr [edi], eax
+  mov  [edi], eax
   add  edx, 12
   add  edi, 4
   loop loopDrug
   test eax, eax                             // Есть зависимость к алкоголю (пиво)?
   jnz  skipBooze                            // Да
-  mov  eax, dword ptr [edx]                 // PID_BOOZE
+  mov  eax, [edx]                           // PID_BOOZE
   call item_d_check_addict_
-  mov  dword ptr [edi-4], eax               // GVAR_ALCOHOL_ADDICT
+  mov  [edi-4], eax                         // GVAR_ALCOHOL_ADDICT
 skipBooze:
-  mov  eax, dword ptr [edx+12]              // PID_JET
+  mov  eax, [edx+12]                        // PID_JET
   call item_d_check_addict_
   test eax, eax
   jz   noJetAddict
@@ -259,7 +257,7 @@ skipBooze:
   inc  eax
 noJetAddict:
   pop  edi
-  mov  dword ptr [edi+296*4-21*4], eax      // GVAR_ADDICT_JET
+  mov  [edi+296*4-21*4], eax                // GVAR_ADDICT_JET
   xor  eax, eax
   dec  eax
   call item_d_check_addict_
@@ -282,9 +280,9 @@ skip:
   rep  stosd
   mov  edx, eax
   call trait_set_
-  mov  dword ptr ds:[_Experience_], eax
+  mov  ds:[_Experience_], eax
 // get active hand by weapon anim code
-  mov  edx, dword ptr [ebx+0x20]            // fid
+  mov  edx, [ebx+0x20]                      // fid
   and  edx, 0x0F000
   sar  edx, 0xC                             // edx = current weapon anim code as seen in hands
   xor  ecx, ecx                             // Левая рука
@@ -347,7 +345,7 @@ static void __declspec(naked) RestoreDudeState() {
   mov  eax, real_Experience
   mov  ds:[_Experience_], eax
   mov  eax, real_free_perk
-  mov  byte ptr ds:[_free_perk], al
+  mov  ds:[_free_perk], al
   mov  eax, real_unspent_skill_points
   mov  ds:[_curr_pc_stat], eax
   mov  eax, real_map_elevation
@@ -366,7 +364,7 @@ static void __declspec(naked) RestoreDudeState() {
   mov  esi, offset real_drug_gvar
   mov  edi, ds:[_game_global_vars]
   mov  eax, real_jet_gvar
-  mov  dword ptr [edi+296*4], eax           // GVAR_ADDICT_JET
+  mov  [edi+296*4], eax                     // GVAR_ADDICT_JET
   add  edi, 21*4                            // esi->GVAR_NUKA_COLA_ADDICT
   mov  ecx, 6
   rep  movsd
@@ -447,7 +445,7 @@ static void _declspec(naked) CombatWrapper_v2() {
   xor  edx, edx
   cmp  ds:[_combatNumTurns], edx
   je   skipControl                          // Это первый ход
-  mov  eax, dword ptr [eax+0x4]             // tile_num
+  mov  eax, [eax+0x4]                       // tile_num
   add  edx, 2
   call tile_scroll_to_
   jmp  skipControl
@@ -474,7 +472,7 @@ npcControl:
   xchg ebx, eax                             // ebx = npc
   call SaveDudeState
   call intface_redraw_
-  mov  eax, dword ptr [ebx+0x4]             // tile_num
+  mov  eax, [ebx+0x4]                       // tile_num
   mov  edx, 2
   call tile_scroll_to_
   xchg ebx, eax                             // eax = npc

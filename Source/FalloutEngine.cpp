@@ -344,6 +344,7 @@ const DWORD win_print_ = 0x4D684C;
 const DWORD win_register_button_ = 0x4D8260;
 const DWORD win_register_button_disable_ = 0x4D8674;
 const DWORD win_show_ = 0x4D6DAC;
+const DWORD wmAreaSetWorldPos_ = 0x4C4710;
 const DWORD wmInterfaceScrollTabsStart_ = 0x4C219C;
 const DWORD wmPartyWalkingStep_ = 0x4C1F90;
 const DWORD wmWorldMapLoadTempData_ = 0x4BD6B4;
