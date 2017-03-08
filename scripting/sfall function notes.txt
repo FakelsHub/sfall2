@@ -14,7 +14,7 @@ Global scripts have multiple modes, which can be set using the set_global_script
 
 Both set_global_script_repeat and set_global_script_type only have an effect on the script they were called from. Every global script needs its own game_loaded block to correctly set up the script type and repeat rate. set_global_script_repeat will have no effect if called on a non-global script.
 
-The read_xxx functions take a memory address as the parameter and can read arbitrary pieces of fallouts address space. The write functions are equivilent except that they write to arbitrary memory addresses. The call_offset_xx functions can be used to call arbitrary functions inside fallout. Different versions are used to call functions with different numbers of arguments. None of these functions will work unless AllowUnsafeScripting is enabled in ddraw.ini
+The read_xxx functions take a memory address as the parameter and can read arbitrary pieces of fallouts address space. The write functions are equivilent except that they write to arbitrary memory addresses. The call_offset_xx functions can be used to call arbitrary functions inside fallout. Different versions are used to call functions with different numbers of arguments.
 
 The get/set_pc_base/extra_stat functions are equivelent to calling get/set_critter_base/extra_stat with dude_obj as the critter pointer. None of these stat functions take perks into account, and neither do they do range clamping to make sure the stats are valid. Use the normal get_critter_stat function to get a correctly perk adjusted and range clamped value for a stat.
 

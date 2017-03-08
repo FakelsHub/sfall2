@@ -84,10 +84,16 @@ void __declspec(naked) PartyControl_CanUseWeapon() {
   call item_get_type_
   cmp  eax, item_type_weapon
   jne  canUse                               // Нет
+  dec  eax
+  dec  eax
+  cmp  IsControllingNPC, eax                // Контроль персонажей?
+  jne  end                                  // Нет
+  inc  eax                                  // hit_right_weapon_primary
+  xchg ecx, eax
   mov  eax, edi                             // eax=item
-  mov  edx, hit_right_weapon_primary
   call item_w_anim_code_
   xchg ecx, eax                             // ecx=ID1=Weapon code
+  xchg edx, eax
   xchg edi, eax                             // eax=item
   call item_w_anim_weap_
   xchg ebx, eax                             // ebx=ID2=Animation code
@@ -476,9 +482,12 @@ npcControl:
   mov  edx, 2
   call tile_scroll_to_
   xchg ebx, eax                             // eax = npc
+  xor  edx, edx
+  push edx
   call combat_turn_
+  pop  ecx
   xchg ecx, eax
-  cmp  IsControllingNPC, 0                  // if game was loaded during turn, PartyControlReset()
+  cmp  IsControllingNPC, eax                // if game was loaded during turn, PartyControlReset()
   je   skipRestore                          // was called and already restored state
   call RestoreDudeState
   call intface_redraw_
@@ -540,19 +549,29 @@ end:
 
 static void _declspec(naked) handle_inventory_hook() {
  __asm {
+  xor  ebx, ebx
   mov  edx, eax                             // edx = _inven_dude
   call inven_worn_
   test eax, eax
   jz   end
-  cmp  IsControllingNPC, 0
+  cmp  IsControllingNPC, ebx
   je   end
-  mov  HiddenArmor, eax
   push eax
   push edx
-  xor  ebx, ebx
   inc  ebx
-  xchg edx, eax
+  xchg edx, eax                             // eax = source, edx = armor
   call item_remove_mult_
+  pop  edx                                  // edx = source
+  pop  ebx                                  // ebx = armor
+  inc  eax                                  // Удалили?
+  jnz  nextArmor                            // Да
+// Не смогли удалить, поэтому снимем броню с учётом уменьшения КБ
+  push edx
+  push eax
+  xchg ebx, eax                             // ebx = newarmor, eax = oldarmor
+  xchg edx, eax                             // edx = oldarmor, eax = source
+  call adjust_ac_
+  pop  ebx
   pop  edx
 nextArmor:
   mov  eax, edx
@@ -562,7 +581,8 @@ nextArmor:
   and  byte ptr [eax+0x27], 0xFB            // Сбрасываем флаг одетой брони
   jmp  nextArmor
 noArmor:
-  pop  eax
+  xchg ebx, eax                             // eax = armor
+  mov  HiddenArmor, eax
 end:
   retn
  }
@@ -570,7 +590,8 @@ end:
 
 static void _declspec(naked) handle_inventory_hook1() {
  __asm {
-  cmp  IsControllingNPC, 0
+  xor  edx, edx
+  cmp  IsControllingNPC, edx
   je   end
   push eax
   mov  edx, HiddenArmor
@@ -594,12 +615,12 @@ static void _declspec(naked) combat_input_hook() {
   cmp  ebx, 0x20                            // Space (окончание хода)?
   jne  skip
 space:
-  pop  ebx
+  pop  ebx                                  // Уничтожаем адрес возврата
   mov  ebx, 0x20                            // Space (окончание хода)
-  mov  edx, 0x4228A8
-  jmp  edx
+  push 0x4228A8
+  retn
 skip:
-  cmp  IsControllingNPC, 0
+  cmp  dword ptr IsControllingNPC, 0
   je   end
   cmp  ebx, 0xD                             // Enter (завершение боя)?
   je   space                                // Да
@@ -671,7 +692,7 @@ void PartyControlInit() {
 
 void __stdcall PartyControlReset() {
  __asm {
-  cmp  IsControllingNPC, 0
+  cmp  dword ptr IsControllingNPC, 0
   je   end
   call RestoreDudeState
 end:

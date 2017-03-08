@@ -118,9 +118,10 @@ static void __declspec(naked) SaveGame_hook() {
   pushad
   test byte ptr ds:[_combat_state], 1       // В бою?
   jz   canSave                              // Нет
-  cmp  IsControllingNPC, 0
+  xor  eax, eax
+  cmp  IsControllingNPC, eax
   jne  skip
-  cmp  SaveInCombatFix, 0
+  cmp  SaveInCombatFix, eax
   je   canSave
   cmp  SaveInCombatFix, 2
   je   skip
@@ -152,8 +153,8 @@ canSave:
   push edx
   push esi
   push edi
-  mov  esi, 0x47B891
-  jmp  esi
+  push 0x47B891
+  retn
 return:
   and  InLoop, (-1^SAVEGAME)
   cmp  eax, 1
@@ -209,8 +210,8 @@ static void __declspec(naked) LoadSlot_hook() {
   push edx
   push esi
   push edi
-  mov  ebx, 0x47DC6D
-  jmp  ebx
+  push 0x47DC6D
+  retn
  }
 }
 
@@ -223,8 +224,8 @@ static void __declspec(naked) LoadGame_hook() {
   push edx
   push esi
   push edi
-  mov  esi, 0x47C645
-  jmp  esi
+  push 0x47C645
+  retn
 return:
   and  InLoop, (-1^LOADGAME)
   cmp  eax, 1
@@ -244,33 +245,31 @@ static void NewGame2() {
 
  SetNewCharAppearanceGlobals();
 
- if (GetPrivateProfileInt("Misc", "PipBoyAvailableAtGameStart", 0, ini)) {
-  SafeWrite8(_gmovie_played_list + 0x3, 1);
- }
-
- if (GetPrivateProfileInt("Misc", "DisableHorrigan", 0, ini)) {
-  *(DWORD*)0x672E04 = 1;
- }
-
  LoadGlobalScripts();
  CritLoad();
 }
 
+static bool DisableHorrigan = false;
 static void __declspec(naked) main_game_loop_call() {
  __asm {
   pushad
   call NewGame2
+  mov  al, DisableHorrigan
+  mov  ds:[_Meet_Frank_Horrigan], al
   popad
   jmp  main_game_loop_
  }
 }
 
+static bool PipBoyAvailableAtGameStart = false;
 static void __declspec(naked) main_menu_loop_call() {
  __asm {
   pushad
   push 0
   call ResetState
-  call LoadHeroAppearance
+  mov  al, PipBoyAvailableAtGameStart
+  mov  ds:[_gmovie_played_list+3], al
+  call LoadHeroAppearance                   // Зачем?
   popad
   jmp  main_menu_loop_
  }
@@ -285,8 +284,8 @@ static void __declspec(naked) wmWorldMapFunc_hook() {
   push edx
   push esi
   push edi
-  mov  edx, 0x4BFE15
-  jmp  edx
+  push 0x4BFE15
+  retn
 return:
   and  InLoop, (-1^WORLDMAP)
   retn
@@ -305,8 +304,8 @@ static void __declspec(naked) combat_hook() {
   push edx
   push esi
   push edi
-  mov  esi, 0x422D31
-  jmp  esi
+  push 0x422D31
+  retn
 return:
   and  InLoop, (-1^COMBAT)
   pushad
@@ -325,8 +324,8 @@ static void __declspec(naked) combat_input_hook() {
   push edx
   push esi
   mov  ecx, ds:[_obj_dude]
-  mov  esi, 0x4227FE
-  jmp  esi
+  push 0x4227FE
+  retn
 return:
   and  InLoop, (-1^PCOMBAT)
   retn
@@ -342,8 +341,8 @@ static void __declspec(naked) do_optionsFunc_hook() {
   push edx
   push esi
   push edi
-  mov  esi, 0x48FC55
-  jmp  esi
+  push 0x48FC55
+  retn
 return:
   and  InLoop, (-1^ESCMENU)
   retn
@@ -358,8 +357,8 @@ static void __declspec(naked) do_prefscreen_hook() {
   push edx
   xor  edx, edx
   dec  edx
-  mov  eax, 0x49079F
-  jmp  eax
+  push 0x49079F
+  retn
 return:
   and  InLoop, (-1^OPTIONS)
   retn
@@ -375,8 +374,8 @@ static void __declspec(naked) game_help_hook() {
   push edx
   push esi
   push edi
-  mov  eax, 0x443F79
-  jmp  eax
+  push 0x443F79
+  retn
 return:
   and  InLoop, (-1^HELP)
   retn
@@ -395,8 +394,8 @@ static void __declspec(naked) editor_design_hook() {
   push edx
   push esi
   push edi
-  mov  esi, 0x431DFD
-  jmp  esi
+  push 0x431DFD
+  retn
 return:
   pushad
   test eax, eax
@@ -421,8 +420,8 @@ static void __declspec(naked) gdProcess_hook() {
   push edx
   push esi
   push edi
-  mov  edx, 0x4465C5
-  jmp  edx
+  push 0x4465C5
+  retn
 return:
   and  InLoop, (-1^DIALOG)
   retn
@@ -438,8 +437,8 @@ static void __declspec(naked) pipboy_hook() {
   push edx
   push esi
   xchg ecx, eax
-  mov  eax, 0x49700A
-  jmp  eax
+  push 0x49700A
+  retn
 return:
   and  InLoop, (-1^PIPBOY)
   retn
@@ -453,8 +452,8 @@ static void __declspec(naked) skilldex_select_hook() {
   push edx
   xor  edx, edx
   dec  edx
-  mov  eax, 0x4ABFD6
-  jmp  eax
+  push 0x4ABFD6
+  retn
 return:
   and  InLoop, (-1^SKILLDEX)
   retn
@@ -470,8 +469,8 @@ static void __declspec(naked) automap_hook() {
   push esi
   push edi
   push ebp
-  mov  esi, 0x41B8C1
-  jmp  esi
+  push 0x41B8C1
+  retn
 return:
   and  InLoop, (-1^AUTOMAP)
   retn
@@ -525,4 +524,8 @@ void LoadGameHookInit() {
  MakeCall(0x4ABFD0, &skilldex_select_hook, true);// SKILLDEX
  MakeCall(0x41B8BC, &automap_hook, true);   // AUTOMAP
  MakeCall(0x46EC9D, &setup_inventory_hook, false);// INVENTORY + INTFACEUSE + INTFACELOOT + BARTER
+
+ PipBoyAvailableAtGameStart = GetPrivateProfileIntA("Misc", "PipBoyAvailableAtGameStart", 0, ini) != 0;
+ DisableHorrigan = GetPrivateProfileIntA("Misc", "DisableHorrigan", 0, ini) != 0;
+
 }

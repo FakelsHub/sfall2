@@ -22,7 +22,7 @@
 #include "FalloutEngine.h"
 #include "SuperSave.h"
 
-DWORD LSPageOffset = 0;
+int LSPageOffset = 0;
 
 static bool ExtraSaveSlots = false;
 
@@ -39,8 +39,8 @@ static const DWORD CorrectSlotCursor[] = {
 static void _stdcall LoadPageOffsets() {
  char LoadPath[MAX_PATH];
  sprintf(LoadPath, filename, *(char**)_patches);
- *(DWORD*)_slot_cursor = GetPrivateProfileIntA("Position", "ListNum", 0, LoadPath);
- if (*(DWORD*)_slot_cursor < 0 || *(DWORD*)_slot_cursor > 9) *(DWORD*)_slot_cursor = 0;
+ *(int*)_slot_cursor = GetPrivateProfileIntA("Position", "ListNum", 0, LoadPath);
+ if (*(int*)_slot_cursor < 0 || *(int*)_slot_cursor > 9) *(int*)_slot_cursor = 0;
  if (ExtraSaveSlots) {
   LSPageOffset = GetPrivateProfileIntA("Position", "PageOffset", 0, LoadPath);
   if (LSPageOffset < 0 || LSPageOffset > 9990) LSPageOffset = 0;
@@ -59,7 +59,7 @@ static void __declspec(naked) game_init_hook() {
 static void _stdcall SavePageOffsets() {
  char SavePath[MAX_PATH], buffer[6];
  sprintf(SavePath, filename, *(char**)_patches);
- _itoa_s(*(DWORD*)_slot_cursor, buffer, 10);
+ _itoa_s(*(int*)_slot_cursor, buffer, 10);
  WritePrivateProfileString("Position", "ListNum", buffer, SavePath);
  if (ExtraSaveSlots) {
   _itoa_s(LSPageOffset, buffer, 10);
@@ -99,8 +99,8 @@ static void __declspec(naked) LSGameStart_hook() {
   push edi                                  // HovOff
   mov  ecx, edi                             // HovOn
   mov  edx, 55+15                           // Xpos
-  mov  eax, ds:[_lsgwin]                    // eax = WinRef
-  mov  ebp, eax                             // ebp = WinRef
+  mov  eax, ds:[_lsgwin]                    // eax = GNWID
+  mov  ebp, eax                             // ebp = GNWID
   call win_register_text_button_
   pop  edx                                  // ширина
   pop  ebx                                  // Ypos
@@ -112,7 +112,7 @@ static void __declspec(naked) LSGameStart_hook() {
   push edi                                  // HovOff
   mov  ecx, edi                             // HovOn
   add  edx, 55+15+15+16                     // Xpos
-  mov  eax, ebp                             // WinRef
+  mov  eax, ebp                             // GNWID
   call win_register_text_button_
   pop  ebx                                  // Ypos
 // right button +100
@@ -128,28 +128,26 @@ static void __declspec(naked) LSGameStart_hook() {
   mov  ecx, edi                             // HovOn
   mov  edx, 55+230-15-16                    // Xpos
   sub  edx, eax
-  mov  eax, ebp                             // WinRef
+  mov  eax, ebp                             // GNWID
   call win_register_text_button_
   pop  edx                                  // ширина
   pop  ebx                                  // Ypos
 // right button +10
   push esi                                  // flags
   mov  eax, 0x50EDB8                        // '>'
-  mov  esi, eax
+  push eax                                  // *DisplayText
   call ds:[_text_width]
   add  eax, edx
-  push esi                                  // '>'
   push edi                                  // ButtUp
   push 0x14D                                // ButtDown (right button)
   push edi                                  // HovOff
   mov  ecx, edi                             // HovOn
   mov  edx, 55+230-15-15-16-16              // Xpos
   sub  edx, eax
-  mov  eax, ebp                             // WinRef
+  mov  eax, ebp                             // GNWID
   call win_register_text_button_
   pop  ebx                                  // Ypos
 // Set Number button
-  xor  esi, esi
   push esi                                  // flags
   push esi
   push esi                                  // PicDown
@@ -161,7 +159,7 @@ static void __declspec(naked) LSGameStart_hook() {
   push 16                                   // Height
   mov  ecx, 50                              // Width
   mov  edx, 145                             // Xpos
-  xchg ebp, eax                             // WinRef
+  xchg ebp, eax                             // GNWID
   call win_register_button_
   retn
  }
@@ -173,7 +171,7 @@ static void __declspec(naked) ShowSlotList_hook() {
   push edx
   push ecx
   push eax
-  push ecx                                  // MaxWidth
+  push ecx                                  // ToWidth
   push eax                                  // _lsgbuf
   push ebx                                  // ColorIndex
   add  eax, 38545                           // ToSurface (640*60+145)
@@ -192,7 +190,7 @@ static void __declspec(naked) ShowSlotList_hook() {
   call sprintf_
   add  esp, 3*4
   pop  edi                                  // edi = _lsgbuf
-  pop  ecx                                  // MaxWidth
+  pop  ecx                                  // ToWidth
   movzx eax, byte ptr ds:[_DARK_GREEN_Color]
   push eax
   mov  eax, edx                             // *DisplayText
@@ -305,8 +303,8 @@ static void __declspec(naked) GetSlotList_hook() {
   add  eax, ebx
   inc  eax
   push eax
-  mov  eax, 0x47E5EA
-  jmp  eax
+  push 0x47E5EA
+  retn
  }
 }
 
@@ -324,6 +322,7 @@ void EnableSuperSaving() {
  ExtraSaveSlots = GetPrivateProfileIntA("Misc", "ExtraSaveSlots", 0, ini) != 0;
  HookCall(0x442995, &game_init_hook);       // load saved page and list positions from file
  HookCall(0x47D82D, &LSGameEnd_hook);       // save current page and list positions to file on load/save scrn exit
+ SafeWrite8(0x4D852C, 0xF4);                // _YellowColor
  if (ExtraSaveSlots) {
   dlog("Running EnableSuperSaving()", DL_INIT);
   HookCall(0x47D812, &LSGameStart_hook);    // save/load button setup func

@@ -29,8 +29,8 @@ static void __declspec(naked) MainMenuButtonYHook() {
   xor edi, edi;
   xor esi, esi;
   mov ebp, MainMenuYOffset;
-  mov  eax, 0x48184A
-  jmp  eax
+  push 0x48184A
+  retn
  }
 }
 
@@ -77,8 +77,8 @@ static void __declspec(naked) MainMenuTextHook() {
   push edi; //ypos
   mov eax, ds:[_main_window];//winptr
   call win_print_
-  mov  eax, 0x4817B0
-  jmp  eax
+  push 0x4817B0
+  retn
  }
 }
 

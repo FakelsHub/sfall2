@@ -79,8 +79,8 @@ static void __declspec(naked) elevator_select_hook3() {
   lea  esi, Menus
   mov  eax, [esi+edi*4]
   mov  eax, [_btncnt+eax*4]
-  mov  esi, 0x43F064
-  jmp  esi
+  push 0x43F064
+  retn
  }
 }
 
@@ -89,8 +89,8 @@ static void __declspec(naked) elevator_select_hook4() {
   lea  edx, Menus
   mov  eax, [edx+edi*4]
   mov  eax, [_btncnt+eax*4]
-  mov  edx, 0x43F18B
-  jmp  edx
+  push 0x43F18B
+  retn
  }
 }
 
@@ -99,8 +99,8 @@ static void __declspec(naked) elevator_select_hook5() {
   lea  eax, Menus
   mov  eax, [eax+edi*4]
   mov  eax, [_btncnt+eax*4]
-  mov  ebx, 0x43F1EB
-  jmp  ebx
+  push 0x43F1EB
+  retn
  }
 }
 

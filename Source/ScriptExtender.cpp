@@ -668,8 +668,8 @@ end:
   push edx;
   push esi;
   push ebp;
-  mov  ecx, 0x4A3911
-  jmp  ecx
+  push 0x4A3911
+  retn
  }
 }
 static void __declspec(naked) ScrPtrHook() {
@@ -684,8 +684,8 @@ end:
   push esi;
   push edi;
   push ebp;
-  mov  ecx, 0x4A5E39
-  jmp  ecx
+  push 0x4A5E39
+  retn
  }
 }
 
@@ -814,9 +814,10 @@ static void __declspec(naked) AfterCombatAttackHook() {
   pushad;
   call AfterAttackCleanup;
   popad;
-  mov eax, 1;
-  mov edx, 0x4230DA;
-  jmp edx;
+  xor  eax, eax
+  inc  eax
+  push 0x4230DA
+  retn
  }
 }
 static void __declspec(naked) ExecMapScriptsHook() {
@@ -827,8 +828,8 @@ static void __declspec(naked) ExecMapScriptsHook() {
   push eax; // int procId
   call HandleMapUpdateForScripts;
   popad;
-  mov ebx, 0x4A67F9; // jump back
-  jmp ebx;
+  push 0x4A67F9                             // jump back
+  retn
  }
 }
 static DWORD __stdcall GetGlobalExportedVarPtr(const char* name) {
@@ -949,11 +950,6 @@ end:
 }
 
 void ScriptExtenderSetup() {
-#ifdef TRACE
- bool AllowUnsafeScripting=GetPrivateProfileIntA("Debugging", "AllowUnsafeScripting", 0, ini)!=0;
-#else
- const bool AllowUnsafeScripting=false;
-#endif
  toggleHighlightsKey = GetPrivateProfileIntA("Input", "ToggleItemHighlightsKey", 0, ini);
  if (toggleHighlightsKey) {
   HookCall(0x44B9BA, &gmouse_bk_process_hook);
@@ -967,8 +963,7 @@ void ScriptExtenderSetup() {
  idle = GetPrivateProfileIntA("Misc", "ProcessorIdle", -1, ini);
 
  dlogr("Adding additional opcodes", DL_SCRIPT);
- if(AllowUnsafeScripting) dlogr("  Unsafe opcodes enabled", DL_SCRIPT);
- else dlogr("  Unsafe opcodes disabled", DL_SCRIPT);
+ dlogr("  Unsafe opcodes enabled", DL_SCRIPT);
 
  arraysBehavior = GetPrivateProfileIntA("Misc", "arraysBehavior", 1, ini);
  if (arraysBehavior > 0) {
@@ -1008,12 +1003,10 @@ void ScriptExtenderSetup() {
 
  HookCall(0x46E141, FreeProgramHook);
 
- if(AllowUnsafeScripting) {
-  opcodes[0x156]=ReadByte;
-  opcodes[0x157]=ReadShort;
-  opcodes[0x158]=ReadInt;
-  opcodes[0x159]=ReadString;
- }
+ opcodes[0x156]=ReadByte;
+ opcodes[0x157]=ReadShort;
+ opcodes[0x158]=ReadInt;
+ opcodes[0x159]=ReadString;
  opcodes[0x15a]=SetPCBaseStat;
  opcodes[0x15b]=SetPCExtraStat;
  opcodes[0x15c]=GetPCBaseStat;
@@ -1121,13 +1114,10 @@ void ScriptExtenderSetup() {
  opcodes[0x1cc]=fApplyHeaveHoFix;
  opcodes[0x1cd]=SetSwiftLearnerMod;
  opcodes[0x1ce]=SetLevelHPMod;
- if(AllowUnsafeScripting) {
-  opcodes[0x1cf]=WriteByte;
-  opcodes[0x1d0]=WriteShort;
-  opcodes[0x1d1]=WriteInt;
-  for(int i=0x1d2;i<0x1dc;i++)
-   opcodes[i]=CallOffset;
- }
+ opcodes[0x1cf]=WriteByte;
+ opcodes[0x1d0]=WriteShort;
+ opcodes[0x1d1]=WriteInt;
+ for (int i = 0x1d2; i < 0x1dc; i++) opcodes[i] = CallOffset;
  opcodes[0x1dc]=ShowIfaceTag;
  opcodes[0x1dd]=HideIfaceTag;
  opcodes[0x1de]=IsIfaceTagActive;
@@ -1191,9 +1181,7 @@ void ScriptExtenderSetup() {
  opcodes[0x218]=set_weapon_ammo_pid;
  opcodes[0x219]=get_weapon_ammo_count;
  opcodes[0x21a]=set_weapon_ammo_count;
- if(AllowUnsafeScripting) {
-  opcodes[0x21b]=WriteString;
- }
+ opcodes[0x21b]=WriteString;
  opcodes[0x21c]=get_mouse_x;
  opcodes[0x21d]=get_mouse_y;
  opcodes[0x21e]=get_mouse_buttons;
@@ -1201,7 +1189,7 @@ void ScriptExtenderSetup() {
  opcodes[0x220]=get_screen_width;
  opcodes[0x221]=get_screen_height;
  opcodes[0x222] = (void*)map_disable_bk_processes_;// Stop game
- opcodes[0x223] = (void*)map_enable_bk_processes_; // Resume the game when it is stopped
+ opcodes[0x223] = (void*)map_enable_bk_processes_;// Resume the game when it is stopped
  opcodes[0x224]=create_message_window;
  opcodes[0x225]=remove_trait;
  opcodes[0x226]=get_light_level;
@@ -1576,12 +1564,12 @@ void SetGlobals(sGlobalVar* globals) {
 }
 
 //fuctions to load and save appearance globals
-void SetAppearanceGlobals(int race, int style) {
+void _stdcall SetAppearanceGlobals(int race, int style) {
  SetGlobalVar2("HAp_Race", race);
  SetGlobalVar2("HApStyle", style);
 }
 
-void GetAppearanceGlobals(int *race, int *style) {
+void _stdcall GetAppearanceGlobals(int *race, int *style) {
  *race=GetGlobalVar2("HAp_Race");
  *style=GetGlobalVar2("HApStyle");
 }

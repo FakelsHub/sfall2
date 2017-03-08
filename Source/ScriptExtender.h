@@ -56,8 +56,8 @@ void SetGlobals(sGlobalVar* globals);
 
 extern DWORD AvailableGlobalScriptTypes;
 
-void SetAppearanceGlobals(int race, int style);
-void GetAppearanceGlobals(int *race, int *style);
+void _stdcall SetAppearanceGlobals(int race, int style);
+void _stdcall GetAppearanceGlobals(int *race, int *style);
 
 void _stdcall RegAnimCombatCheck(DWORD newValue);
 

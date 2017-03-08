@@ -1,24 +1,24 @@
 
-*0x8156 - int   read_byte(int address)
-*0x8157 - int   read_short(int address)
-*0x8158 - int   read_int(int address)
-*0x8159 - char* read_string(int address)
+0x8156 - int   read_byte(int address)
+0x8157 - int   read_short(int address)
+0x8158 - int   read_int(int address)
+0x8159 - char* read_string(int address)
 
-*0x81cf - void  write_byte(int address, int value)
-*0x81d0 - void  write_short(int address, int value)
-*0x81d1 - void  write_int(int address, int value)
-*0x821b - void  write_string(int address, char* value)
+0x81cf - void  write_byte(int address, int value)
+0x81d0 - void  write_short(int address, int value)
+0x81d1 - void  write_int(int address, int value)
+0x821b - void  write_string(int address, char* value)
 
-*0x81d2 - void  call_offset_v0(int address)
-*0x81d3 - void  call_offset_v1(int address, int arg1)
-*0x81d4 - void  call_offset_v2(int address, int arg1, int arg2)
-*0x81d5 - void  call_offset_v3(int address, int arg1, int arg2, int arg3)
-*0x81d6 - void  call_offset_v4(int address, int arg1, int arg2, int arg3, int arg4)
-*0x81d7 - int   call_offset_r0(int address)
-*0x81d8 - int   call_offset_r1(int address, int arg1)
-*0x81d9 - int   call_offset_r2(int address, int arg1, int arg2)
-*0x81da - int   call_offset_r3(int address, int arg1, int arg2, int arg3)
-*0x81db - int   call_offset_r4(int address, int arg1, int arg2, int arg3, int arg4)
+0x81d2 - void  call_offset_v0(int address)
+0x81d3 - void  call_offset_v1(int address, int arg1)
+0x81d4 - void  call_offset_v2(int address, int arg1, int arg2)
+0x81d5 - void  call_offset_v3(int address, int arg1, int arg2, int arg3)
+0x81d6 - void  call_offset_v4(int address, int arg1, int arg2, int arg3, int arg4)
+0x81d7 - int   call_offset_r0(int address)
+0x81d8 - int   call_offset_r1(int address, int arg1)
+0x81d9 - int   call_offset_r2(int address, int arg1, int arg2)
+0x81da - int   call_offset_r3(int address, int arg1, int arg2, int arg3)
+0x81db - int   call_offset_r4(int address, int arg1, int arg2, int arg3, int arg4)
 
 0x815a - void set_pc_base_stat(int StatID, int value)
 0x815b - void set_pc_extra_stat(int StatID, int value)
@@ -274,7 +274,7 @@
 0x8212 - int sfall_ver_build()
 
 0x8213 - void hero_select_win(int)
-0x8214 - void set_hero_race(int style)
+0x8214 - void set_hero_race(int race)
 0x8215 - void set_hero_style(int style)
 
 0x8216 - void set_critter_burst_disable(objptr critter, int disable)
@@ -348,5 +348,3 @@
 0x826e - ObjectPtr create_spatial(int scriptID, int tile, int elevation, int radius)
 0x826f - int art_exists(int artFID)
 0x8270 - int obj_is_carrying_obj(ObjectPtr invenObj, ObjectPtr itemObj)
-
-* These functions require AllowUnsafeScripting to be enabled in ddraw.ini

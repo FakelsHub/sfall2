@@ -27,16 +27,16 @@ static const DWORD DamageFunctionReturn = 0x424A63;
 // Damage Fix v5 by Glovz 2014.04.16.xx.xx
 static __declspec(naked) void DamageFunction1() {
 __asm {
-    mov ebx,dword ptr ss:[esp+0x1c]; // get the number of hits
+    mov ebx, ss:[esp+0x1c]; // get the number of hits
     xor ecx,ecx; // set the loop counter to 0
     cmp ebx,0x0; // compare the number of hits to 0
     jle end; // exit
 begin:
     mov dword ptr ss:[esp+0x30],0x0; // clear value
-    mov edx,dword ptr ds:[esi+4]; // get pointer to weapon being used by an attacker (I think)
-    mov eax,dword ptr ds:[esi]; // get pointer to critter attacking
+    mov edx,ds:[esi+4]; // get pointer to weapon being used by an attacker (I think)
+    mov eax,ds:[esi]; // get pointer to critter attacking
     call item_w_damage_ // get the raw damage value
-    mov ebx,dword ptr ss:[esp+0x18]; // get the bonus ranged damage value
+    mov ebx,ss:[esp+0x18]; // get the bonus ranged damage value
     cmp ebx,0x0; // compare the range bonus damage value to 0
     jle rdJmp; // if the RB value is less than or equal to 0 then goto rdJmp
     add eax,ebx; // add the RB value to the RD value
@@ -44,10 +44,10 @@ begin:
     cmp eax,0x0; // compare the new damage value to 0
     jle noDamageJmp; // goto noDamageJmp
     mov ebx,eax; // set the ND value
-    mov edx,dword ptr ss:[esp+0x28]; // get the armorDT value
+    mov edx,ss:[esp+0x28]; // get the armorDT value
     cmp edx,0x0; // compare the armorDT value to 0
     jle bJmp; // if the armorDT value is less than or equal to 0 then goto bJmp
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
     call item_w_dam_div_ // get the ammoY value
     cmp eax,0x0; // compare the ammoY value to 0
     jg aJmp; // if the ammoY value is greater than 0 then goto aJmp
@@ -108,16 +108,16 @@ aJmp:
     sub ebx,eax; // subtract the new armorDT value from the RD value
     jmp cJmp; // goto cJmp
 bJmp:
-    mov edx,dword ptr ss:[esp+0x2c]; // get the armorDR value
+    mov edx,ss:[esp+0x2c]; // get the armorDR value
     cmp edx,0x0; // compare the armorDR value to 0
     jle dJmp; // if the armorDR value is less than or equal to 0 then goto dJmp
 cJmp:
     cmp ebx,0x0; // compare the new damage value to 0
     jle noDamageJmp; // goto noDamageJmp
-    mov edx,dword ptr ss:[esp+0x2c]; // get the armorDR value
+    mov edx,ss:[esp+0x2c]; // get the armorDR value
     cmp edx,0x0; // compare the armorDR value to 0
     jle eJmp; // if the armorDR value is less than or equal to 0 then goto eJmp
-    mov eax,dword ptr ss:[esp+0x20]; // get the CD value
+    mov eax,ss:[esp+0x20]; // get the CD value
     cmp eax,0x64; // compare the CD value to 100
     jg sdrJmp; // if the CD value is greater than 100 then goto sdrJmp
     je aSubCJmp; // if the CD value is equal to 100 then goto aSubCJmp
@@ -126,7 +126,7 @@ cJmp:
   sdrJmp:
     sub edx,0x14; // subtract 20 from the armorDR value
  aSubCJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
     call item_w_dr_adjust_ // get the ammoDRM value
     cmp eax,0x0; // compare the ammoDRM value to 0
     jl adrJmp; // if the ammoDRM value is less than 0 then goto adrJmp
@@ -137,7 +137,7 @@ cJmp:
   adrJmp:
     add edx,eax; // add the ammoDRM value to the armorDR value
  bSubCJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
     call item_w_dam_mult_ // get the ammoX value
     cmp eax,0x0; // compare the ammoX value to 0
     jg cSubCJmp; // if the ammoX value is greater than 0 then goto cSubCJmp;
@@ -155,11 +155,11 @@ cJmp:
     sub ebx,eax; // subtract the damage resisted value from the ND value
     jmp eJmp; // goto eJmp
 dJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
     call item_w_dam_mult_ // get the ammoX value
     cmp eax,0x1; // compare the ammoX value to 1
     jle bSubDJmp; // if the ammoX value is less than or equal to 1 then goto bSubDJmp;
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
     call item_w_dam_div_ // get the ammoY value
     cmp eax,0x1; // compare the ammoY value to 1
     jle aSubDJmp; // if the ammoY value is less than or equal to 1 then goto aSubDJmp
@@ -181,7 +181,7 @@ dJmp:
     add ebx,eax; // add the quotient value to the ND value
     jmp eJmp; // goto eJmp
  bSubDJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
     call item_w_dam_div_ // get the ammoY value
     cmp eax,0x1; // compare the ammoY value to 1
     jle eJmp; // goto eJmp
@@ -195,15 +195,15 @@ dJmp:
 eJmp:
     cmp ebx,0x0; // compare the new damage value to 0
     jle noDamageJmp; // goto noDamageJmp
-    mov eax,dword ptr ss:[esp+0x24]; // get the CM value
+    mov eax,ss:[esp+0x24]; // get the CM value
     cmp eax,0x2; // compare the CM value to 2
     jle addNDJmp; // if the CM value is less than or equal to 2 then goto addNDJmp
     imul ebx,eax; // multiply the ND value by the CM value
     sar ebx,0x1; // divide the result by 2
 addNDJmp:
-    add dword ptr ds:[edi],ebx; // accumulate damage
+    add ds:[edi],ebx; // accumulate damage
 noDamageJmp:
-    mov eax,dword ptr ss:[esp+0x1c]; // get the number of hits
+    mov eax,ss:[esp+0x1c]; // get the number of hits
     inc ecx; // the counter value increments by one
     cmp ecx,eax; // is the counter value less than the number of hits
     jl begin; // goto begin
@@ -215,16 +215,16 @@ end:
 // Damage Fix v5.1 by Glovz 2014.04.16.xx.xx
 static __declspec(naked) void DamageFunction2() {
 __asm {
-    mov ebx,dword ptr ss:[esp+0x1c]; // get the number of hits
+    mov ebx,ss:[esp+0x1c]; // get the number of hits
     xor ecx,ecx; // set the loop counter to 0
     cmp ebx,0x0; // compare the number of hits to 0
     jle end; // exit
 begin:
     mov dword ptr ss:[esp+0x30],0x0; // clear value
-    mov edx,dword ptr ds:[esi+4]; // get pointer to weapon being used by an attacker (I think)
-    mov eax,dword ptr ds:[esi]; // get pointer to critter attacking
+    mov edx,ds:[esi+4]; // get pointer to weapon being used by an attacker (I think)
+    mov eax,ds:[esi]; // get pointer to critter attacking
     call item_w_damage_ // get the raw damage value
-    mov ebx,dword ptr ss:[esp+0x18]; // get the bonus ranged damage value
+    mov ebx,ss:[esp+0x18]; // get the bonus ranged damage value
     cmp ebx,0x0; // compare the range bonus damage value to 0
     jle rdJmp; // if the RB value is less than or equal to 0 then goto rdJmp
     add eax,ebx; // add the RB value to the RD value
@@ -232,10 +232,10 @@ begin:
     cmp eax,0x0; // compare the new damage value to 0
     jle noDamageJmp; // goto noDamageJmp
     mov ebx,eax; // set the ND value
-    mov edx,dword ptr ss:[esp+0x28]; // get the armorDT value
+    mov edx,ss:[esp+0x28]; // get the armorDT value
     cmp edx,0x0; // compare the armorDT value to 0
     jle bJmp; // if the armorDT value is less than or equal to 0 then goto bJmp
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
     call item_w_dam_div_ // get the ammoY value
     cmp eax,0x0; // compare the ammoY value to 0
     jg aJmp; // if the ammoY value is greater than 0 then goto aJmp
@@ -298,16 +298,16 @@ aJmp:
     sub ebx,eax; // subtract the new armorDT value from the RD value
     jmp cJmp; // goto cJmp
 bJmp:
-    mov edx,dword ptr ss:[esp+0x2c]; // get the armorDR value
+    mov edx,ss:[esp+0x2c]; // get the armorDR value
     cmp edx,0x0; // compare the armorDR value to 0
     jle dJmp; // if the armorDR value is less than or equal to 0 then goto dJmp
 cJmp:
     cmp ebx,0x0; // compare the new damage value to 0
     jle noDamageJmp; // goto noDamageJmp
-    mov edx,dword ptr ss:[esp+0x2c]; // get the armorDR value
+    mov edx,ss:[esp+0x2c]; // get the armorDR value
     cmp edx,0x0; // compare the armorDR value to 0
     jle eJmp; // if the armorDR value is less than or equal to 0 then goto eJmp
-    mov eax,dword ptr ss:[esp+0x20]; // get the CD value
+    mov eax,ss:[esp+0x20]; // get the CD value
     cmp eax,0x64; // compare the CD value to 100
     jg sdrJmp; // if the CD value is greater than 100 then goto sdrJmp
     je aSubCJmp; // if the CD value is equal to 100 then goto aSubCJmp
@@ -316,7 +316,7 @@ cJmp:
   sdrJmp:
     sub edx,0x14; // subtract 20 from the armorDR value
  aSubCJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
     call item_w_dr_adjust_ // get the ammoDRM value
     cmp eax,0x0; // compare the ammoDRM value to 0
     jl adrJmp; // if the ammoDRM value is less than 0 then goto adrJmp
@@ -327,7 +327,7 @@ cJmp:
   adrJmp:
     add edx,eax; // add the ammoDRM value to the armorDR value
  bSubCJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
     call item_w_dam_mult_ // get the ammoX value
     cmp eax,0x0; // compare the ammoX value to 0
     jg cSubCJmp; // if the ammoX value is greater than 0 then goto cSubCJmp;
@@ -345,11 +345,11 @@ cJmp:
     sub ebx,eax; // subtract the damage resisted value from the ND value
     jmp eJmp; // goto eJmp
 dJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to ammo being used in the critters weapon (I think)
     call item_w_dam_mult_ // get the ammoX value
     cmp eax,0x1; // compare the ammoX value to 1
     jle bSubDJmp; // if the ammoX value is less than or equal to 1 then goto bSubDJmp;
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
     call item_w_dam_div_ // get the ammoY value
     cmp eax,0x1; // compare the ammoY value to 1
     jle aSubDJmp; // if the ammoY value is less than or equal to 1 then goto aSubDJmp
@@ -371,7 +371,7 @@ dJmp:
     add ebx,eax; // add the quotient value to the ND value
     jmp eJmp; // goto eJmp
  bSubDJmp:
-    mov eax,dword ptr ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
+    mov eax,ds:[esi+0x8]; // get pointer to critters ammo being used in their weapon (I think)
     call item_w_dam_div_ // get the ammoY value
     cmp eax,0x1; // compare the ammoY value to 1
     jle eJmp; // goto eJmp
@@ -385,7 +385,7 @@ dJmp:
 eJmp:
     cmp ebx,0x0; // compare the new damage value to 0
     jle noDamageJmp; // goto noDamageJmp
-    mov eax,dword ptr ss:[esp+0x24]; // get the CM value
+    mov eax,ss:[esp+0x24]; // get the CM value
     cmp eax,0x2; // compare the CM value to 2
     jle addNDJmp; // if the CM value is less than or equal to 2 then goto addNDJmp
     mov edx,ebx; // set temp ND value
@@ -397,9 +397,9 @@ eJmp:
   divSeven:
     add ebx,eax; // add the critical damage value to the ND value
 addNDJmp:
-    add dword ptr ds:[edi],ebx; // accumulate damage
+    add ds:[edi],ebx; // accumulate damage
 noDamageJmp:
-    mov eax,dword ptr ss:[esp+0x1c]; // get the number of hits
+    mov eax,ss:[esp+0x1c]; // get the number of hits
     inc ecx; // the counter value increments by one
     cmp ecx,eax; // is the counter value less than the number of hits
     jl begin; // goto begin
@@ -411,26 +411,26 @@ end:
 // YAAM
 static __declspec(naked) void DamageFunction5() {
  __asm {
-  mov eax,dword ptr ds:[esi+0x8];  // Get pointer to critter's weapon
-  mov edx,dword ptr ss:[esp+0x24]; // Get Critical Multiplier (passed in as argument to function)
+  mov eax,ds:[esi+0x8];  // Get pointer to critter's weapon
+  mov edx,ss:[esp+0x24]; // Get Critical Multiplier (passed in as argument to function)
   call item_w_dam_mult_   // Retrieve Ammo Dividend
   imul edx,eax;    // Damage Multipler = Critical Multipler * Ammo Dividend
-  mov eax,dword ptr ds:[esi+0x8];  // Get pointer to critter's weapon
+  mov eax,ds:[esi+0x8];  // Get pointer to critter's weapon
   call item_w_dam_div_   // Retrieve Ammo Divisor
   imul ebp,eax;    // Ammo Divisor = 1 * Ammo Divisor (ebp set to 1 earlier in function)
-  mov ebx,dword ptr ss:[esp+0x1c]; // Get number of hits
+  mov ebx,ss:[esp+0x1c]; // Get number of hits
   xor ecx,ecx;    // Set loop counter to zero
-  mov dword ptr ss:[esp+0x24],edx; // Store Damage Multiplier
+  mov ss:[esp+0x24],edx; // Store Damage Multiplier
   test ebx,ebx;    // Is number of hits <= 0?
   jle end;  // If yes, jump beyond damage calculation loop
 ajmp:       // Start of damage calculation loop
-  mov edx,dword ptr ds:[esi+0x4];  // Get pointer to weapon (?)
-  mov eax,dword ptr ds:[esi];  // Get pointer to critter (?)
-  mov ebx,dword ptr ss:[esp+0x18]; // Get Bonus Ranged Damage
+  mov edx,ds:[esi+0x4];  // Get pointer to weapon (?)
+  mov eax,ds:[esi];  // Get pointer to critter (?)
+  mov ebx,ss:[esp+0x18]; // Get Bonus Ranged Damage
   call item_w_damage_  // Retrieve Raw Damage
   add ebx,eax;     // Raw Damage = Raw Damage + Bonus Ranged Damage
-  mov edx,dword ptr ss:[esp+0x28]; // Get armor DT
-  mov eax,dword ptr ds:[esi+0x8];  // Get pointer to critter's weapon
+  mov edx,ss:[esp+0x28]; // Get armor DT
+  mov eax,ds:[esi+0x8];  // Get pointer to critter's weapon
   call item_w_dr_adjust_   // Retrieve ammo DT (well, it's really Retrieve ammo DR, but since we're treating ammo DR as ammo DT...)
   sub edx,eax;    // DT = armor DT - ammo DT
   test edx,edx;    // Is DT >= 0?
@@ -454,15 +454,15 @@ djmp:
   sar edx,0x1f;
   sub eax,edx;
   sar eax,0x1;    // Raw Damage = Raw Damage / 2 (related to critical hit damage multiplier bonus)
-  mov edx,dword ptr ss:[esp+0x20]; // Get combat difficulty setting (75 if wimpy, 100 if normal or if attacker is player, 125 if rough)
+  mov edx,ss:[esp+0x20]; // Get combat difficulty setting (75 if wimpy, 100 if normal or if attacker is player, 125 if rough)
   imul edx,eax;    // Raw Damage = Raw Damage * combat difficulty setting
   mov ebx,0x64;
   mov eax,edx;
   sar edx,0x1f;
   idiv ebx;
   mov ebx,eax;    // Raw Damage = Raw Damage / 100
-  mov edx,dword ptr ss:[esp+0x28]; // Get armor DT
-  mov eax,dword ptr ds:[esi+0x8];  // Get pointer to critter's weapon
+  mov edx,ss:[esp+0x28]; // Get armor DT
+  mov eax,ds:[esi+0x8];  // Get pointer to critter's weapon
   call item_w_dr_adjust_   // Retrieve ammo DT
   sub edx,eax;    // DT = armor DT - ammo DT
   test edx,edx;    // Is DT >= 0?
@@ -473,7 +473,7 @@ djmp:
 ejmp:
   xor eax,eax;
 fjmp:
-  mov edx,dword ptr ss:[esp+0x2c]; // Get armor DR
+  mov edx,ss:[esp+0x2c]; // Get armor DR
   add edx,eax;    // DR = armor DR + DT (note that DT should be less than or equal to zero)
   test edx,edx;    // Is DR >= 0?
   jge gjmp;
@@ -492,9 +492,9 @@ hjmp:
 cjmp:
   test ebx,ebx;    // Is Raw Damage <= 0?
   jle ijmp;    // If yes, don't accumulate damage
-  add dword ptr ds:[edi],ebx;  // Otherwise, Accumulated Damage = Accumulated Damage + Raw Damage
+  add ds:[edi],ebx;  // Otherwise, Accumulated Damage = Accumulated Damage + Raw Damage
 ijmp:
-  mov eax,dword ptr ss:[esp+0x1c]; // Get number of hits
+  mov eax,ss:[esp+0x1c]; // Get number of hits
   inc ecx;    // counter += 1
   cmp ecx,eax;    // Is counter < number of hits?
   jl ajmp;    // If yes, go back to start of damage calcuation loop (calculate damage for next hit)
@@ -566,8 +566,8 @@ static void __declspec(naked) display_stats_hook1() {
   push eax
   call sprintf_
   add  esp, 5*4
-  mov  eax, 0x472569
-  jmp  eax
+  push 0x472569
+  retn
  }
 }
 
@@ -604,8 +604,8 @@ check:
   jg   end
   mov  ebx, ROLL_CRITICAL_SUCCESS           // Upgrade to critical hit
 end:
-  mov  eax, 0x423A0D
-  jmp  eax
+  push 0x423A0D
+  retn
  }
 }
 

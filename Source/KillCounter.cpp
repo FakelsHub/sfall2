@@ -45,7 +45,7 @@ end:
   push ebx
   lea  ebx, ds:[_pc_kill_counts+eax*2]
   xor  eax, eax
-  mov  ax, word ptr [ebx]
+  mov  ax, [ebx]
   pop  ebx
   retn
  }

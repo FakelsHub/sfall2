@@ -47,8 +47,7 @@ skip:
   cmp  esi, 1
   jg   end
   pop  eax                                  // ”ничтожаем адрес возврата
-  mov  eax, 0x4615BE
-  push eax
+  push 0x4615BE
 end:
   retn
  }

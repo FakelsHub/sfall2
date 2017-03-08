@@ -84,15 +84,15 @@ itsCar:
   cmp  eax, -1
   jne  skip
 noCar:
-  mov  eax, 0x49C38B
-  jmp  eax                                  // "Это ничего не даст."
+  push 0x49C38B
+  retn                                      // "Это ничего не даст."
 skip:
   test eax, eax
   jnz  end
   dec  eax
 end:
-  mov  esi, 0x49C3C5
-  jmp  esi
+  push 0x49C3C5
+  retn
  }
 }
 
@@ -128,8 +128,8 @@ skip:
   mov  eax, ds:[_obj_dude]
   call queue_find_first_
 end:
-  mov  esi, 0x47A6A1
-  jmp  esi
+  push 0x47A6A1
+  retn
  }
 }
 
@@ -160,26 +160,28 @@ skip:
   mov  eax, 2                               // type = зависимость
   mov  edx, offset remove_jet_addict
   call queue_clear_type_
-  mov  eax, 0x479FD1
-  jmp  eax
+  push 0x479FD1
+  retn
  }
 }
 
 static void __declspec(naked) item_wd_process_hook() {
  __asm {
   cmp  esi, PERK_add_jet
-  je   itsJet
-  retn
-itsJet:
-  pop  edx                                  // Уничтожаем адрес возврата
+  jne  end
   xor  edx, edx                             // edx=init
   mov  ecx, [ebx+0x4]                       // ecx=drug_pid
   push ecx
   mov  ecx, esi                             // ecx=perk
   mov  ebx, 10080                           // ebx=время в минутах (10080 минут = 168 часов = 7 дней)
   call insert_withdrawal_
-  mov  eax, 0x47A3FB
-  jmp  eax
+  pop  eax                                  // Уничтожаем адрес возврата
+  xor  eax, eax
+  pop  esi
+  pop  ecx
+  pop  ebx
+end:
+  retn
  }
 }
 
@@ -279,12 +281,13 @@ static void __declspec(naked) gdProcessUpdate_hook() {
   add  eax, esi
   cmp  eax, ds:[_optionRect + 12]           // _optionRect.offy
   jge  skip
-  add  eax, 2
-  mov  esi, 0x44702D
-  jmp  esi
+  inc  eax
+  inc  eax
+  push 0x44702D
+  retn
 skip:
-  mov  esi, 0x4470DB
-  jmp  esi
+  push 0x4470DB
+  retn
  }
 }
 
@@ -297,8 +300,10 @@ static void __declspec(naked) invenWieldFunc_hook() {
   push ebx
   mov  cl, [edi+0x27]
   and  cl, 0x3
-  xchg edx, eax                             // eax=source, edx=item
+  xchg edx, eax                             // eax = source, edx = item
   call item_remove_mult_
+  pop  ebx
+  xchg ebp, eax
 nextWeapon:
   mov  eax, esi
   test cl, 0x2                              // Правая рука?
@@ -313,11 +318,13 @@ removeFlag:
   and  byte ptr [eax+0x27], 0xFC            // Сбрасываем флаг оружия в руке
   jmp  nextWeapon
 noWeapon:
-  or   byte ptr [edi+0x27], cl              // Устанавливаем флаг оружия в руке
+  or   [edi+0x27], cl                       // Устанавливаем флаг оружия в руке
+  inc  ebp
+  jz   skip
   xchg esi, eax
   mov  edx, edi
-  pop  ebx
   call item_add_force_
+skip:
   popad
   jmp  item_get_type_
  }
@@ -438,8 +445,8 @@ static void __declspec(naked) inven_pickup_hook() {
   dec  edx
   sub  edx, eax
   lea  edx, ds:0[edx*8]
-  mov  eax, 0x470EC9
-  jmp  eax
+  push 0x470EC9
+  retn
  }
 }
 
@@ -476,8 +483,8 @@ next:
   cmp  edx, 6
   jb   next
 end:
-  mov  eax, 0x47125C
-  jmp  eax
+  push 0x47125C
+  retn
 found:
   mov  ebx, 0x4711DF
   add  edx, [esp+0x40]                      // inventory_offset
@@ -554,13 +561,6 @@ end:
  }
 }
 
-static void __declspec(naked) item_d_take_drug_hook1() {
- __asm {
-  mov  eax, 0x47A168
-  jmp  eax
- }
-}
-
 static void __declspec(naked) op_wield_obj_critter_hook() {
  __asm {
   call adjust_ac_
@@ -624,8 +624,8 @@ static void __declspec(naked) loot_container_hook1() {
   mov  edx, [esp+0x138]
   xchg edx, eax
   call stat_pc_add_experience_
-  cmp  edx, 1
-  jne  skip
+  dec  edx
+  jnz  skip
   push XPWithSwiftLearner
   mov  ebx, [esp+0xE8]
   push ebx
@@ -636,8 +636,8 @@ static void __declspec(naked) loot_container_hook1() {
   mov  eax, esp
   call display_print_
 skip:
-  mov  ebx, 0x4745E3
-  jmp  ebx
+  push 0x4745E3
+  retn
  }
 }
 
@@ -669,8 +669,8 @@ static void __declspec(naked) set_new_results_hook() {
   jmp  queue_remove_this_                   // Удаляем отключку из очереди (если отключка там есть)
 end:
   pop  eax                                  // Уничтожаем адрес возврата
-  mov  eax, 0x424FC6
-  jmp  eax
+  push 0x424FC6
+  retn
  }
 }
 
@@ -695,7 +695,6 @@ end:
 
 static void __declspec(naked) obj_load_func_hook() {
  __asm {
-  mov  edi, 0x488EF9
   test byte ptr [eax+0x25], 0x4             // Temp_
   jnz  end
   mov  edi, [eax+0x64]
@@ -715,9 +714,11 @@ static void __declspec(naked) obj_load_func_hook() {
 clear:
   and  word ptr [eax+0x44], 0x7FFD          // not (DAM_LOSE_TURN or DAM_KNOCKED_DOWN)
 skip:
-  mov  edi, 0x488F14
+  push 0x488F14
+  retn
 end:
-  jmp  edi
+  push 0x488EF9
+  retn
  }
 }
 
@@ -736,8 +737,8 @@ static void __declspec(naked) combat_ctd_init_hook() {
   jnz  end
   mov  [ebx+0x54], eax                      // pobj.who_hit_me
 end:
-  mov  eax, 0x422F11
-  jmp  eax
+  push 0x422F11
+  retn
  }
 }
 
@@ -758,8 +759,8 @@ clear:
 skip:
   mov  [edx+0x18], eax                      // combat_data.who_hit_me
 end:
-  mov  eax, 0x489422
-  jmp  eax
+  push 0x489422
+  retn
  }
 }
 
@@ -855,8 +856,8 @@ skip:
   pop  edx
   mov  eax, ebp
   call item_get_type_
-  cmp  eax, item_type_container
-  jne  end
+  dec  eax                                  // item_type_container?
+  jnz  end                                  // Нет
   mov  [ebp+0x7C], edx                      // iobj.owner = _inven_dude
 end:
   pop  ebp
@@ -877,8 +878,8 @@ static void __declspec(naked) inven_item_wearing() {
   jnz  skip                                 // Нет
   mov  eax, esi
   call item_get_type_
-  cmp  eax, item_type_container             // Сумка/Рюкзак?
-  jne  skip                                 // Нет
+  dec  eax                                  // Сумка/Рюкзак?
+  jnz  skip                                 // Нет
   mov  eax, esi
   call obj_top_environment_
   test eax, eax                             // Есть владелец?
@@ -981,8 +982,8 @@ end:
   mov  ds:[_target_xpos], eax
   mov  ds:[_target_ypos], eax
   mov  ds:[_In_WorldMap], eax
-  mov  eax, 0x4C5A77
-  jmp  eax
+  push 0x4C5A77
+  retn
  }
 }
 
@@ -1081,7 +1082,7 @@ void BugsInit() {
  dlogr(" Done", DL_INIT);
 
  dlog("Applying Jet Antidote fix.", DL_INIT);
- MakeCall(0x47A013, &item_d_take_drug_hook1, true);
+ MakeCall(0x47A013, (void*)0x47A168, true);
  dlogr(" Done", DL_INIT);
 
  dlog("Applying shiv patch.", DL_INIT);

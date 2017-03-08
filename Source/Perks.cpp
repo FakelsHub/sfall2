@@ -363,11 +363,11 @@ oloop:
   call HaveFakePerks;
   test eax, eax;
   jnz win;
-  mov ebx, 0x00434446;
-  jmp ebx;
+  push 0x434446
+  retn
 win:
-  mov ebx, 0x0043438A;
-  jmp ebx;
+  push 0x43438A
+  retn
  }
 }
 static void __declspec(naked) PlayerHasTraitHook() {
@@ -375,8 +375,8 @@ static void __declspec(naked) PlayerHasTraitHook() {
   call HaveFakeTraits;
   test eax, eax;
   jz end;
-  mov eax, 0x0043425B;
-  jmp eax;
+  push 0x43425B
+  retn
 end:
   jmp PlayerHasPerkHook;
  }
@@ -440,11 +440,11 @@ static void __declspec(naked) EndPerkLoopHook() {
   add eax, PERK_count;
   cmp ebx, eax;
   jl end;
-  mov eax, 0x00434446;
-  jmp eax;
+  push 0x434446
+  retn
 end:
-  mov eax, 0x004343A5;
-  jmp eax;
+  push 0x4343A5
+  retn
  }
 }
 
@@ -604,8 +604,8 @@ lower:
   sub ecx, eax;
   mov eax, ecx;
   add eax, ebx;
-  mov edi, 0x478AFC;
-  jmp edi;
+  push 0x478AFC
+  retn
  }
 }
 void _stdcall ApplyHeaveHoFix() {
@@ -640,8 +640,7 @@ static void __declspec(naked) editor_design_hook2() {
   mov  ds:[_Tag_], eax
   mov  eax, Mutate_
   mov  ds:[_Mutate_], eax
-  call RestorePlayer_
-  retn
+  jmp  RestorePlayer_
  }
 }
 
@@ -669,19 +668,18 @@ static void __declspec(naked) perks_dialog_hook() {
  }
 }
 
-static const DWORD perk_can_add_hook_End = 0x496889;
-static const DWORD perk_can_add_hook_End1 = 0x496891;
 static void __declspec(naked) perk_can_add_hook() {
  __asm {
   mov  esi, ds:[_perkLevelDataList]
   mov  esi, [esi+edx*4]
   imul esi, esi, 3
-  add  esi, [ecx+0x10]
-  cmp  eax, esi
-  jge  end
-  jmp  perk_can_add_hook_End
+  add  esi, [ecx+0x10]                      // Perk.ReqLevel
+  cmp  eax, esi                             // Уровень игрока меньше требуемого уровня?
+  jl   end                                  // Да
+  pop  esi                                  // Уничтожаем адрес возврата
+  push 0x496891
 end:
-  jmp  perk_can_add_hook_End1
+  retn
  }
 }
 
@@ -805,16 +803,14 @@ static void PerkSetup() {
  HookCall(0x431E2B, &editor_design_hook);
  HookCall(0x4329B2, &editor_design_hook2);
  HookCall(0x43CA77, &perks_dialog_hook);
- MakeCall(0x496884, &perk_can_add_hook, true);
+ MakeCall(0x496884, &perk_can_add_hook, false);
 
 // Приподнимем окно перков
  SafeWrite8(0x43C577, 31);                  // 91-60=31
  SafeWrite8(0x43CB69, 74);                  // 134-60=74
 
- DWORD RiflescopePenalty = GetPrivateProfileIntA("Misc", "RiflescopePenalty", 8, ini);
- if (RiflescopePenalty >= 0 && RiflescopePenalty != 8) {
-  SafeWrite32(0x42448E, RiflescopePenalty);
- }
+ int RiflescopePenalty = GetPrivateProfileIntA("Misc", "RiflescopePenalty", -1, ini);
+ if (RiflescopePenalty >= 0) SafeWrite32(0x42448E, RiflescopePenalty);
 
 }
 

@@ -18,6 +18,6 @@
 
 #pragma once
 
-extern DWORD LSPageOffset;
+extern int LSPageOffset;
 
 void EnableSuperSaving();

@@ -181,7 +181,7 @@ static void __declspec(naked) WriteShort() {
   jnz end;
   cmp si, 0xC001;
   jnz end;
-  //mov word ptr ds:[eax], dx;
+  //mov ds:[eax], dx;
   and edx, 0xffff;
   push edx;
   push eax;
@@ -209,7 +209,7 @@ static void __declspec(naked) WriteInt() {
   jnz end;
   cmp si, 0xC001;
   jnz end;
-  //mov dword ptr ds:[eax], edx;
+  //mov ds:[eax], edx;
   push edx;
   push eax;
   call SafeWrite32;

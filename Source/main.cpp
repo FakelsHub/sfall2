@@ -136,8 +136,8 @@ static void __declspec(naked) game_time_date_hook() {
   add  esi, ds:[_pc_proto+0x134]            // _pc_proto.bonus_age
   mov  [edi], esi
 end:
-  mov  esi, 0x4A33BE
-  jmp  esi
+  push 0x4A33BE
+  retn
  }
 }
 
@@ -175,8 +175,8 @@ static void __declspec(naked) script_chk_timed_events_hook() {
  __asm {
   inc  dword ptr ds:[_fallout_game_time]
   call TimerReset
-  mov  ecx, 0x4A3DFB
-  jmp  ecx
+  push 0x4A3DFB
+  retn
  }
 }
 
@@ -522,8 +522,8 @@ decrease:
 negative:
   xor  ebx, ebx
 end:
-  mov  esi, 0x460BA6
-  jmp  esi
+  push 0x460BA6
+  retn
  }
 }
 
@@ -570,8 +570,8 @@ static void __declspec(naked) partyMember_init_hook() {
   push eax
   call mem_malloc_                          // malloc the necessary memory
   pop  ebx
-  mov  edx, 0x493D16
-  jmp  edx                                  // call memset to set all malloc'ed memory to 0
+  push 0x493D16
+  retn                                      // call memset to set all malloc'ed memory to 0
  }
 }
 
@@ -579,26 +579,28 @@ static void __declspec(naked) partyMemberGetAIOptions_hook() {
  __asm {
   imul edx, edx, 204
   mov  eax, ds:[_partyMemberAIOptions]      // get starting offset of internal NPC table
-  mov  esi, 0x49423A
-  jmp  esi                                  // eax+edx = offset of specific NPC record
+  push 0x49423A
+  retn                                      // eax+edx = offset of specific NPC record
  }
 }
 
 static void __declspec(naked) item_w_called_shot_hook() {
  __asm {
-  mov  edx, 0x478E7F
   test eax, eax                             // does player have Fast Shot trait?
   jz   end                                  // skip ahead if no
-  push edx
   mov  edx, ecx                             // hit_mode
   mov  eax, ebx                             // source
   call item_w_range_                        // get weapon's range
-  pop  edx
   cmp  eax, 2                               // is weapon range less than or equal 2 (i.e. melee/unarmed attack)?
   jle  end                                  // skip ahead if yes
-  mov  edx, 0x478E9B                        // otherwise, disallow called shot attempt
+  xor  eax, eax                             // otherwise, disallow called shot attempt
+  pop  esi
+  pop  ecx
+  pop  ebx
+  retn
 end:
-  jmp  edx
+  push 0x478E7F
+  retn
  }
 }
 
@@ -615,8 +617,8 @@ static void __declspec(naked) op_obj_can_see_obj_hook() {
   push edi
   push obj_shoot_blocking_at_               // arg3 check hex objects func pointer
   mov  esi, 0x20                            // arg2 flags, 0x20 = check shootthru
-  mov  edi, 0x4163B7
-  jmp  edi
+  push 0x4163B7
+  retn
  }
 }
 
@@ -626,15 +628,15 @@ static void __declspec(naked) get_input_str_hook() {
  __asm {
   push ecx
   mov  cl, XltKey
-  test byte ptr ds:[_kb_lock_flags], cl
+  test ds:[_kb_lock_flags], cl
   jz   end
   mov  ecx, offset XltTable
   and  eax, 0xFF
   mov  al, [ecx+eax-0x20]
 end:
-  mov  byte ptr [esp+esi+4], al
-  mov  eax, 0x433F43
-  jmp  eax
+  mov  [esp+esi+4], al
+  push 0x433F43
+  retn
  }
 }
 
@@ -642,15 +644,15 @@ static void __declspec(naked) get_input_str2_hook() {
  __asm {
   push edx
   mov  dl, XltKey
-  test byte ptr ds:[_kb_lock_flags], dl
+  test ds:[_kb_lock_flags], dl
   jz   end
   mov  edx, offset XltTable
   and  eax, 0xFF
   mov  al, [edx+eax-0x20]
 end:
-  mov  byte ptr [esp+edi+4], al
-  mov  eax, 0x47F369
-  jmp  eax
+  mov  [esp+edi+4], al
+  push 0x47F369
+  retn
  }
 }
 
@@ -671,8 +673,8 @@ static void __declspec(naked) kb_next_ascii_English_US_hook() {
   je   end
   cmp  dh, 0x30                             // DIK_B
 end:
-  mov  eax, 0x4CC35D
-  jmp  eax
+  push 0x4CC35D
+  retn
  }
 }
 
@@ -711,7 +713,7 @@ static void __declspec(naked) FirstTurnAndNoEnemy() {
   xor  eax, eax
   test byte ptr ds:[_combat_state], 1
   jz   end                                  // Не в бою
-  cmp  dword ptr ds:[_combatNumTurns], eax
+  cmp  ds:[_combatNumTurns], eax
   jne  end                                  // Это не первый ход
   call combat_should_end_
   test eax, eax                             // Враги есть?
@@ -766,7 +768,8 @@ static void __declspec(naked) check_move_hook() {
   call FirstTurnAndNoEnemy
   test eax, eax                             // Это первый ход в бою и врагов нет?
   jnz  skip                                 // Да
-  cmp  dword ptr [ecx], -1
+  dec  eax
+  cmp  [ecx], eax
   je   end
   retn
 skip:
@@ -774,8 +777,8 @@ skip:
   dec  esi
 end:
   pop  eax                                  // Уничтожаем адрес возврата
-  mov  eax, 0x4180A7
-  jmp  eax
+  push 0x4180A7
+  retn
  }
 }
 
@@ -786,13 +789,13 @@ static void __declspec(naked) gmouse_bk_process_hook() {
   test eax, eax                             // Это первый ход в бою и врагов нет?
   jnz  end                                  // Да
   xchg edi, eax
-  cmp  eax, dword ptr [edx+0x40]
+  cmp  eax, [edx+0x40]
   jg   end
   retn
 end:
   pop  eax                                  // Уничтожаем адрес возврата
-  mov  eax, 0x44B8C5
-  jmp  eax
+  push 0x44B8C5
+  retn
  }
 }
 
@@ -857,8 +860,8 @@ static void __declspec(naked) wmTownMapFunc_hook() {
   retn
 end:
   pop  eax                                  // Уничтожаем адрес возврата
-  mov  eax, 0x4C4976
-  jmp  eax
+  push 0x4C4976
+  retn
  }
 }
 
@@ -891,7 +894,7 @@ static void __declspec(naked) SaveGame_hook() {
  __asm {
   pushad
   mov  ecx, ds:[_slot_cursor]
-  mov  dword ptr ds:[_flptr], eax
+  mov  ds:[_flptr], eax
   test eax, eax
   jz   end                                  // Это пустой слот, можно записывать
   call db_fclose_
@@ -915,8 +918,8 @@ nextSlot:
   ja   firstSlot                            // Да
   mov  ds:[_slot_cursor], ecx
   popad
-  mov  eax, 0x47B929
-  jmp  eax
+  push 0x47B929
+  retn
 firstSlot:
   xor  ecx, ecx
 end:
@@ -932,8 +935,8 @@ end:
   xor  ebx, ebx
   inc  ebx
   mov  ds:[_quick_done], ebx
-  mov  ebx, 0x47B9A4
-  jmp  ebx
+  push 0x47B9A4
+  retn
  }
 }
 
@@ -978,8 +981,8 @@ skip:
   mov  al, ds:[_RedColor]
 end:
   and  eax, 0xFF
-  mov  ebx, 0x44909D
-  jmp  ebx
+  push 0x44909D
+  retn
  }
 }
 
@@ -1004,8 +1007,8 @@ static void __declspec(naked) partyMemberAC() {
   call sprintf_
   add  esp, 6*4
   xor  eax, eax
-  mov  edx, 0x44923D
-  jmp  edx
+  push 0x44923D
+  retn
  }
 }
 
@@ -1153,12 +1156,12 @@ static void __declspec(naked) barter_attempt_transaction_hook() {
   je   found
   cmp  dword ptr [eax+0x64], PID_ACTIVE_STEALTH_BOY
   je   found
-  mov  eax, 0x474D34
-  jmp  eax
+  push 0x474D34
+  retn
 found:
   call item_m_turn_off_
-  mov  eax, 0x474D17
-  jmp  eax                                  // А есть ли ещё включённые предметы среди продаваемых?
+  push 0x474D17
+  retn                                      // А есть ли ещё включённые предметы среди продаваемых?
  }
 }
 
@@ -1190,6 +1193,16 @@ static void __declspec(naked) register_object_take_out_hook() {
   call register_object_change_fid_
   pop  ecx
   xor  eax, eax
+  retn
+ }
+}
+
+static void __declspec(naked) gdAddOptionStr_hook() {
+ __asm {
+  mov  ecx, ds:[_gdNumOptions]
+  add  ecx, '1'
+  push ecx
+  push 0x4458FA
   retn
  }
 }
@@ -1421,17 +1434,13 @@ static void DllMain2() {
  tmp = GetPrivateProfileIntA("Misc", "TimeLimit", 13, ini);
  if (tmp < 13 && tmp > -4) {
   dlog("Applying time limit patch.", DL_INIT);
-  if (tmp < -1) {
-   MakeCall(0x4A33B8, &game_time_date_hook, true);
-  }
+  if (tmp < -1) MakeCall(0x4A33B8, &game_time_date_hook, true);
   if (tmp < 0) {
    SafeWrite32(0x51D864, 99);
    HookCall(0x4A34F9, &TimerReset);         // inc_game_time_
    HookCall(0x4A3551, &TimerReset);         // inc_game_time_in_seconds_
    MakeCall(0x4A3DF5, &script_chk_timed_events_hook, true);
-   for (int i = 0; i < sizeof(TimedRest)/4; i++) {
-    HookCall(TimedRest[i], &TimedRest_hook);
-   }
+   for (int i = 0; i < sizeof(TimedRest)/4; i++) HookCall(TimedRest[i], &TimedRest_hook);
   } else {
    SafeWrite8(0x4A34EC, (BYTE)tmp);
    SafeWrite8(0x4A3544, (BYTE)tmp);
@@ -1467,9 +1476,7 @@ static void DllMain2() {
  dlogr(" Done", DL_INIT);
 
  dlog("Applying cities limit patch.", DL_INIT);
- if (*((BYTE*)0x4BF3BB) == 0x74) {
-  SafeWrite8(0x4BF3BB, 0xEB);              // jmps
- }
+ if (*((BYTE*)0x4BF3BB) == 0x74) SafeWrite8(0x4BF3BB, 0xEB);// jmps
  dlogr(" Done", DL_INIT);
 
  tmp = GetPrivateProfileIntA("Misc", "WorldMapSlots", 0, ini);
@@ -1526,9 +1533,7 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
- if (GetPrivateProfileIntA("Misc", "UseFileSystemOverride", 0, ini)) {
-  FileSystemInit();
- }
+ if (GetPrivateProfileIntA("Misc", "UseFileSystemOverride", 0, ini)) FileSystemInit();
 
  dlog("Applying print to file patch.", DL_INIT);
  SafeWrite32(0x6C0364, (DWORD)&FakeFindFirstFile);
@@ -1587,11 +1592,7 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
- if (GetPrivateProfileIntA("Misc", "EnableHeroAppearanceMod", 0, ini)) {
-  dlog("Setting up Appearance Char Screen buttons. ", DL_INIT);
-  EnableHeroAppearanceMod();
-  dlogr(" Done", DL_INIT);
- }
+ EnableHeroAppearanceMod();
 
  if (GetPrivateProfileIntA("Misc", "SkipOpeningMovies", 0, ini)) {
   dlog("Blocking opening movies. ", DL_INIT);
@@ -1623,9 +1624,7 @@ static void DllMain2() {
  if (tmp != 293) SafeWrite32(0x518D64, tmp);
  dlogr(" Done", DL_INIT);
 
- if (GetPrivateProfileIntA("Misc", "RemoveWindowRounding", 0, ini)) {
-  SafeWrite16(0x4B8090, 0x04EB);            // jmps 0x4B8096
- }
+ if (GetPrivateProfileIntA("Misc", "RemoveWindowRounding", 0, ini)) SafeWrite16(0x4B8090, 0x04EB);// jmps 0x4B8096
 
  dlogr("Running TilesInit().", DL_INIT);
  TilesInit();
@@ -1808,9 +1807,7 @@ static void DllMain2() {
   dlog("Applying EncounterTableSize patch.", DL_INIT);
   SafeWrite8(0x4BDB17, (BYTE)tmp);
   tmp = (tmp + 1) * 180 + 0x50;
-  for (int i = 0; i < sizeof(EncounterTableSize)/4; i++) {
-   SafeWrite32(EncounterTableSize[i], tmp);
-  }
+  for (int i = 0; i < sizeof(EncounterTableSize)/4; i++) SafeWrite32(EncounterTableSize[i], tmp);
   dlogr(" Done", DL_INIT);
  }
 
@@ -1818,9 +1815,7 @@ static void DllMain2() {
  MainMenuInit();
  dlogr(" Done", DL_INIT);
 
- if(GetPrivateProfileIntA("Misc", "DisablePipboyAlarm", 0, ini)) {
-  SafeWrite8(0x499518, 0xC3);               // retn
- }
+ if (GetPrivateProfileIntA("Misc", "DisablePipboyAlarm", 0, ini)) SafeWrite8(0x499518, 0xC3);// retn
 
  dlog("Initing AI patches.", DL_INIT);
  AIInit();
@@ -1872,9 +1867,7 @@ static void DllMain2() {
   HookCall(0x471AC8, &FakeCombatFix3);      // use_inventory_on_
  }
 
- if (GetPrivateProfileIntA("Misc", "DisableHotkeysForUnknownAreasInCity", 0, ini)) {
-  MakeCall(0x4C4945, &wmTownMapFunc_hook, false);
- }
+ if (GetPrivateProfileIntA("Misc", "DisableHotkeysForUnknownAreasInCity", 0, ini)) MakeCall(0x4C4945, &wmTownMapFunc_hook, false);
 
  if (GetPrivateProfileIntA("Misc", "EnableMusicInDialogue", 0, ini)) {
   SafeWrite8(0x44525B, 0x00);
@@ -1935,13 +1928,10 @@ static void DllMain2() {
 
  if (GetPrivateProfileIntA("Misc", "InstanWeaponEquip", 0, ini)) {
 // Пропускать анимацию убирания оружия
-  for (int i = 0; i < sizeof(PutAwayWeapon)/4; i++) {
-   SafeWrite8(PutAwayWeapon[i], 0xEB);      // jmps
-  }
+  for (int i = 0; i < sizeof(PutAwayWeapon)/4; i++) SafeWrite8(PutAwayWeapon[i], 0xEB);// jmps
   BlockCall(0x472AD5);                      //
   BlockCall(0x472AE0);                      // invenUnwieldFunc_
   BlockCall(0x472AF0);                      //
-
   MakeCall(0x415238, &register_object_take_out_hook, true);
  }
 
@@ -1953,13 +1943,23 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
+ if (GetPrivateProfileIntA("Misc", "NumbersInDialogue", 0, ini)) {
+  SafeWrite32(0x502C32, 0x2000202E);
+  SafeWrite8(0x446F3B, 0x35);
+  SafeWrite32(0x5029E2, 0x7325202E);
+  SafeWrite32(0x446F03, 0x2424448B);         // mov  eax, [esp+0x24]
+  SafeWrite8(0x446F07, 0x50);                // push eax
+  SafeWrite32(0x446FE0, 0x2824448B);         // mov  eax, [esp+0x28]
+  SafeWrite8(0x446FE4, 0x50);                // push eax
+  MakeCall(0x4458F5, &gdAddOptionStr_hook, true);
+ }
+
  dlogr("Leave DllMain2", DL_MAIN);
 }
 
 static void _stdcall OnExit() {
  ConsoleExit();
  AnimationsAtOnceExit();
- HeroAppearanceModExit();
 }
 
 static void __declspec(naked) OnExitFunc() {

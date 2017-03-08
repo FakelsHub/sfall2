@@ -115,8 +115,8 @@ static void __declspec(naked) determine_to_hit_func_hook() {
   mov  args[4], eax                         // source
   mov  args[8], ebx                         // target
   mov  args[12], ecx                        // body_part
-  mov  edi, 0x4243AE
-  jmp  edi
+  push 0x4243AE
+  retn
 return:
   mov  args[0], eax
   pushad
@@ -182,8 +182,8 @@ static void __declspec(naked) item_w_mp_cost_hook() {
   mov  args[0], eax                         // source
   mov  args[4], edx                         // hit_mode
   mov  args[8], ebx                         // is_secondary
-  mov  edi, 0x478B2B
-  jmp  edi
+  push 0x478B2B
+  retn
 return:
   mov  args[12], eax
   pushad
@@ -322,8 +322,8 @@ static void __declspec(naked) compute_damage_hook() {
   sub  esp, 0x34
   mov  args[32], ebx                        // DamageMultiplier
   mov  args[36], edx                        // rounds
-  mov  esi, 0x4247BF
-  jmp  esi
+  push 0x4247BF
+  retn
 return:
   pop  edx                                  // Восстановим указатель на ctd
   mov  eax, [edx]                           // ctd.source
@@ -409,8 +409,8 @@ static void __declspec(naked) critter_kill_hook() {
   push ebp
   sub  esp, 0x28
   mov  args[0], eax
-  mov  esi, 0x42DA6B
-  jmp  esi
+  push 0x42DA6B
+  retn
 return:
   pushad
   push HOOK_ONDEATH
@@ -489,8 +489,8 @@ defaulthandler:
   push edi
   push ebp
   sub  esp, 0x14
-  mov  esi, 0x49C3D3
-  jmp  esi
+  push 0x49C3D3
+  retn
 skip:
   cmp  rets[0], -1
   je   defaulthandler
@@ -545,8 +545,8 @@ defaulthandler:
   push ebx
   push ecx
   sub  esp, 0x10
-  mov  ecx, 0x49BF3D
-  jmp  ecx
+  push 0x49BF3D
+  retn
 skip:
   cmp  rets[0], -1
   je   defaulthandler
@@ -578,8 +578,8 @@ static void __declspec(naked) item_remove_mult_hook() {
   push edi
   push ebp
   sub  esp, 0xC
-  mov  ecx, 0x477497
-  jmp  ecx                                  // item_remove_mult_
+  push 0x477497
+  retn                                      // item_remove_mult_
  }
 }
 
@@ -594,8 +594,8 @@ static void __declspec(naked) barter_compute_value_hook() {
   mov  ebp, esp
   mov  args[0], eax                         // source
   mov  args[4], edx                         // target
-  mov  ecx, 0x474B32
-  jmp  ecx
+  push 0x474B32
+  retn
 return:
   mov  args[8], eax                         // default value of the goods
   push eax
@@ -631,8 +631,8 @@ static void __declspec(naked) critter_compute_ap_from_distance_hook() {
   cmp  ebx, ObjType_Critter
   mov  args[0], eax                         // source
   mov  args[4], edx                         // distance
-  mov  ebx, 0x42E636
-  jmp  ebx
+  push 0x42E636
+  retn
 return:
   mov  args[8], eax
   pushad
@@ -660,8 +660,8 @@ static void __declspec(naked) obj_blocking_at_hook() {
   mov  args[0], eax                         // source
   mov  args[4], edx                         // tile
   mov  args[8], ebx                         // elev
-  mov  esi, 0x48B84E
-  jmp  esi
+  push 0x48B84E
+  retn
 return:
   mov  args[12], eax
   pushad
@@ -689,8 +689,8 @@ static void __declspec(naked) obj_ai_blocking_at_hook() {
   mov  args[0], eax                         // source
   mov  args[4], edx                         // tile
   mov  args[8], ebx                         // elev
-  mov  esi, 0x48BA26
-  jmp  esi
+  push 0x48BA26
+  retn
 return:
   mov  args[12], eax
   pushad
@@ -718,8 +718,8 @@ static void __declspec(naked) obj_shoot_blocking_at_hook() {
   mov  args[0], eax                         // source
   mov  args[4], edx                         // tile
   mov  args[8], ebx                         // elev
-  mov  ecx, 0x48B936
-  jmp  ecx
+  push 0x48B936
+  retn
 return:
   mov  args[12], eax
   pushad
@@ -745,8 +745,8 @@ static void __declspec(naked) obj_sight_blocking_at_hook() {
   mov  args[8], ebx                         // elev
   xchg ecx, eax
   mov  edx, ds:[_objectTable][edx*4]
-  mov  eax, 0x48BB92
-  jmp  eax
+  push 0x48BB92
+  retn
 return:
   mov  args[12], eax
   pushad
@@ -806,8 +806,8 @@ static void __declspec(naked) item_w_compute_ammo_cost_hook() {
   mov  ebx, [edx]
 skip:
   mov  args[4], ebx                         // rounds in attack
-  mov  ebx, 0x4790B1
-  jmp  ebx
+  push 0x4790B1
+  retn
 return:
   cmp  eax, -1
   je   end
@@ -842,8 +842,8 @@ static void __declspec(naked) item_w_rounds_hook() {
   inc  edx
   mov  args[12], edx                        // type of hook (2)
   test eax, eax
-  mov  edx, 0x478D86
-  jmp  edx
+  push 0x478D86
+  retn
 return:
   cmp  eax, -1
   je   end
@@ -918,8 +918,8 @@ defaulthandler:
   push edi
   push ebp
   sub  esp, 0xBC
-  mov  esi, 0x4AAD11
-  jmp  esi
+  push 0x4AAD11
+  retn
 skip:
   cmp  rets[0], -1
   je   defaulthandler
@@ -949,8 +949,8 @@ defaulthandler:
   push edi
   push ebp
   sub  esp, 0x58
-  mov  esi, 0x4ABBEA
-  jmp  esi
+  push 0x4ABBEA
+  retn
 skip:
   cmp  rets[0], -1
   je   defaulthandler
@@ -972,8 +972,8 @@ static void __declspec(naked) is_within_perception_hook() {
   push ebp
   mov  args[0], eax                         // source
   mov  args[4], edx                         // target
-  mov  ecx, 0x42BA09
-  jmp  ecx
+  push 0x42BA09
+  retn
 return:
   mov  args[8], eax                         // check result
   pushad
@@ -1064,9 +1064,11 @@ canUseWeapon:
   xchg edx, eax                             // eax = source, edx = item
   push eax
   call item_remove_mult_                    // Временно удаляем предмет из сумки
+  cmp  eax, -1                              // Удалили?
   pop  eax                                  // eax = source
   mov  edx, esi                             // edx = item
   pop  ebx                                  // ebx = count
+  je   fail                                 // Нет
   push eax
   call item_add_check                       // Проверяем поместится ли предмет из руки в сумке
   xchg edi, eax                             // eax = item, edi = код добавления
@@ -1112,8 +1114,8 @@ defaulthandler:
   push edi
   push ebp
   mov  ebp, eax
-  mov  edi, 0x4714E5
-  jmp  edi
+  push 0x4714E5
+  retn
 return:
   hookend
   retn
@@ -1149,9 +1151,11 @@ itsPlayer:
   xchg edx, eax                             // eax = source, edx = item
   push eax
   call item_remove_mult_                    // Временно удаляем одеваемую броню из сумки
+  inc  eax                                  // Удалили?
   pop  eax                                  // eax = source
   mov  edx, ecx                             // edx = item
   pop  ebx                                  // ebx = count
+  jz   fail                                 // Нет
   push eax
   call item_add_check                       // Проверяем поместится ли снимаемая броня в сумке
   xchg edi, eax                             // eax = item, edi = код добавления
@@ -1215,8 +1219,7 @@ reload:
   jmp  end
 skip:
   pop  eax                                  // Уничтожаем адрес возврата
-  mov  eax, 0x476588
-  push eax
+  push 0x476588
 end:
   hookend
   retn
@@ -1321,8 +1324,8 @@ defaulthandler:
   push edi
   push ebp
   sub  esp, 0x1C
-  mov  esi, 0x47276E
-  jmp  esi
+  push 0x47276E
+  retn
 end:
   cmp  rets[0], -1
   je   defaulthandler
@@ -1368,8 +1371,8 @@ defaulthandler:
   push esi
   mov  esi, eax
   cmp  eax, ds:[_obj_dude]
-  mov  ecx, 0x472A6E
-  jmp  ecx
+  push 0x472A6E
+  retn
 end:
   cmp  rets[0], -1
   je   defaulthandler
@@ -1409,8 +1412,8 @@ defaulthandler:
   push edi
   push ebp
   sub  esp, 0x14
-  mov  esi, 0x4540A3
-  jmp  esi
+  push 0x4540A3
+  retn
 end:
   cmp  rets[0], -1
   je   defaulthandler
@@ -1491,7 +1494,13 @@ static void _LoadHookScript(const char* path, int id) {
  }
 }
 
-static void HookScriptInit2() {
+void HookScriptClear() {
+ for (int i = 0; i < numHooks; i++) hooks[i].clear();
+}
+
+void HookScriptInit() {
+ isGlobalScriptLoading = 1; // this should allow to register global exported variables
+
  dlogr("Initing hook scripts", DL_HOOK|DL_INIT);
 
  LoadHookScript("tohit", HOOK_TOHIT);
@@ -1589,15 +1598,6 @@ static void HookScriptInit2() {
 
  dlogr("Completed hook script init", DL_HOOK|DL_INIT);
 
-}
-
-void HookScriptClear() {
- for (int i = 0; i < numHooks; i++) hooks[i].clear();
-}
-
-void HookScriptInit() {
- isGlobalScriptLoading = 1; // this should allow to register global exported variables
- HookScriptInit2();
  InitingHookScripts = 1;
  for (int i = 0; i < numHooks; i++) {
   if (hooks[i].size()) InitScriptProgram(hooks[i][0].prog);// zero hook is always hs_*.int script because Hook scripts are loaded BEFORE global scripts

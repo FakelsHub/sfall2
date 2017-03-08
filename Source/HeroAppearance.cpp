@@ -22,2720 +22,2421 @@
 #include "Define.h"
 #include "FalloutEngine.h"
 #include "HeroAppearance.h"
+#include "LoadGameHook.h"
+#include "PartyControl.h"
 #include "ScriptExtender.h"
 
- bool AppModEnabled=false;//check if Appearance mod enabled for script fuctions
+static char RaceText[8];
+static char StyleText[8];
 
- //char scrn surfaces
- BYTE *NewButt01Surface=NULL;
- BYTE *CharScrnBackSurface=NULL;
+static const char* RaceName = "AppRace";
+static const char* StyleName = "AppStyle";
+static const char* AppearanceFmt = "Appearance\\h%cR%02dS%02d";
 
- //char scrn critter rotation vars
- DWORD CharRotTick=0;
- DWORD CharRotOri=0;
+static bool raceExist = false;
+static bool styleExist = false;
 
+// holds Appearance values to restore after global reset in NewGame2 fuction in LoadGameHooks.cpp
+static DWORD CurrentAppearance[2] = {0, 0};
 
- int CurrentRaceVal=0, CurrentStyleVal=0;//holds Appearance values to restore after global reset in NewGame2 fuction in LoadGameHooks.cpp
+static DWORD critterListCount = 0, critterArraySize = 0;// Critter art list size
 
- DWORD critterListSize=0, critterArraySize=0;//Critter art list size
-
-
- //fallout2 path node structure
-struct sPath {
-  char* path;
-  void* pDat;
-  DWORD isDat;
-  sPath* next;
+static DWORD write32[27][2] = {
+// {0x43647C, 592+3},                         // skill slider thingy (xpos)
+// {0x4364FA, 614+3},                         // skill slider thingy (plus button xpos)
+// {0x436567, 614+3},                         // skill slider thingy (minus button xpos)
+ {0x43332F, 522+48},                        // x счётчика
+ {0x43338D, 522+48},                        // x счётчика
+ {0x43628A, 522+48},                        // x счётчика
+ {0x4362F2, 522+48},                        // x счётчика
+ {0x43631E, 522+48},                        // x счётчика
+ {0x43B5B2, 522+48},                        // x счётчика
+ {0x433678, 347+80},                        // x для кнопок выбора навыков
+ {0x43A71E, 223-77},                        // ширина информационного окна #117 (530)
+ {0x43A72A, 376+77},                        // x для информационного окна #117 (530)
+ {0x4361C4, 370+77},                        // x для восстановления окна с навыками (to)
+ {0x4361D9, 270-77},                        // ширина для окна с навыками
+ {0x4361DE, 370+77},                        // x для восстановления окна с навыками (from)
+ {0x43641C, 573+3},                         // x для значения навыка в процентах
+ {0x43A74C, 223-77},                        // ширина информационного окна с навыками (531)
+ {0x43A75B, 370+77},                        // x для информационного окна с навыками (531)
+ {0x43A77D, 592+3-347-80},                  // ширина информационного окна с счётчиком (532)
+ {0x43A789, 347+80},                        // x для информационного окна с счётчиком (532)
+// x и ширина строки #138 (ОСНОВН.)
+ {0x433370, 0x02485605},                    // add  eax, 640*233+470 (0x24856)
+ {0x433374, 0x0064BB00},                    // mov  ebx, 100 (0x64)
+// x и ширина строки #117 (НАВЫКИ)
+ {0x43621E, 0x000E4905},                    // add  eax, 640*5+380+77 (0xE49)
+ {0x436222, 0x0092BB00},                    // mov  ebx, 146 (0x92)
+// x и ширина строки #112 (ДОП. ОЧКИ)
+ {0x436260, 0x02484005},                    // add  eax, 640*233+448 (0x24840)
+ {0x436264, 0x007ABB00},                    // mov  ebx, 122 (0x7A)
+// x и ширина строки #138 (ОСНОВН.)
+ {0x4362BC, 0x02485605},                    // add  eax, 640*233+470 (0x24856)
+ {0x4362C0, 0x0064BB00},                    // mov  ebx, 100 (0x64)
+// x и ширина навыков
+ {0x4363D9, 0x904DC283},                    // add  edx, 77 (0x4D)
+ {0x4363DF, 0x000077BB}                     // mov  ebx, 573+3-380-77 (0x77)
 };
 
-sPath **TempPathPtr=(sPath**)_paths;
-sPath *HeroPathPtr=NULL;
-sPath *RacePathPtr=NULL;
-
-
-//for word wrapping
-typedef struct LINENode {
-  DWORD offset;
-  LINENode *next;
-
-  LINENode() {
-     next=NULL;
-     offset=0;
-  }
-}LINENode;
-
-
-//for holding a message
-typedef struct MSGNode {
-  DWORD ref;
-  DWORD a;
-  char *msg1;//unused
-  char *msg2;
-
-  MSGNode() {
-     ref=0;
-     a=0;
-     msg1=NULL;
-     msg2=NULL;
-  }
-}MSGNode;
-
-
-//for holding msg array
-typedef struct MSGList {
-  long numMsgs;
-  void *MsgNodes;
-
-  MSGList() {
-     MsgNodes=NULL;
-     numMsgs=0;
-  }
-}MSGList;
-
-
-
-//structures for holding frms loaded with fallout2 functions
-#pragma pack(2)
-typedef class FRMframe {
-                public:
-                WORD width;
-                WORD height;
-                DWORD size;
-                WORD x;
-                WORD y;
-} FRMframe;
-
-typedef class FRMhead {
-                public:
-                DWORD version;//version num
-                WORD FPS;//frames per sec
-                WORD actionFrame;
-                WORD numFrames;//number of frames per direction
-                WORD xCentreShift[6];//offset from frm centre +=right -=left
-                WORD yCentreShift[6];//offset from frm centre +=down -=up
-                DWORD oriOffset[6];//frame area offset for diff orientations
-                DWORD frameAreaSize;
-} FRMhead;
-#pragma pack()
-
-
-//structures for loading unlisted frms 
-typedef class UNLSTDframe {
-                public:
-                WORD width;
-                WORD height;
-                DWORD size;
-                WORD x;
-                WORD y;
-                BYTE *indexBuff;
-    UNLSTDframe() {
-       width=0;
-       height=0;
-       size=0;
-       x=0;
-       y=0;
-                   indexBuff=NULL;
-    }
-    ~UNLSTDframe() {
-                if(indexBuff!=NULL)
-                   delete[] indexBuff;
-    }
-} UNLSTDframe;
-
-typedef class UNLSTDfrm {
-                public:
-                DWORD version;
-                WORD FPS;
-                WORD actionFrame;
-                WORD numFrames;
-                WORD xCentreShift[6];
-                WORD yCentreShift[6];
-                DWORD oriOffset[6];
-                DWORD frameAreaSize;
-    UNLSTDframe *frames;
-    UNLSTDfrm() {
-       version=0;
-       FPS=0;
-       actionFrame=0;
-       numFrames=0;
-       for(int i=0; i<6; i++){
-           xCentreShift[i]=0;
-           yCentreShift[i]=0;
-           oriOffset[i]=0;
-       }
-       frameAreaSize=0;
-                   frames=NULL;
-    }
-    ~UNLSTDfrm() {
-                    if(frames!=NULL)
-                       delete[] frames;
-    }
-} UNLSTDfrm;
-
-
-
-
-/*
-WORD ByteSwap16 (WORD num) {
-   return (((num >> 8)) | (num << 8));
-}
-
-DWORD ByteSwap32 (DWORD num) {
-   return (((num&0x000000FF)<<24)+((num&0x0000FF00)<<8)+
-   ((num&0x00FF0000)>>8)+((num&0xFF000000)>>24));
-}
-*/
-
-/////////////////////////////////////////////////////////////////FILE FUNCTIONS////////////////////////////////////////////////////////////////////////
-//--------------------------------------------------
-void* FOpenFile(char *FileName, char *flags) {
-  void *retVal;
-  __asm {
-     mov edx, flags
-     mov eax, FileName
-     call xfopen_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-//--------------------------------------------------
-int FCloseFile(void *FileStream) {
-  int retVal;
-  __asm {
-
-     mov eax, FileStream
-     call db_fclose_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//--------------------------------------------------
-int Ffseek(void *FileStream, long fOffset, int origin) {
-  int retVal;
-  __asm {
-     mov ebx, origin
-     mov edx, fOffset
-     mov eax, FileStream
-     call xfseek_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//--------------------------------------------------
-int FReadByte(void *FileStream, BYTE *toMem) {
-  int retVal;
-  __asm {
-     mov edx, toMem
-     mov eax, FileStream
-     call db_freadByte_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//--------------------------------------------------
-int FReadWord(void *FileStream, WORD *toMem) {
-  int retVal;
-  __asm {
-     mov edx, toMem
-     mov eax, FileStream
-     call db_freadShort_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-//--------------------------------------------------
-int FReadDword(void *FileStream, DWORD *toMem) {
-  int retVal;
-  __asm {
-     mov edx, toMem
-     mov eax, FileStream
-     call db_freadInt_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-//--------------------------------------------------
-int FReadWordArray(void *FileStream, WORD *toMem, DWORD NumElements) {
-  int retVal;
-  __asm {
-     mov ebx, NumElements
-     mov edx, toMem
-     mov eax, FileStream
-     call db_freadShortCount_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//--------------------------------------------------
-int FReadDwordArray(void *FileStream, DWORD *toMem, DWORD NumElements) {
-  int retVal;
-  __asm {
-     mov ebx, NumElements
-     mov edx, toMem
-     mov eax, FileStream
-     call db_freadIntCount_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//--------------------------------------------------
-int FReadString(void *FileStream, char *toMem, DWORD charLength, DWORD NumStrings) {
-  int retVal;
-  __asm {
-     mov ecx, FileStream
-     mov ebx, NumStrings
-     mov edx, charLength
-     mov eax, toMem
-     call db_fread_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//--------------------------------------------------
-int FWriteByte(void *FileStream, BYTE bVal) {
-  int retVal;
-  __asm {
-     xor edx, edx
-  mov dl, bVal
-     mov eax, FileStream
-     call db_fwriteByte_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//--------------------------------------------------
-int FWriteDword(void *FileStream, DWORD bVal) {
-  int retVal;
-  __asm {
-     mov edx, bVal
-     mov eax, FileStream
-     call db_fwriteInt_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-/////////////////////////////////////////////////////////////////MESSAGE FUNCTIONS////////////////////////////////////////////////////////////////////////
-
-//--------------------------------------------------
-int LoadMsgList(MSGList *MsgList, char *MsgFilePath) {
-  int retVal;
-  __asm {
-     mov edx, MsgFilePath
-     mov eax, MsgList
-     call message_load_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-//-----------------------------------------
-int DestroyMsgList(MSGList *MsgList) {
-  int retVal;
-  __asm {
-     mov eax, MsgList
-     call message_exit_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-/*
-//-----------------------------------------------------------
-bool GetMsg(MSGList *MsgList, MSGNode *MsgNode, DWORD msgRef) {
-  bool retVal=FALSE;
-  MsgNode->ref=msgRef;
-
-  __asm {
-    mov edx, MsgNode
-    mov eax, MsgList
-    call message_search_
-    cmp eax, 1
-  jne EndFunc
-    mov retVal, 1
-  EndFunc:
-  }
-return retVal;
-}
-*/
-
-
-//----------------------------------------------------
-MSGNode *GetMsgNode(MSGList *MsgList, DWORD msgRef) {
-
-  if(MsgList==NULL)return NULL;
-  if(MsgList->numMsgs<=0)return NULL;
-
-  MSGNode *MsgNode=(MSGNode*)MsgList->MsgNodes;
-
-  long last=MsgList->numMsgs-1;
-  long first=0;
-  long mid;
-
-  //Use Binary Search to find msg
-  while (first <= last) {
-     mid = (first + last)/2;
-     if(msgRef > MsgNode[mid].ref) 
-        first = mid + 1;
-     else if(msgRef < MsgNode[mid].ref) 
-        last = mid - 1;
-     else
-        return &MsgNode[mid];
-   }
-
-  return NULL;
-}
-
-
-//--------------------------------------------------------
-char* GetMsg(MSGList *MsgList, DWORD msgRef, int msgNum) {
-  MSGNode *MsgNode = GetMsgNode(MsgList, msgRef);
-  if(MsgNode) {
-  if(msgNum==2)
-     return MsgNode->msg2;
-  else if(msgNum==1)
-        return MsgNode->msg1;
-  }
-  return NULL;
-}
-
-
-
-/////////////////////////////////////////////////////////////////MOUSE FUNCTIONS////////////////////////////////////////////////////////////////////////
-//-----------------------------------------------------
-//get current mouse pic ref
-int GetMousePic() {
- return *(DWORD*)0x518C0C;
-}
-
-//-----------------------------------------------------
-//set mouse pic
-int SetMousePic(int picNum) {
-
-  __asm {
-     mov eax, picNum
-     call gmouse_set_cursor_
-     mov picNum, eax
-  }
-return picNum;//0 = success, -1 = fail
-}
-
-
-//--------------------------------------------------
-void GetMousePos(int *x_out, int *y_out) {
-
-  __asm {
-     push esi
-     mov edx, y_out
-     mov eax, x_out
-     call mouse_get_position_
-     pop esi
-  }
-}
-
-//-----------------------------------------------------
-void ShowMouse() {
-
-  __asm {
-     call mouse_show_
-  }
-
-}
-
-
-//-----------------------------------------------------
-void HideMouse() {
-
-  __asm {
-     call mouse_hide_
-  }
-}
-
-
-//-------------------------------------------------------
-//returns 0 if mouse is hidden
-int IsMouseHidden() {
- return *(DWORD*)_mouse_is_hidden;
-}
-
-
-
-/////////////////////////////////////////////////////////////////FRM FUNCTIONS////////////////////////////////////////////////////////////////////////
-
-//--------------------------------------------------
-DWORD LoadFrm(DWORD LstRef, DWORD LstNum) {
-  DWORD FrmID;
-
-  __asm {
-     push 0
-     xor ecx,ecx
-     xor ebx,ebx
-     mov edx,LstNum
-     mov eax,LstRef
-     call art_id_
-     mov FrmID, eax
-  }
-  return FrmID;
-}
-
-
-//---------------------------------------------
-void UnloadFrm(DWORD FrmObj) {
-
-  __asm {
-     mov eax, FrmObj
-     call art_ptr_unlock_
-  }
-}
-
-//--------------------------------------------------------
-BYTE* GetFrmSurface(DWORD FrmID, DWORD FrameNum, DWORD Ori, DWORD *FrmObj_out) {
-  BYTE *Surface;
-
-  __asm {
-     mov ecx, FrmObj_out//0x518F4C
-     mov ebx, Ori
-     mov edx, FrameNum
-     mov eax, FrmID
-     call art_ptr_lock_data_
-     mov Surface,eax
-  }
-  return Surface;
-}
-
-
-//--------------------------------------------------------
-BYTE* GetFrmSurface2(DWORD FrmID, DWORD *FrmObj_out, DWORD *frmWidth_out, DWORD *frmHeight_out) {
-  BYTE *Surface;
-
-  __asm {
-     mov ecx, frmHeight_out
-     mov ebx, frmWidth_out
-     mov edx, FrmObj_out//0x518F4C
-     mov eax, FrmID
-     call art_lock_
-     mov Surface,eax
-  }
-  return Surface;
-}
-
-//--------------------------------------------------------
-FRMhead* GetFrm(DWORD FrmID, DWORD *FrmObj_out) {
-  FRMhead* Frm;
-
-  __asm {
-     mov edx, FrmObj_out
-     mov eax, FrmID
-     call art_ptr_lock_
-     mov Frm, eax
-  }
-  return Frm;
-}
-
-//--------------------------------------------------------
-DWORD GetFrmFrameWidth(FRMhead* Frm, DWORD FrameNum, DWORD Ori) {
-  DWORD Width;
-
-  __asm {
-     mov ebx, Ori//0-5
-     mov edx, FrameNum
-     mov eax, Frm
-     call art_frame_width_
-     mov Width,eax
-  }
-  return Width;
-}
-
-
-//--------------------------------------------------------
-DWORD GetFrmFrameHeight(FRMhead* Frm, DWORD FrameNum, DWORD Ori) {
-  DWORD Height;
-
-  __asm {
-     mov ebx, Ori//0-5
-     mov edx, FrameNum
-     mov eax, Frm
-     call art_frame_length_
-     mov Height,eax
-  }
-  return Height;
-}
-
-
-//--------------------------------------------------------
-BYTE* GetFrmFrameSurface(FRMhead* Frm,  DWORD FrameNum, DWORD Ori) {
-  BYTE *Surface;
-
-  __asm {
-     mov ebx, Ori//0-5
-     mov edx, FrameNum
-     mov eax, Frm
-     call art_frame_data_
-     mov Surface,eax
-  }
-  return Surface;
-}
-
-
-
-/////////////////////////////////////////////////////////////////UNLISTED FRM FUNCTIONS////////////////////////////////////////////////////////////////////////
-
-//---------------------------------------------------------------
-bool LoadFrmHeader(UNLSTDfrm *frmHeader, void*frmStream) {
-
-  if(FReadDword(frmStream, &frmHeader->version)==-1)return 0;
-  else if(FReadWord(frmStream, &frmHeader->FPS)==-1)return 0;
-  else if(FReadWord(frmStream, &frmHeader->actionFrame)==-1)return 0;
-  else if(FReadWord(frmStream, &frmHeader->numFrames)==-1)return 0;
-
-  else if(FReadWordArray(frmStream, frmHeader->xCentreShift, 6)==-1)return 0;
-  else if(FReadWordArray(frmStream, frmHeader->yCentreShift, 6)==-1)return 0;
-  else if(FReadDwordArray(frmStream, frmHeader->oriOffset, 6)==-1)return 0;
-  else if(FReadDword(frmStream, &frmHeader->frameAreaSize)==-1)return 0;
-
-  return 1;
-}
-
-//------------------------------------------------------------
-bool LoadFrmFrame(UNLSTDframe *frame, void *frmStream) {
-
-  //FRMframe *frameHeader = (FRMframe*)frameMEM;
-  //BYTE* frameBuff = frame + sizeof(FRMframe);
-
-  if(FReadWord(frmStream, &frame->width)==-1)return 0;
-  else if(FReadWord(frmStream, &frame->height)==-1)return 0;
-  else if(FReadDword(frmStream, &frame->size)==-1)return 0;
-  else if(FReadWord(frmStream, &frame->x)==-1)return 0;
-  else if(FReadWord(frmStream, &frame->y)==-1)return 0;
-  frame->indexBuff= new BYTE[frame->size];
-  if(FReadString(frmStream, (char*)frame->indexBuff, frame->size, 1)!=1)return 0;
-
-  return 1;
-}
-
-
-//-------------------------------------------------------------------
-UNLSTDfrm *LoadUnlistedFrm(char *FrmName, unsigned int folderRef) {
-
-  if(folderRef>10) return NULL;
-
-  char*artfolder = (char*)(0x51073C+folderRef*32);//address of art type name
-  char FrmPath[MAX_PATH];
-
-  sprintf_s(FrmPath, MAX_PATH, "art\\%s\\%s\0", artfolder, FrmName);
-
-
-  UNLSTDfrm *frm = new UNLSTDfrm;
-
-  void *frmStream = FOpenFile(FrmPath, "rb");
-
-
-  if(frmStream){
-   if(!LoadFrmHeader(frm, frmStream)) {
-         FCloseFile(frmStream);
-      delete frm;
-         return NULL;
-   }
-   
-   DWORD oriOffset_1st=frm->oriOffset[0];
-   DWORD oriOffset_new=0;
-   frm->frames = new UNLSTDframe[6*frm->numFrames];
-   for(int ori=0; ori<6; ori++) {
-       if(ori==0 || frm->oriOffset[ori]!=oriOffset_1st) {
-           frm->oriOffset[ori]=oriOffset_new;
-     for(int fNum=0; fNum<frm->numFrames; fNum++) {
-        if(!LoadFrmFrame(&frm->frames[oriOffset_new+fNum], frmStream)) {
-                    FCloseFile(frmStream);
-        delete frm;
-                    return NULL;
-        }
-       }
-       oriOffset_new+=frm->numFrames;
-    }
-    else frm->oriOffset[ori]=0;
-   }
-
-     FCloseFile(frmStream);
-  }
-  else {
-     delete frm;
-     return NULL;
-  }
-  return frm;
-}
-
-
-
-/////////////////////////////////////////////////////////////////WINDOW FUNCTIONS////////////////////////////////////////////////////////////////////////
-
-//-----------------------------------------------------------------------------------------------
-int CreateWin(DWORD x, DWORD y, DWORD width, DWORD height, DWORD BGColourIndex, DWORD flags) {
-  int WinRef;
-
-  __asm {
-     push flags
-     push BGColourIndex
-     mov ecx,height
-     mov ebx,width
-     mov edx, y
-     mov eax, x
-     call win_add_
-     mov WinRef, eax
-  }
-  return WinRef;
-}
-
-
-//----------------------------------------------------------------------------------
-void DestroyWin(int WinRef) {
-
-  __asm {
-     mov eax, WinRef
-     call win_delete_
-  }
-}
-
-
-//--------------------------------------------------
-WINinfo *GetWinStruct(int WinRef) {
-  WINinfo *winStruct;
-
-  __asm {
-     push edx
-     mov eax, WinRef
-     call GNW_find_
-     mov winStruct, eax
-     pop edx
-  }
-  return winStruct;
-}
-
-
-
-//---------------------------------
-BYTE* GetWinSurface(int WinRef) {
-  BYTE *surface;
-
-  __asm {
-     mov eax, WinRef
-     call win_get_buf_
-     mov surface, eax
-  }
-  return surface;
-}
-
-//----------------------------------------------------------------------------------
-void ShowWin(int WinRef) {
-
-  __asm {
-     mov eax, WinRef
-     call win_show_
-  }
-}
-/*
-//----------------------------------------------------------------------------------
-void HideWin(int WinRef) {
-
-  __asm {
-     mov eax, WinRef
-     call win_hide_
-  }
-}
-*/
-//-----------------------------------------------------------------------------------------------------------------------
-void RedrawWin(int WinRef) {
-
-  __asm {
-     mov eax, WinRef
-     call win_draw_
-  }
-}
-
-
-/////////////////////////////////////////////////////////////////BUTTON FUNCTIONS////////////////////////////////////////////////////////////////////////
-//---------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-int CreateButton(int WinRef, DWORD Xpos, DWORD Ypos, DWORD Width, DWORD Height, DWORD HovOn, DWORD HovOff,
-                 DWORD ButtDown, DWORD ButtUp, BYTE *PicUp, BYTE *PicDown, DWORD ButType) {
-  int ret_val;
-
-  __asm {
-     push ButType//button type: 0x10 = move window pos, 0x20 or 0x0 = regular click, 0x23 = toggle click
-     push 0x0//? always 0
-     push PicDown//0//button down pic index
-     push PicUp//0//button up pic index
-     push ButtUp
-     push ButtDown
-     push HovOff
-     push HovOn
-     push Height
-     mov ecx, Width
-     mov edx, Xpos
-     mov ebx, Ypos
-     mov eax, WinRef
-     call win_register_button_
-     mov ret_val, eax
-  }
-  return ret_val;
-}
-
-//-----------------------------
-int check_buttons(void) {
-int key_code;
-
-  __asm {
-     call get_input_
-     mov key_code, eax
-  }
-  return key_code;
-}
-
-
-/////////////////////////////////////////////////////////////////TEXT FUNCTIONS////////////////////////////////////////////////////////////////////////
-//-------------------------
-void SetFont(int ref) {
-
-  __asm {
-     mov eax, ref
-     call text_font_
-  }
-}
-
-//-----------------------
-int GetFont(void) {
-return *(DWORD*)_curr_font_num;
-}
-
-
-//---------------------------------------------------------
-//print text to surface
-void PrintText(char *DisplayText, BYTE ColourIndex, DWORD Xpos, DWORD Ypos, DWORD TxtWidth, DWORD ToWidth, BYTE *ToSurface) {
-  DWORD posOffset = Ypos*ToWidth+Xpos;
-  __asm {
-     xor eax, eax
-     MOV AL,ColourIndex
-     push eax
-     mov edx, DisplayText
-     mov ebx, TxtWidth
-     mov ecx, ToWidth
-     mov eax, ToSurface
-     add eax, posOffset
-     call dword ptr ds:[_text_to_buf]
-  }
-}
-
-//---------------------------------------------------------
-//gets the height of the currently selected font
-DWORD GetTextHeight() {
-  DWORD TxtHeight;
-  __asm {
-     call dword ptr ds:[_text_height]//get text height
-     mov TxtHeight, eax
-  }
-  return TxtHeight;
-}
-
-//---------------------------------------------------------
-//gets the length of a string using the currently selected font
-DWORD GetTextWidth(char *TextMsg) {
-  DWORD TxtWidth;
-  __asm {
-     mov eax, TextMsg
-     call dword ptr ds:[_text_width]//get text width
-     mov TxtWidth, eax
-  }
-  return TxtWidth;
-}
-
-//---------------------------------------------------------
-//get width of Char for current font
-DWORD GetCharWidth(char CharVal) {
-  DWORD charWidth;
+static DWORD write16[10][2] = {
+ {0x419521, 0x003B},                        // jmp  0x419560
+ {0x433368, 0xA192},                        // xchg edx, eax; mov  eax, ds:[_win_buf]
+ {0x433378, 0x0000},
+ {0x436216, 0xA192},                        // xchg edx, eax; mov  eax, ds:[_win_buf]
+ {0x436226, 0x0000},
+ {0x436258, 0xA192},                        // xchg edx, eax; mov  eax, ds:[_win_buf]
+ {0x436268, 0x0000},
+ {0x4362B4, 0xA192},                        // xchg edx, eax; mov  eax, ds:[_win_buf]
+ {0x4362C4, 0x0000},
+ {0x4363E3, 0x9200}                         // xchg edx, eax
+};
+
+/*static DWORD write8[2][2] = {
+ {0x4365C8, 100}                           // Чтобы обрабатывались 98 и 99 _info_line в DrawInfoWin_
+ {0x43ACD5, 160}                            // Максимальная ширина описания в DrawCard_
+};*/
+
+static void __declspec(naked) makeDataPath() {
+// ecx = Race, ebx = Style, esi = filename, edi = filename_dat
  __asm {
-    mov al, CharVal
-    call dword ptr ds:[_text_char_width]
-    mov charWidth, eax
- }
-return charWidth;
-}
-
-//---------------------------------------------------------
-//get maximum string length for current font - if all characters were maximum width
-DWORD GetMaxTextWidth(char *TextMsg) {
-  DWORD msgWidth;
- __asm {
-    mov eax, TextMsg
-    call dword ptr ds:[_text_mono_width]
-    mov msgWidth, eax
- }
-return msgWidth;
-}
-
-//---------------------------------------------------------
-//get number of pixels between characters for current font
-DWORD GetCharGapWidth() {
-  DWORD gapWidth;
- __asm {
-    call dword ptr ds:[_text_spacing]
-    mov gapWidth, eax
- }
-return gapWidth;
-}
-
-//---------------------------------------------------------
-//get maximum character width for current font
-DWORD GetMaxCharWidth() {
-  DWORD charWidth=0;
- __asm {
-    call dword ptr ds:[_text_max]
-    mov charWidth, eax
- }
-return charWidth;
-}
-
-
-/////////////////////////////////////////////////////////////////DAT FUNCTIONS////////////////////////////////////////////////////////////////////////
-
-
-//-----------------------------------------
-void* LoadDat(char*FileName) {
-  void *dat=NULL;
-  __asm {
-     mov eax, FileName
-     call dbase_open_
-     mov dat, eax
-  }
-  return dat;
-}
-
-
-//-----------------------------------------
-void UnloadDat(void *dat) {
-
-  __asm {
-     mov eax, dat
-     call dbase_close_
-  }
-}
-
-
-/////////////////////////////////////////////////////////////////OTHER FUNCTIONS////////////////////////////////////////////////////////////////////////
-
-/*
-void DrawLineX(int WinRef, DWORD XStartPos, DWORD XEndPos, DWORD Ypos, BYTE ColourIndex) {
-
-  __asm {
-     xor eax, eax
-     mov al, ColourIndex
-     push eax
-     mov ebx, Ypos
-     push ebx
-     mov ecx, XEndPos
-     mov edx, XStartPos
-     mov eax, WinRef
-
-     call win_line_
-  }
-}
-*/
-
-
-
-//---------------------------------------------------------
-void PlayAcm(char *AcmName) {
-
-  __asm {
-     mov eax, AcmName
-     call gsound_play_sfx_file_
-  }
-}
-
-
-
-//------------------------------
-void _stdcall RefreshArtCache(void)
-{
-  __asm {
-
-     call art_flush_
-  }
-}
-
-
-
-
-
-// Check fallout paths for file----------------
-int CheckFile(char*FileName, DWORD *size_out) {
-int retVal=0;
-  __asm {
-     mov edx, size_out
-  mov eax, FileName
-     call db_dir_entry_
-     mov retVal, eax
-  }
-  return retVal;
-}
-
-
-/////////////////////////////////////////////////////////////////APP MOD FUNCTIONS////////////////////////////////////////////////////////////////////////
-
-
-//-----------------------------------------
-char _stdcall GetSex(void) {
-  char sex;
-  __asm {
-     mov  edx, STAT_gender //sex stat ref
-     mov eax,dword ptr ds:[_obj_dude]//hero state structure
-     call stat_level_//get Player stat val
-     test eax, eax //male=0, female=1
-     jne Female
-     mov sex, 'M'
-     jmp EndFunc
- Female:
-     mov sex, 'F'
- EndFunc:
-  }
-  return sex;
-}
-
-
- //----------------------------------------------------------------
-int _stdcall LoadHeroDat(unsigned int Race, unsigned int Style) {
-
-  if(HeroPathPtr->pDat) {//unload previous Dats
-  UnloadDat(HeroPathPtr->pDat);
-  HeroPathPtr->pDat=NULL;
-     HeroPathPtr->isDat=0;
-  }
-  if(RacePathPtr->pDat) {
-  UnloadDat(RacePathPtr->pDat);
-  RacePathPtr->pDat=NULL;
-  RacePathPtr->isDat=0;
-  }
-
-  sprintf_s(HeroPathPtr->path, 64, "Appearance\\h%cR%02dS%02d.dat\0", GetSex(), Race, Style);
-  if(GetFileAttributes(HeroPathPtr->path)!=INVALID_FILE_ATTRIBUTES) {//check if Dat exists for selected appearance
-  HeroPathPtr->pDat=LoadDat(HeroPathPtr->path);
-     HeroPathPtr->isDat=1;
-  }
-  else {
-     sprintf_s(HeroPathPtr->path, 64, "Appearance\\h%cR%02dS%02d\0", GetSex(), Race, Style);
-     if(GetFileAttributes(HeroPathPtr->path)==INVALID_FILE_ATTRIBUTES)//check if folder exists for selected appearance
-        return -1;
-  }
-
-  TempPathPtr=&HeroPathPtr;//set path for selected appearance
-  HeroPathPtr->next = *(sPath**)_paths;
-
-  if(Style!=0){
-  sprintf_s(RacePathPtr->path, 64, "Appearance\\h%cR%02dS%02d.dat\0", GetSex(), Race, 0);
-  if(GetFileAttributes(RacePathPtr->path)!=INVALID_FILE_ATTRIBUTES) {//check if Dat exists for selected race base appearance
-  RacePathPtr->pDat=LoadDat(RacePathPtr->path);
-  RacePathPtr->isDat=1;
-  }
-  else
-        sprintf_s(RacePathPtr->path, 64, "Appearance\\h%cR%02dS%02d\0", GetSex(), Race, 0);
-
-  if(GetFileAttributes(RacePathPtr->path)!=INVALID_FILE_ATTRIBUTES) {//check if folder/Dat exists for selected race base appearance
-        HeroPathPtr->next = RacePathPtr;//set path for selected race base appearance
-        RacePathPtr->next = *(sPath**)_paths;
-     }
-  
-  }
-
-  return 0;
-}
-
-
-//---------------------------------------------------------
-//insert hero art path in front of main path structure when loading art
-static void __declspec(naked) LoadNewHeroArt() {
-
-  __asm {
-  cmp byte ptr ds:[esi], 'r'
-   je isReading
-     mov ecx, _paths
-   jmp setPath
-   isReading:
-     mov ecx, TempPathPtr
-   setPath:
-     mov ecx,dword ptr ds:[ecx]
-     ret
-  }
-
-}
-
-/*
-//----------------------------------------------------------------
-int _stdcall CheckHeroFile(char* FileName) {
-
-char TempPath[64];
- // sprintf_s(TempPath, 64, "%s\\%s\0", cPath, FileName);
-  sprintf_s(TempPath, 64, "%s\\%s\0", HeroPathPtr->path, FileName);
-
-  if(GetFileAttributes(TempPath)==INVALID_FILE_ATTRIBUTES)
-     return -1;
-
-
-  return 0;
-}
-*/
-
-//---------------------------------------------------------
-static void __declspec(naked) CheckHeroExist() {
-
-  __asm {
-      //pushad
-   cmp esi, critterArraySize//check if loading hero art
-     jle EndFunc
-
-  sub esp, 0x4
-  lea ebx, [esp]
-  push ebx
-     push _art_name //critter art file name address
-     //call CheckHeroFile//check if art file exists
-  call CheckFile
-  add esp, 0xC
-     cmp eax, -1
-     jne EndFunc
-
-     //pop eax//drop func ret address
-  add esp, 0x4
-     //if file not found load regular critter art instead
-     sub esi, critterArraySize
-  //popad
-     mov eax, 0x4194E2
-     jmp eax
-  EndFunc:
-  //popad
-     mov eax, _art_name
-     ret
-  }
-
-}
-
-
-//---------------------------------------------------------
-//adjust base hero art if num below hero art range
-static void __declspec(naked) AdjustHeroBaseArt() {
-
-
-  __asm {
-     //cmp eax, critterListSize
-    // jg EndFunc
-     add eax, critterListSize
-//EndFunc:
-     mov dword ptr ds:[_art_vault_guy_num],eax
-     ret
-  }
-
-}
-
-
-//---------------------------------------------------------
-//adjust armor art if num below hero art range
-static void __declspec(naked) AdjustHeroArmorArt() {
-
-  __asm {
-     pop ebx//get ret addr
-  mov dword ptr ss:[esp], ebx//reinsert ret addr in old (push 0) 
-  xor ebx, ebx
-  push 0
-  call art_id_                              //call load frm func
-  
-  mov dx, ax
-     and dh, 0xFF00//mask out current weapon flag
-     cmp edx, critterListSize//check if critter art in PC range
-   jg EndFunc
-     add eax, critterListSize//shift critter art index up into hero range
-   EndFunc:
-     //mov dword ptr ds:[_i_fid],eax
-     ret
-  }
-
-}
-
-
-//-----------------------------------------
-void _stdcall SetHeroArt(int NewArtFlag) {
-
-  __asm {
-     mov eax, dword ptr ds:[_obj_dude]//hero state struct
-     mov eax, dword ptr ds:[eax+0x20]//get hero FrmID
-     xor edx, edx
-     mov dx, ax
-     and dh, 0xFF00//mask out current weapon flag
-     cmp edx, critterListSize//check if critter LST index is in Hero range
-     jg IsHero
-     cmp NewArtFlag, 1
-     jne EndFunc
-     add eax, critterListSize//shift index up into hero range
-     jmp SetArt
-  IsHero:
-     cmp NewArtFlag, 0
-     jne EndFunc
-     sub eax, critterListSize//shift index down into normal critter range
-  SetArt:
-     mov ebx, 0//SomePtr
-     mov edx, eax
-     mov eax, dword ptr ds:[_obj_dude]//hero state struct
-     mov dword ptr ds:[eax+0x20],edx //copy new FrmID to hero state struct
-     //call obj_change_fid_ // set critter FrmID function
-  EndFunc:
-  }
-
-}
-
-
-//----------------------------------------------
-//return hero art val to normal before saving
-static void __declspec(naked) SavCritNumFix() {
-
-  __asm {
-
-     push eax
-     push edx
-     push 0      //set hero FrmID LST index to normal range before saving
-     call SetHeroArt
-     pop edx
-     pop eax
-
-     push ebx
-     call obj_save_dude_                    //save current hero state structure fuction
-     pop ebx
-
-     push eax
-     push edx
-     push 1      //return hero FrmID LST index back to hero art range after saving hero state structure
-     call SetHeroArt
-     pop edx
-     pop eax
-
-     ret
-  }
-
-}
-
-
-
-//---------------------------------------------------------
-static void __declspec(naked) DoubleArt() {
-
-  __asm {
-     cmp dword ptr ss:[esp+0xCC], 0x510774 //check if loading critter lst. 0x510774= addr of critter list size val
-     jne EndFunc
-     shl edi, 1//double critter list size to add room for hero art
-  EndFunc:
-     mov eax, ecx
-     xor ebx, ebx
-     xor edx, edx
-     ret
-  }
-
-}
-
-
-//------------------------------
-void FixCritList() {
-  //int size = (*(DWORD*)0x510774)/2;//critter list size after resize by DoubleArt func
-  critterListSize=(*(DWORD*)0x510774)/2;
-  critterArraySize=critterListSize*13;
-
-  char *CritList = (*(char**)0x51076C);//critter list offset
-  char *HeroList = CritList+(critterArraySize);//set start of hero critter list after regular critter list
-
-  memset( HeroList, '\0', critterArraySize);
-
-  for(DWORD i=0; i<critterListSize;i++) {//copy critter name list to hero name list 
-      *HeroList ='_';//insert a '_' char at the front of new hero critt names. -fallout wont load the same name twice
-      memcpy(HeroList+1,CritList, 11 );
-   HeroList+=13;
-   CritList+=13;
-  }
-
-
-}
-
-
-//---------------------------------------------------------
-static void __declspec(naked) AddHeroCritNames() {
-
-  __asm {
-     call FixCritList//insert names for hero critters
-     MOV EAX,DWORD PTR DS:[_art + 0x3C]
-     ret
-  }
-
-}
-
-
-//-----------------------------------------------------------------------------------------------------------------------
-void sub_draw(long subWidth, long subHeight, long fromWidth, long fromHeight, long fromX, long fromY, BYTE *fromBuff,
-              long toWidth, long toHeight, long toX, long toY, BYTE *toBuff, int maskRef) {
-
-  //if(toX<0)fromX=fromX+toX, subWidth=subWidth+toX, toX=0;
-  //if(toY<0)fromY=fromY+toY, subHeight=subHeight+toY, toY=0;
-
-  //if(fromX+subWidth>fromWidth)subWidth=fromWidth-fromX;
-  //if(fromY+subHeight>fromHeight)subHeight=fromHeight-fromY;
-
-  //if(toX+subWidth>toWidth)subWidth=toWidth-toX;
-  //if(toY+subHeight>toHeight)subHeight=toHeight-toY;
-
-  fromBuff=fromBuff+fromY*fromWidth+fromX;
-  toBuff=toBuff+toY*toWidth+toX;
-
-  for(long h=0; h<subHeight; h++) {
-      for(long w=0; w<subWidth; w++) {
-          if(fromBuff[w]!=maskRef)
-             toBuff[w]=fromBuff[w];
-      }
-   fromBuff+=fromWidth;
-      toBuff+=toWidth;
-  }
-
-}
-
-
-//-----------------------------------------------
-void DrawPC(void) {
-  RECT critRect;
-  __asm {
- /*
- lea ebx, //-out- RECT*
-    mov eax,dword ptr ds:[_obj_dude]//critter struct
- mov edx, dword ptr ds:[eax+0x20]// new frmId
-    call obj_change_fid_                    //set new critt FrmID func
-    */
-    lea edx, critRect//out critter RECT*
- mov eax, dword ptr ds:[_obj_dude]//dude critter struct
-    call obj_bound_ //get critter rect func
-
-    mov edx, dword ptr ds:[_obj_dude]//dude critter struct
-    lea eax, critRect//RECT*
-    mov edx, dword ptr ds:[EDX+0x28]//map level the dude is on
- call tile_refresh_rect_                    //draw rect area func
-  }
-
-}
-
-
-//----------------------------------------------------------------------
-void _stdcall RefreshPCArt() {
-//scan inventory items for armor and weapons currently being worn or wielded
-//and setup matching FrmID for PC
- __asm{
-
-     call proto_dude_update_gender_         //refresh PC base model art
-
-
-    mov eax, dword ptr ds:[_obj_dude]//PC state struct
-    mov dword ptr ds:[_inven_dude], eax//inventory temp pointer to PC state struct
-    mov eax,dword ptr ds:[_inven_dude]
-    lea edx,dword ptr ds:[eax+0x2C]
-    mov dword ptr ds:[_pud],edx//PC inventory
-
-
-    xor eax,eax
-    xor edx,edx//itemListOffset
-    xor ebx,ebx//itemNum
-
-
-    mov dword ptr ds:[_i_rhand],eax//item2
-    mov dword ptr ds:[_i_worn],eax//armor
-    mov dword ptr ds:[_i_lhand],eax//item1
- jmp LoopStart
-
- CheckNextItem:
-    mov eax, dword ptr ds:[eax+0x8]//PC inventory item list
-    mov eax, dword ptr ds:[edx+eax]//PC inventory item list + itemListOffset
-
-    test byte ptr ds:[eax+0x27],1//if item in item1 slot
- jnz IsItem1
-    test byte ptr ds:[eax+0x27],2//if item in item2 slot
- jnz IsItem2
-    test byte ptr ds:[eax+0x27],4//if item in armor slot
- jnz IsArmor
- jmp SetNextItem
-
- IsItem1:
-    mov dword ptr ds:[_i_lhand],eax//set item1
-    test byte ptr ds:[eax+0x27],2//check if same item type also in item2 slot
- jz SetNextItem
-
- IsItem2:
-    mov dword ptr ds:[_i_rhand],eax//set item2
- jmp SetNextItem
-
- IsArmor:
-    mov dword ptr ds:[_i_worn],eax//set armor
-
- SetNextItem:
-    inc ebx //itemNum++
-    add edx,0x8 //itemListOffset + itemsize
- LoopStart:
-    mov eax, dword ptr ds:[_pud]//PC inventory
-    cmp ebx, dword ptr ds:[eax]//size of item list
- JL CheckNextItem
-
-
-    //inventory function - setup pc FrmID and store at address _i_fid
-    call adjust_fid_
-
-    //copy new FrmID to hero state struct
-    mov edx, dword ptr ds:[_i_fid]
-    mov eax, dword ptr ds:[_inven_dude]
-    mov dword ptr ds:[eax+0x20],edx
-  //  call obj_change_fid_
-
-
-    xor eax,eax
-    mov dword ptr ds:[_i_rhand],eax//item2
-    mov dword ptr ds:[_i_worn],eax//armor
-    mov dword ptr ds:[_i_lhand],eax//item1
- }
-
-
-  if(!AppModEnabled)return;
-
-  if(LoadHeroDat(CurrentRaceVal, CurrentStyleVal)!=0) {   //if load fails
-     CurrentStyleVal=0;//set style to default
-     if(LoadHeroDat(CurrentRaceVal, CurrentStyleVal)!=0) {   //if race fails with style at default
-        CurrentRaceVal=0;//set race to default
-        LoadHeroDat(CurrentRaceVal, CurrentStyleVal);
-     }
-  }
-  RefreshArtCache();
-  SetAppearanceGlobals(CurrentRaceVal, CurrentStyleVal);//store new globals
-  DrawPC();
-}
-
-
-//----------------------------------------------------------------------
-void _stdcall LoadHeroAppearance(void) {
-
-  if(!AppModEnabled)return;
-
-  GetAppearanceGlobals(&CurrentRaceVal, &CurrentStyleVal);
-  RefreshArtCache();
-  LoadHeroDat(CurrentRaceVal, CurrentStyleVal);
-  SetHeroArt(1);
-  DrawPC();
-}
-
-
-//---------------------------------------
-void _stdcall SetNewCharAppearanceGlobals(void) {
-
-  if(!AppModEnabled)return;
-
-  if(CurrentRaceVal>0 || CurrentStyleVal>0)
-     SetAppearanceGlobals(CurrentRaceVal, CurrentStyleVal);
-}
-
-
-
-//----------------------------------------------------------------------
-void _stdcall SetHeroStyle(int newStyleVal) {
-
-  if(!AppModEnabled)return;
-
-  if(newStyleVal==CurrentStyleVal)return;
-
-  RefreshArtCache();
-
-  if(LoadHeroDat(CurrentRaceVal, newStyleVal)!=0) {//if new style cannot be set
-     if(CurrentRaceVal==0 && newStyleVal==0)CurrentStyleVal=0;//ignore error if appearance = default
-     else LoadHeroDat(CurrentRaceVal, CurrentStyleVal);//reload original style
-  }
-  else
-    CurrentStyleVal=newStyleVal;
-
-  SetAppearanceGlobals(CurrentRaceVal, CurrentStyleVal);
-  DrawPC();
-}
-
-
-//----------------------------------------------------------------------
-void _stdcall SetHeroRace(int newRaceVal) {
-
-  if(!AppModEnabled)return;
-
-  if(newRaceVal==CurrentRaceVal)return;
-
-  RefreshArtCache();
-
-  if(LoadHeroDat(newRaceVal, 0)!=0) {   //if new race fails with style at 0
-     if(newRaceVal==0)CurrentRaceVal=0, CurrentStyleVal=0;//ignore if appearance = default
-     else LoadHeroDat(CurrentRaceVal, CurrentStyleVal);//reload original race & style
-  }
-  else
-     CurrentRaceVal=newRaceVal, CurrentStyleVal=0;
-
-  SetAppearanceGlobals(CurrentRaceVal, CurrentStyleVal);//store new globals
-  DrawPC();
-}
-
-
-//--------------------------------------------------------------------------------------
-bool CreateWordWrapList(char *TextMsg, DWORD WrapWidth, DWORD *lineNum, LINENode *StartLine) {
-
-  *lineNum=1;
-
-  if(GetMaxCharWidth()>=WrapWidth)return FALSE;
-
-  if(GetTextWidth(TextMsg)<WrapWidth)return TRUE;
-
-
-  DWORD GapWidth=GetCharGapWidth();
-
-  StartLine->next=new LINENode;
-  LINENode *NextLine=StartLine->next;
-
-  DWORD lineWidth=0, wordWidth=0;
-
-  char CurrentChar=NULL;
-  DWORD i=0;
-
-  while(TextMsg[i]!=NULL) {
-     CurrentChar=TextMsg[i];
-
-        lineWidth=lineWidth+GetCharWidth(CurrentChar)+GapWidth;
-        wordWidth=wordWidth+GetCharWidth(CurrentChar)+GapWidth;
-
-     if(lineWidth<=WrapWidth) {
-        if(isspace(CurrentChar) || CurrentChar=='-')
-           NextLine->offset=i+1, wordWidth=0;
-     }
-     else {
-        if(isspace(CurrentChar))
-           NextLine->offset=i+1, wordWidth=0;
-
-        lineWidth=wordWidth;
-        wordWidth=0;
-        CurrentChar=NULL;
-        *lineNum= *lineNum+1;
-        NextLine->next=new LINENode;
-        NextLine=NextLine->next;
-     }
-   i++;
-
-   if(TextMsg[i]==NULL)
-      NextLine->offset=0;
-  }
-
-return TRUE;
-}
-
-
-
-/*
-int WordWrap(char *TextMsg, DWORD lineLength, WORD *lineNum, WORD *lineOffsets) {
-  int retVal;
-  __asm {
-    mov ebx, lineOffsets
-    mov ecx, lineNum
-    mov edx, lineLength
-    mov eax, TextMsg
-    call _word_wrap_
-    mov retVal, eax
-  }
-return retVal;
-}
-*/
-
-void DeleteWordWrapList(LINENode *CurrentLine) {
-     LINENode *NextLine=NULL;
-
-     while(CurrentLine!=NULL) {
-        NextLine=CurrentLine->next;
-        delete CurrentLine;
-        CurrentLine=NextLine;
-     }
-  }
-
-
-
-//----------------------------------------------------------------
-void DrawPCConsole() {
-
-  DWORD NewTick = *(DWORD*)0x5709C4;//char scrn gettickcount ret
-  DWORD RotSpeed=*(DWORD*)0x47066B;//get rotation speed -inventory rotation speed
-
-  if(CharRotTick>NewTick)
-     CharRotTick=NewTick;
-
-  if(NewTick-CharRotTick>RotSpeed) {
-     CharRotTick=NewTick;
-     if(CharRotOri<5)
-        CharRotOri++;
-     else CharRotOri=0;
-
-
-     int WinRef=*(DWORD*)_edit_win;//char screen window ref
-     //BYTE *WinSurface = GetWinSurface(WinRef);
-     WINinfo *WinInfo=GetWinStruct(WinRef);
-
-     BYTE *ConSurface = new BYTE [70*102];
-
-     sub_draw( 70, 102, 640, 480, 338, 78, CharScrnBackSurface, 70, 102, 0, 0, ConSurface, 0);
-     //sub_draw( 70, 102, widthBG, heightBG, xPosBG, yPosBG, BGSurface, 70, 102, 0, 0, ConSurface, 0);
-
-     //DWORD CritNum = *(DWORD*)_art_vault_guy_num;//pointer to current base hero critter FrmId
-     DWORD CritNum = *(DWORD*)(*(DWORD*)_obj_dude+0x20);//pointer to current armored hero critter FrmId
-     DWORD CritFrmObj;
-  FRMhead *CritFrm;
-    // DWORD PcCritOri=0;
-     DWORD CritWidth;
-     DWORD CritHeight;
-     BYTE *CritSurface;
-
-  CritFrm = GetFrm(LoadFrm(1, CritNum), &CritFrmObj);
-     CritWidth = GetFrmFrameWidth(CritFrm, 0, CharRotOri);
-     CritHeight = GetFrmFrameHeight(CritFrm, 0, CharRotOri);
-     CritSurface = GetFrmFrameSurface(CritFrm, 0, CharRotOri);
-
-     sub_draw( CritWidth, CritHeight, CritWidth, CritHeight, 0, 0, CritSurface, 70, 102, 35-CritWidth/2, 51-CritHeight/2, ConSurface, 0);
-
-     BYTE ConsoleGreen = *(BYTE*)_GreenColor;//palette offset stored in mem - text colour
-     BYTE ConsoleGold = *(BYTE*)_YellowColor;//palette offset stored in mem - text colour
-
-     BYTE styleColour=ConsoleGreen, raceColour=ConsoleGreen;
-     if(*(DWORD*)_info_line==0x501)
-        raceColour=ConsoleGold;
-     else if(*(DWORD*)_info_line==0x502)
-        styleColour=ConsoleGold;
-/*
-     int oldFont = GetFont();//store current font
-     SetFont(0x65);//set font for consol text
-     char TextBuf[12];
-
-     sprintf_s(TextBuf, 12, "%2d\0", CurrentRaceVal);
-     PrintText(TextBuf, raceColour, 2, 2, 64, 70, ConSurface);
-
-     sprintf_s(TextBuf, 12, "%2d\0", CurrentStyleVal);
-     PrintText(TextBuf, styleColour, 5, 88, 64, 70, ConSurface);
-
-     SetFont(oldFont);//restore previous font
-*/
-
-     //sub_draw( 70, 102, 70, 102, 0, 0, ConSurface, 640, 480, 338, 78, WinSurface, 0);
-     sub_draw( 70, 102, 70, 102, 0, 0, ConSurface, WinInfo->width, WinInfo->height, 338, 78, WinInfo->surface, 0);
-
-     UnloadFrm(CritFrmObj);
-     CritSurface=NULL;
-     delete[] ConSurface;
-     WinInfo=NULL;
-     RedrawWin(WinRef);
-  }
-
-}
-
-
-//------------------------------------------------------------------------------------------------------------------------------------------------
-void DrawCharNote(bool Style, int WinRef, DWORD xPosWin, DWORD yPosWin, BYTE *BGSurface, DWORD xPosBG, DWORD yPosBG, DWORD widthBG, DWORD heightBG) {
-
-  MSGList MsgList;
-  char *TitleMsg=NULL;
-  char *InfoMsg=NULL;
-
-  char *MsgFileName=NULL;
-
-  if(!Style)MsgFileName="game\\AppRace.msg";
-  else MsgFileName="game\\AppStyle.msg";
-
-  if(LoadMsgList(&MsgList, MsgFileName)==1) {
-  TitleMsg=GetMsg(&MsgList, 100, 2);
-  InfoMsg=GetMsg(&MsgList, 101, 2);
-  }
-
-  BYTE colour=*(BYTE*)0x6A38D0;//brown
-
-  WINinfo *WinInfo=GetWinStruct(WinRef);
-
-  BYTE *PadSurface;
-  PadSurface = new BYTE [280*168];
-  sub_draw( 280, 168, widthBG, heightBG, xPosBG, yPosBG, BGSurface, 280, 168, 0, 0, PadSurface, 0);
-
-  UNLSTDfrm *frm;
-  if(Style) frm=LoadUnlistedFrm("AppStyle.frm", 10);
-  else frm=LoadUnlistedFrm("AppRace.frm", 10);
-
-  if(frm) {
-     sub_draw(frm->frames[0].width, frm->frames[0].height, frm->frames[0].width, frm->frames[0].height, 0, 0, frm->frames[0].indexBuff, 280, 168, 136, 37, PadSurface, 0);//cover buttons pics bottom
-     //sub_draw(frm->width, frm->height, frm->width, frm->height, 0, 0, frm->surface, 280, 168, 136, 37, PadSurface, 0);//cover buttons pics bottom
-     //sub_draw(frm->width, frm->height, frm->width, frm->height, 0, 0, frm->surface, 280, 168, 135, 36, PadSurface, 0);//cover buttons pics bottom
-     delete frm;
-  }
-
-
-
-  int oldFont = GetFont();//store current font
-  SetFont(0x66);//set font for title
-
-  DWORD textHeight=GetTextHeight();
-
-  if(TitleMsg!=NULL) {
-     PrintText(TitleMsg, colour, 0, 0, 265, 280, PadSurface);
-     //DrawLineX(WinRef, 348, 613, 272+textHeight, colour);
-     //DrawLineX(WinRef, 348, 613, 273+textHeight, colour);
-     memset( PadSurface+280*textHeight, colour, 265 );
-     memset( PadSurface+280*(textHeight+1), colour, 265 );
-  }
-
-  SetFont(0x65);//set font for info
-
-  textHeight=GetTextHeight();
-
-  DWORD lineNum=0;
-
-  LINENode *StartLine=new LINENode;
-  LINENode *CurrentLine, *NextLine;
-
-
-  if(InfoMsg!=NULL) {
-     if(CreateWordWrapList(InfoMsg, 160, &lineNum, StartLine)) {
-        int lineHeight=43;
-        char TempChar=0;
-
-        if(lineNum==1)PrintText(InfoMsg, colour, 0, lineHeight, 280, 280, PadSurface);
-        else{
-           if(lineNum>11)lineNum=11;
-           CurrentLine=StartLine;
-
-           for(DWORD line=0; line<lineNum; line++) {
-               NextLine=CurrentLine->next;
-               TempChar=InfoMsg[NextLine->offset];//[line+1]];
-               InfoMsg[NextLine->offset]='\0';
-               PrintText(InfoMsg+CurrentLine->offset, colour, 0, lineHeight, 280, 280, PadSurface);
-               InfoMsg[NextLine->offset]=TempChar;
-               lineHeight=lineHeight+textHeight+1;
-               CurrentLine=NextLine;
-           }
-        }
-     }
-  }
-
-  sub_draw( 280, 168, 280, 168, 0, 0, PadSurface, WinInfo->width, WinInfo->height, xPosWin, yPosWin, WinInfo->surface, 0);
-
-
-  DeleteWordWrapList(StartLine);
-  CurrentLine=NULL;
-  NextLine=NULL;
-  delete[]PadSurface;
-  WinInfo=NULL;
-  SetFont(oldFont);//restore previous font
-  DestroyMsgList(&MsgList);
-//RedrawWin(*(DWORD*)_edit_win);
-}
-
-
-/*
-void DrawCharNote(DWORD LstNum, char *TitleTxt, char *AltTitleTxt, char *Message) {
-
-  __asm {
-    MOV ECX,Message//100//DWORD PTR DS:[_folder_card_desc]
-    MOV EBX,AltTitleTxt//DWORD PTR DS:[_folder_card_title2]
-    MOV EDX,TitleTxt//DWORD PTR DS:[_folder_card_title]
-    MOV EAX,LstNum//11//LstNum//DWORD PTR DS:[_folder_card_fid]
-    CALL DrawCard_
-  }
-
-}
-*/
-
-
-//----------------------------------------------------------------------------------------------------------------------------------------------------------------------
-void _stdcall HeroSelectWindow(int RaceStyleFlag) {
-
-if(!AppModEnabled)return;
-
-  bool isStyle=TRUE;
-  if(RaceStyleFlag==0)isStyle=FALSE;
-
-  DWORD ResWidth=*(DWORD*)0x4CAD6B;
-  DWORD ResHeight=*(DWORD*)0x4CAD66;
-
-  int WinRef = CreateWin(ResWidth/2-242, (ResHeight-100)/2-65, 484, 230, 100, 0x4);
-  if(WinRef==-1)return;
-
-  int mouseWasHidden=IsMouseHidden();
-  if(mouseWasHidden)
-     ShowMouse();
-
-  int oldMouse = GetMousePic();
-  SetMousePic(1);
-
-
-  BYTE *WinSurface = GetWinSurface(WinRef);
-
-  BYTE *mainSurface;
-  mainSurface = new BYTE [484*230];
-
-  DWORD tempObj;
-  BYTE *tempSurface;
-  //perkwin
-  tempSurface=GetFrmSurface(LoadFrm(6, 86), 0, 0, &tempObj);
-  sub_draw( 484, 230, 573, 230, 89, 0, tempSurface, 484, 230, 0, 0, mainSurface, 0);
-  sub_draw( 13, 230, 573, 230, 0, 0, tempSurface, 484, 230, 0, 0, mainSurface, 0);
-  UnloadFrm(tempObj);
-
-  //opbase
-  tempSurface=GetFrmSurface(LoadFrm(6, 220), 0, 0, &tempObj);
-  sub_draw( 164, 217, 164, 217, 0, 0, tempSurface, 484, 230, 12, 4, mainSurface, 0);
-  UnloadFrm(tempObj);
-
-  //use
-  tempSurface=GetFrmSurface(LoadFrm(6, 113), 0, 0, &tempObj);
-  sub_draw( 138, 132, 292, 376, 128, 20, tempSurface, 484, 230, 25, 38, mainSurface, 0);
-  sub_draw( 2, 132, 292, 376, 23, 224, tempSurface, 484, 230, 25, 38, mainSurface, 0);
-  sub_draw( 12, 4, 292, 376, 135, 148, tempSurface, 484, 230, 25, 166, mainSurface, 0);
-  UnloadFrm(tempObj);
-
-  //barter
-  tempSurface=GetFrmSurface(LoadFrm(6, 111), 0, 0, &tempObj);
-  sub_draw(25, 52, 640, 191, 190, 54, tempSurface, 484, 230, 27, 57, mainSurface, 0);//button background up down
-  UnloadFrm(tempObj);
-
-  //loot
-  tempSurface=GetFrmSurface(LoadFrm(6, 114), 0, 0, &tempObj);
-  sub_draw(116, 27, 537, 376, 392, 325, tempSurface, 484, 230, 36, 180, mainSurface, 0);//button background "done"
-  UnloadFrm(tempObj);
-
-
-  DWORD MenuUObj, MenuDObj;
-  BYTE *MenuUSurface=GetFrmSurface(LoadFrm(6, 299), 0, 0, &MenuUObj);//MENUUP Frm
-  BYTE *MenuDSurface=GetFrmSurface(LoadFrm(6, 300), 0, 0, &MenuDObj);//MENUDOWN Frm
-  CreateButton(WinRef, 116, 181, 26, 26, -1, -1, -1, 0x0D, MenuUSurface, MenuDSurface, 0x20);
-
-
-
-  DWORD DidownUObj, DidownDObj;
-  BYTE *DidownUSurface=GetFrmSurface(LoadFrm(6, 93), 0, 0, &DidownUObj);//MENUUP Frm
-  BYTE *DidownDSurface=GetFrmSurface(LoadFrm(6, 94), 0, 0, &DidownDObj);//MENUDOWN Frm
-  CreateButton(WinRef, 28, 84, 24, 25, -1, -1, -1, 0x150, DidownUSurface, DidownDSurface, 0x20);
-
-  DWORD DiupUObj, DiupDObj;
-  BYTE *DiupUSurface=GetFrmSurface(LoadFrm(6, 100), 0, 0, &DiupUObj);//MENUUP Frm
-  BYTE *DiupDSurface=GetFrmSurface(LoadFrm(6, 101), 0, 0, &DiupDObj);//MENUDOWN Frm
-  CreateButton(WinRef, 28, 59, 23, 24, -1, -1, -1, 0x148, DiupUSurface, DiupDSurface, 0x20);
-
-
-  int oldFont;
-  oldFont = GetFont();
-  SetFont(0x67);
-  BYTE textColour = *(BYTE*)0x6A82F3;//PeanutButter colour -palette offset stored in mem
-
-
-  char titleText[8];
-  DWORD titleTextWidth;
- //Get alternate text from ini if available
-  if(isStyle)GetPrivateProfileString("AppearanceMod", "StyleText", "Style", titleText, 8, translationIni);
-  else GetPrivateProfileString("AppearanceMod", "RaceText", "Race", titleText, 8, translationIni);
-
-  titleTextWidth=GetTextWidth(titleText);
-
-  PrintText(titleText, textColour, 94-titleTextWidth/2, 10, titleTextWidth, 484, mainSurface);
-
-
-  DWORD titleTextHeight=GetTextHeight();
-  //Title underline
-  memset( mainSurface+484*(10+titleTextHeight)+94-titleTextWidth/2, textColour, titleTextWidth );
-  memset( mainSurface+484*(10+titleTextHeight+1)+94-titleTextWidth/2, textColour, titleTextWidth );
-
-
-  sub_draw( 484, 230, 484, 230, 0, 0, mainSurface, 484, 230, 0, 0, WinSurface, 0);
-
-  ShowWin(WinRef);
-
-  int raceVal=CurrentRaceVal, styleVal=CurrentStyleVal;//show default style when setting race
-  if(!isStyle)styleVal=0;
-  LoadHeroDat(raceVal, styleVal);
-
-  BYTE *ConDraw;
-  ConDraw = new BYTE [70*102];
-
-//  char TextBuf[12];
-
-  DWORD NewTick=0, OldTick=0;
-
-  textColour=*(BYTE*)_GreenColor;//ConsoleGreen colour -palette offset stored in mem
-  SetFont(0x65);
-
-  DWORD CritNum = *(DWORD*)_art_vault_guy_num;//pointer to current base hero critter FrmID
-  //DWORD CritNum = *(DWORD*)(*(DWORD*)_obj_dude+0x20);//pointer to current armored hero critter FrmID
-  FRMhead *CritFrm;
-  DWORD CritFrmObj=0, CritOri=0, CritWidth=0, CritHeight=0;
-  BYTE *CritSurface=NULL;
-
-  int button=0, exitMenu=0;
-
-  bool drawFlag=TRUE;//redraw flag for char note pad
-
-  DWORD RotSpeed=*(DWORD*)0x47066B;//get rotation speed -inventory rotation speed
-
-  DWORD RedrawTick=0;
-
-  while(!exitMenu) {//main loop
-
-
-     NewTick = GetTickCount();//timer for redraw
-     if(OldTick>NewTick)
-        OldTick=NewTick;
-
-  if(NewTick-OldTick>RotSpeed) {//time to rotate critter
-        OldTick=NewTick;
-        if(CritOri<5)
-           CritOri++;
-        else CritOri=0;
-  }
-     
-     if(RedrawTick>NewTick)
-        RedrawTick=NewTick;
-
-  if(NewTick-RedrawTick>60) {//time to redraw
-        RedrawTick=NewTick;
-        sub_draw( 70, 102, 484, 230, 66, 53, mainSurface, 70, 102, 0, 0, ConDraw, 0);
-
-  CritFrm = GetFrm(LoadFrm(1, CritNum), &CritFrmObj);
-        CritWidth = GetFrmFrameWidth(CritFrm, 0, CritOri);
-        CritHeight = GetFrmFrameHeight(CritFrm, 0, CritOri);
-        CritSurface = GetFrmFrameSurface(CritFrm, 0, CritOri);
-        sub_draw( CritWidth, CritHeight, CritWidth, CritHeight, 0, 0, CritSurface, 70, 102, 35-CritWidth/2, 51-CritHeight/2, ConDraw, 0);
-        UnloadFrm(CritFrmObj);
-        CritSurface=NULL;
-/*
-        if(isStyle)sprintf_s(TextBuf, 12, "%2d\0", styleVal);
-        else sprintf_s(TextBuf, 12, "%2d\0", raceVal);
-
-        PrintText(TextBuf, textColour, 2, 2, 64, 70, ConDraw);
-*/
-        sub_draw( 70, 102, 70, 102, 0, 0, ConDraw, 484, 230, 66, 53, WinSurface, 0);
-
-        if(drawFlag==TRUE)
-           DrawCharNote(isStyle, WinRef, 190, 29, mainSurface, 190, 29, 484, 230);
-        drawFlag=FALSE;
-
-        RedrawWin(WinRef);
-     }
-
-
-
-     button = check_buttons();
-     if(button==0x148) {//previous style/race -up arrow button pushed
-        drawFlag=TRUE;
-        PlayAcm("ib1p1xx1");
-        RefreshArtCache();
-
-        if(isStyle) {
-           if(styleVal>0)styleVal--;
-           if(LoadHeroDat(raceVal, styleVal)!=0) {
-              styleVal=0;
-              LoadHeroDat(raceVal, styleVal);
-           }
-        }
-        else {//Race
-           if(raceVal>0)styleVal=0, raceVal--;
-           if(LoadHeroDat(raceVal, styleVal)!=0) {
-              raceVal=0;
-              LoadHeroDat(raceVal, styleVal);
-           }
-
-        }
-     }
-     else if(button==0x150) {//Next style/race -down arrow button pushed
-        drawFlag=TRUE;
-        PlayAcm("ib1p1xx1");
-        RefreshArtCache();
-
-        if(isStyle) {
-           styleVal++;
-           if(LoadHeroDat(raceVal, styleVal)!=0) {
-              styleVal--;
-              LoadHeroDat(raceVal, styleVal);
-           }
-        }
-        else {//Race
-           styleVal=0, raceVal++;
-           if(LoadHeroDat(raceVal, styleVal)!=0) {
-              raceVal--;
-              LoadHeroDat(raceVal, styleVal);
-           }
-        }
-     }
-     else if(button==0x0D) {//save and exit -Enter button pushed
-        exitMenu=-1;
-        if(!isStyle && CurrentRaceVal==raceVal)//return style to previous value if no race change
-           styleVal=CurrentStyleVal;
-
-        CurrentRaceVal=raceVal;
-        CurrentStyleVal=styleVal;
-     }
-     else if(button==0x1B)//exit -ESC button pushed
-        exitMenu=-1;
-
-  }
-
-  RefreshArtCache();
-  LoadHeroDat(CurrentRaceVal, CurrentStyleVal);
-  SetAppearanceGlobals(CurrentRaceVal, CurrentStyleVal);
-
-  DestroyWin(WinRef);
-  delete[]mainSurface;
-  delete[]ConDraw;
-  UnloadFrm(MenuUObj);
-  UnloadFrm(MenuDObj);
-  MenuUSurface=NULL;
-  MenuDSurface=NULL;
-
-  UnloadFrm(DidownUObj);
-  UnloadFrm(DidownDObj);
-  DidownUSurface=NULL;
-  DidownDSurface=NULL;
-
-  UnloadFrm(DiupUObj);
-  UnloadFrm(DiupDObj);
-  DiupUSurface=NULL;
-  DiupDSurface=NULL;
-
-  SetFont(oldFont);
-  SetMousePic(oldMouse);
-
-  if(mouseWasHidden)
-     HideMouse();
-}
-
-
-void FixTextHighLight() {
-
-  __asm {
-     //redraw special text
-     mov eax,7
-     xor ebx,ebx
-     xor edx,edx
-     call PrintBasicStat_
-     //redraw trait options text
-     call ListTraits_
-     //redraw skills text
-     xor eax,eax
-     call ListSkills_
-     //redraw level text
-     call PrintLevelWin_
-     //redraw perks, karma, kill text
-     call DrawFolder_
-     //redraw hit points to crit chance text
-     call ListDrvdStats_
-     //redraw note pad area text
-     //call DrawInfoWin_
-        }
-}
-
-//-------------------------------------------
-void _stdcall DrawCharNoteNewChar(bool Style) {
-  DrawCharNote(Style, *(DWORD*)_edit_win, 348, 272, CharScrnBackSurface, 348, 272, 640, 480);
-}
-
-//-------------------------------------------------------------------
-int _stdcall CheckCharButtons() {
-
-  int button=check_buttons();
-
-  int raceVal=CurrentRaceVal;
-  int styleVal=CurrentStyleVal;
-
-  int drawFlag=-1;
-
-  if(*(DWORD*)_info_line==0x503)button=0x501;
-  else if(*(DWORD*)_info_line==0x504)button=0x502;
-  else if(*(DWORD*)_info_line==0x501 || *(DWORD*)_info_line==0x502) {
-     switch(button) {
-        case 0x14B://button =left
-        case 0x14D://button =right
-           if(*(DWORD*)0x5709D0==1) {//if in char creation scrn
-
-            if(*(DWORD*)_info_line==0x501)
-               button=button+0x3C6;
-            else if(*(DWORD*)_info_line==0x502)
-               button=button+0x3C6+1;
-           }
-        break;
-        case 0x148://button =up
-        case 0x150://button =down
-            if(*(DWORD*)_info_line==0x501)
-               button=0x502;
-            else if(*(DWORD*)_info_line==0x502)
-               button=0x501;
-        break;
-        case 0x0D://button =return
-        case 0x1B://button =esc
-        case 0x1F4://button =done
-        case 'd'://button =done
-        case 'D'://button =done
-        case 0x1F6://button =cancel
-        case 'c'://button =cancel
-        case 'C'://button =cancel
-        if(*(DWORD*)_info_line==0x501)//for redrawing note when reentering char screen
-           *(DWORD*)_info_line=0x503;
-        else
-           *(DWORD*)_info_line=0x504;
-        break;
-
-        default :
-        break;
-     }
-  }
-
-
-  switch(button) {
-     case 0x9://tab button pushed
-        if(*(DWORD*)_info_line>=0x3D && *(DWORD*)_info_line<0x4F)//if menu ref in last menu go to race
-           button=0x501,drawFlag=0;
-     break;
-     case 0x501://race button pushed
-        drawFlag=0;
-     break;
-     case 0x502://style button pushed
-        drawFlag=1;
-     break;
-     case 0x511://race left button pushed
-        RefreshArtCache();
-
-        if(raceVal>0)styleVal=0, raceVal--;
-
-        if(LoadHeroDat(raceVal, styleVal)!=0) {
-           raceVal=0;
-           LoadHeroDat(raceVal, styleVal);
-        }
-        drawFlag=0;
-     break;
-     case 0x513://race right button pushed
-        RefreshArtCache();
-
-        styleVal=0, raceVal++;
-        if(LoadHeroDat(raceVal, styleVal)!=0) {
-           raceVal--;
-           LoadHeroDat(raceVal, styleVal);
-        }
-        drawFlag=0;
-     break;
-     case 0x512://style left button pushed
-        RefreshArtCache();
-
-        if(styleVal>0)styleVal--;
-
-        if(LoadHeroDat(raceVal, styleVal)!=0) {
-           styleVal=0;
-           LoadHeroDat(raceVal, styleVal);
-        }
-        drawFlag=1;
-     break;
-     case 0x514://style right button pushed
-        RefreshArtCache();
-
-        styleVal++;
-        if(LoadHeroDat(raceVal, styleVal)!=0) {
-           styleVal--;
-           LoadHeroDat(raceVal, styleVal);
-        }
-        drawFlag=1;
-     break;
-     default :
-     break;
-  }
-  CurrentRaceVal=raceVal;
-  CurrentStyleVal=styleVal;
-
-
-
-
-  if(drawFlag==1) {
-     PlayAcm("ib3p1xx1");
-     *(DWORD*)_info_line=0x502;
-     FixTextHighLight();
-     DrawCharNoteNewChar(1);
-     //DrawCharNote(1, *(DWORD*)_edit_win, 348, 272, CharScrnBackSurface, 348, 272, 640, 480);
-  }
-  else if(drawFlag==0) {
-     PlayAcm("ib3p1xx1");
-     *(DWORD*)_info_line=0x501;
-     FixTextHighLight();
-     DrawCharNoteNewChar(0);
-     //DrawCharNote(0, *(DWORD*)_edit_win, 348, 272, CharScrnBackSurface, 348, 272, 640, 480);
-  }
-
-  DrawPCConsole();//(*(DWORD*)_edit_win, 338, 78, CharScrnBackSurface, 338, 78, 640, 480);
-
-  return button;
-}
-
-
-//------------------------------------------
-static void __declspec(naked) CheckCharScrnButtons(void) {
-
-  __asm {
-     call CheckCharButtons
-     cmp eax, 0x500
-     jl EndFunc
-     cmp eax, 0x515
-     jg EndFunc
-     pop eax//ditch old ret addr
-     push 0x431E8A//recheck buttons if app mod button
-     EndFunc:
-     ret
- }
-}
-
-//-------------------------------
-void DeleteCharSurfaces() {
-  delete[]NewButt01Surface;
-  NewButt01Surface=NULL;
-  delete[]CharScrnBackSurface;
-  CharScrnBackSurface=NULL;
-}
-
-//------------------------------------------
-static void __declspec(naked) CharScrnEnd(void) {
-
-  __asm {
-  pushad
-     call DeleteCharSurfaces
-     popad
-     MOV EBP,DWORD PTR DS:[_info_line]
-     retn
- }
-}
-
-
-//------------------------------------------
-static void __declspec(naked) SexScrnEnd(void) {
-
-  __asm {
-     pushad
-     MOV EDX, STAT_gender
-     MOV EAX,DWORD PTR DS:[_obj_dude]
-     CALL stat_level_
-     mov ecx, eax
-     call SexWindow_          //call gender selection window
-     MOV EDX, STAT_gender
-     MOV EAX,DWORD PTR DS:[_obj_dude]
-     CALL stat_level_
-     cmp ecx, eax      //check if gender has been changed
-  je EndFunc
-
-     xor ebx, ebx
-//     cmp byte ptr ds:[_gmovie_played_list + 0x3],1//check if wearing vault suit
-//     jne NoVaultSuit
-//     mov ebx, 0x8
-//NoVaultSuit:
-     test eax, eax// check if male 0
-  jnz IsFemale
-     mov eax,dword ptr ds:[ebx+_art_vault_person_nums]//base male model
-  jmp ChangeSex
-  IsFemale:
-     mov eax,dword ptr ds:[ebx+0x5108AC]//base female model
-  ChangeSex:
-     call AdjustHeroBaseArt
-     //mov dword ptr ds:[_art_vault_guy_num],eax//current base dude model
-     mov eax,dword ptr ds:[_obj_dude]//dude state structure
-     call inven_worn_
-     mov CurrentRaceVal, 0//reset race and style to defaults
-     mov CurrentStyleVal, 0
-
-     push CurrentStyleVal
-     push CurrentRaceVal
-     call LoadHeroDat
-     call RefreshPCArt
- //Check If Race or Style selected to redraw info note
-     cmp dword ptr ds:[_info_line], 0x501
-  jne CheckIfStyle
-      push 0
-      call DrawCharNoteNewChar
-  CheckIfStyle:
-      cmp dword ptr ds:[_info_line], 0x502
-  jne EndFunc
-      push 1
-      call DrawCharNoteNewChar
-
-  EndFunc:
-     popad
-     retn
- }
-}
-
-
-//------------------------------------------
-static void __declspec(naked) AddCharScrnButtons(void) {
-
-  __asm {
-     push ebp     // prolog
-     mov ebp, esp
-     sub esp, __LOCAL_SIZE
-     pushad
- }
-
-    int WinRef;
-    WinRef=*(DWORD*)_edit_win;//char screen window ref
-
-    //race and style buttons
-    CreateButton(WinRef, 332, 0, 82, 32, -1, -1, 0x501, -1, 0, 0, 0);
-    CreateButton(WinRef, 332, 226, 82, 32, -1, -1, 0x502, -1, 0, 0, 0);
-
-  if(*(DWORD*)0x5709D0==1) {//equals 1 if new char screen - equals 0 if ingame char screen
-
-   //reset hero appearance
-    // RefreshArtCache();
-     //CurrentRaceVal=0;
-     //CurrentStyleVal=0;
-     //LoadHeroDat(CurrentRaceVal, CurrentStyleVal);
- // RefreshPCArt();
-  
-     if(NewButt01Surface==NULL) {
-        NewButt01Surface = new BYTE [20*18*4];
-
-        DWORD FrmObj;//frm objects for char screen Appearance button
-        BYTE *FrmSurface;
-
-        FrmSurface=GetFrmSurface(LoadFrm(6, 122), 0, 0, &FrmObj);//SLUFrm
-        sub_draw(20, 18, 20, 18, 0, 0, FrmSurface, 20, 18*4, 0, 0, NewButt01Surface, 0x0);
-        UnloadFrm(FrmObj);
-        FrmSurface=GetFrmSurface(LoadFrm(6, 123), 0, 0, &FrmObj);//SLDFrm
-        sub_draw(20, 18, 20, 18, 0, 0, FrmSurface, 20, 18*4, 0, 18, NewButt01Surface, 0x0);
-        UnloadFrm(FrmObj);
-        FrmSurface=GetFrmSurface(LoadFrm(6, 124), 0, 0, &FrmObj);//SRUFrm
-        sub_draw(20, 18, 20, 18, 0, 0, FrmSurface, 20, 18*4, 0, 18*2, NewButt01Surface, 0x0);
-        UnloadFrm(FrmObj);
-        FrmSurface=GetFrmSurface(LoadFrm(6, 125), 0, 0, &FrmObj);//SRDFrm
-        sub_draw(20, 18, 20, 18, 0, 0, FrmSurface, 20, 18*4, 0, 18*3, NewButt01Surface, 0x0);
-        UnloadFrm(FrmObj);
-        FrmSurface=NULL;
-     }
-
-
-    //check if Data exists for other races male or female, and if so enable race selection buttons.
-    if(GetFileAttributes("Appearance\\hmR01S00\0")!=INVALID_FILE_ATTRIBUTES || GetFileAttributes("Appearance\\hfR01S00\0")!=INVALID_FILE_ATTRIBUTES ||
-       GetFileAttributes("Appearance\\hmR01S00.dat\0")!=INVALID_FILE_ATTRIBUTES || GetFileAttributes("Appearance\\hfR01S00.dat\0")!=INVALID_FILE_ATTRIBUTES) {
-    //race selection buttons
-       CreateButton(WinRef, 348, 37, 20, 18, -1, -1, -1, 0x511, NewButt01Surface, NewButt01Surface+(20*18), 0x20);
-       CreateButton(WinRef, 373, 37, 20, 18, -1, -1, -1, 0x513, NewButt01Surface+(20*18*2), NewButt01Surface+(20*18*3), 0x20);
- }
-  //style selection buttons
-     CreateButton(WinRef, 348, 199, 20, 18, -1, -1, -1, 0x512, NewButt01Surface, NewButt01Surface+(20*18), 0x20);
-     CreateButton(WinRef, 373, 199, 20, 18, -1, -1, -1, 0x514, NewButt01Surface+(20*18*2), NewButt01Surface+(20*18*3), 0x20);
-  }
-
-
-  __asm {
-     popad
-     mov      esp, ebp   // epilog
-     pop      ebp
-     //move tag skills button to fit Appearance interface
-     mov edx, 0x1AA;//0x18C+36 was 0x18C tag/skills button xpos
-     retn
- }
-
-
- }
-
-
-
-//------------------------------------------
-static void __declspec(naked) FixCharScrnBack(void) {
-//00432B92  |. A3 A4075700    MOV DWORD PTR DS:[5707A4],EAX
-  __asm {
-  MOV DWORD PTR DS:[_bckgnd],EAX//surface ptr for char scrn back
-  test eax, eax//check if frm loaded ok
-  je EndFunc
-
-     push ebp     // prolog
-     mov ebp, esp
-     sub esp, __LOCAL_SIZE
-     pushad
- }
-
-
-
-    if(CharScrnBackSurface==NULL) {
-       CharScrnBackSurface = new BYTE [640*480];
-
-       BYTE *OldCharScrnBackSurface;
-       OldCharScrnBackSurface = *(BYTE**)_bckgnd;//char screen background frm surface
-
-       //CharScrnBackSurface=*(BYTE**)_bckgnd;//char screen background frm surface
-
-       //copy old charscrn surface to new
-       sub_draw(640, 480, 640, 480, 0, 0, OldCharScrnBackSurface, 640, 480, 0, 0, CharScrnBackSurface, 0);
-
-       //copy Tag Skill Counter background to the right
-       sub_draw(38, 26, 640, 480, 519, 228, OldCharScrnBackSurface, 640, 480, 519+36, 228, CharScrnBackSurface, 0);
-       //copy a blank part of the Tag Skill Bar hiding the old counter
-       sub_draw(38, 26, 640, 480, 460, 228, OldCharScrnBackSurface, 640, 480, 519, 228, CharScrnBackSurface, 0);
-
-       sub_draw(36, 258, 640, 480, 332, 0, OldCharScrnBackSurface, 640, 480, 408, 0, CharScrnBackSurface, 0);//shift behind button rail
-       sub_draw(6, 32, 640, 480, 331, 233, OldCharScrnBackSurface, 640, 480, 330, 6, CharScrnBackSurface, 0);//shadow for style/race button
-
-
-       DWORD FrmObj, FrmMaskObj;//frm objects for char screen Appearance button
-       BYTE *FrmSurface,*FrmMaskSurface;
-
-       FrmSurface=GetFrmSurface(LoadFrm(6, 113), 0, 0, &FrmObj);
-       sub_draw(81, 132, 292, 376, 163, 20, FrmSurface, 640, 480, 331, 63, CharScrnBackSurface, 0);//char view win
-       sub_draw(79, 31, 292, 376, 154, 228, FrmSurface, 640, 480, 331, 32, CharScrnBackSurface, 0);//upper  char view win
-       sub_draw(79, 30, 292, 376, 158, 236, FrmSurface, 640, 480, 331, 195, CharScrnBackSurface, 0);//lower  char view win
-       UnloadFrm(FrmObj);
-
-       //Sexoff Frm
-       FrmSurface=GetFrmSurface(LoadFrm(6, 188), 0, 0, &FrmObj);
-       //Sex button mask frm
-       FrmMaskSurface=GetFrmSurface(LoadFrm(6, 187), 0, 0, &FrmMaskObj);
-
-       sub_draw(80, 28, 80, 32, 0, 0, FrmMaskSurface, 80, 32, 0, 0, FrmSurface, 0x39);//mask for style and race buttons
-       UnloadFrm(FrmMaskObj);
-       FrmMaskSurface=NULL;
-
-       FrmSurface[80*32-1]=0;
-       FrmSurface[80*31-1]=0;
-       FrmSurface[80*30-1]=0;
-
-       FrmSurface[80*32-2]=0;
-       FrmSurface[80*31-2]=0;
-       FrmSurface[80*30-2]=0;
-
-       FrmSurface[80*32-3]=0;
-       FrmSurface[80*31-3]=0;
-       FrmSurface[80*30-3]=0;
-
-       FrmSurface[80*32-4]=0;
-       FrmSurface[80*31-4]=0;
-       FrmSurface[80*30-4]=0;
-
-       sub_draw(80, 32, 80, 32, 0, 0, FrmSurface, 640, 480, 332, 0, CharScrnBackSurface, 0);//style and race buttons
-       sub_draw(80, 32, 80, 32, 0, 0, FrmSurface, 640, 480, 332, 225, CharScrnBackSurface, 0);//style and race buttons
-       UnloadFrm(FrmObj);
-
-       //frm background for char screen Appearance button
-       FrmSurface=GetFrmSurface(LoadFrm(6, 174), 0, 0, &FrmObj);//Pickchar frm
-       sub_draw(69, 20, 640, 480, 282, 320, FrmSurface, 640, 480, 337, 37, CharScrnBackSurface, 0);//button backround top
-       sub_draw(69, 20, 640, 480, 282, 320, FrmSurface, 640, 480, 337, 199, CharScrnBackSurface, 0);//button backround bottom
-       sub_draw(47, 16, 640, 480, 94, 394, FrmSurface, 640, 480, 347, 39, CharScrnBackSurface, 0);//cover buttons pics top
-       sub_draw(47, 16, 640, 480, 94, 394, FrmSurface, 640, 480, 347, 201, CharScrnBackSurface, 0);//cover buttons pics bottom
-       UnloadFrm(FrmObj);
-       FrmSurface=NULL;
-
-       int oldFont;
-       oldFont = GetFont();
-       SetFont(0x67);
-       BYTE PeanutButter;
-       PeanutButter = *(BYTE*)0x6A82F3;//palette offset stored in mem
-       char RaceText[8], StyleText[8];
-       DWORD raceTextWidth, styleTextWidth;
-
-       //Get alternate text from ini if available
-       GetPrivateProfileString("AppearanceMod", "RaceText", "Race", RaceText, 8, translationIni);
-       GetPrivateProfileString("AppearanceMod", "StyleText", "Style", StyleText, 8, translationIni);
-
-       raceTextWidth=GetTextWidth(RaceText);
-       styleTextWidth=GetTextWidth(StyleText);
-
-       PrintText(RaceText, PeanutButter, 372-raceTextWidth/2, 6, raceTextWidth, 640, CharScrnBackSurface);
-       PrintText(StyleText, PeanutButter, 372-styleTextWidth/2, 231, styleTextWidth, 640, CharScrnBackSurface);
-       SetFont(oldFont);
-
-    }
-
-  __asm {
-
-     popad
-     mov      esp, ebp   // epilog
-     pop      ebp
-     mov eax, CharScrnBackSurface
-  EndFunc:
-  MOV DWORD PTR DS:[_bckgnd],EAX//surface ptr for char scrn back
-     retn
- }
-
-
- }
-
-
-//Adjust PC SFX Name---------------------------------------------
-static void __declspec(naked) FixPcSFX() {
-//Skip Underscore char at the start of PC App Name
-  __asm {
-  mov ah, byte ptr ds:[ebx]
-  cmp ah, 0x5F//check if Name begins with an '_' character
-  jne ExitFunc
-     add ebx, 1//shift address to next char
-  ExitFunc:
-  //restore original code
-  mov eax, ebx
-  cmp dword ptr ds:[_gsound_initialized], 0
-     ret
-  }
-
-}
-
-/*
-//Set path to normal before printing or saving character details------------
-static void __declspec(naked) FixCharScrnSaveNPrint() {
-//00432359  |> E8 AA580000    |CALL fallout2.00437C08
-
-  __asm {
-     push TempPathPtr//store current path
-     mov eax, _paths
-  mov TempPathPtr, eax//set path to normal
+  push edx
+  mov  eax, ds:[_obj_dude]                  // hero state structure
+//  test eax, eax
+//  jz   skip
+  mov  edx, STAT_gender                     // sex stat ref
+  call stat_level_                          // get Player stat val
+//skip:
+  mov  edx, 'M'
+  dec  eax                                  // male=0, female=1
+  jnz  end
+  mov  edx, 'F'
+end:
+  push ebx                                  // Style
+  push ecx                                  // Race
+  push edx                                  // Sex
+  push AppearanceFmt                        // 'Appearance\\h%cR%02dS%02d'
+  push esi                                  // buf
+  call sprintf_
+  push 0x50243A                             // '.dat'
   push esi
-  call OptionWindow_                        //call char-scrn menu function
-  pop esi
-  pop TempPathPtr //restore stored path
-
-     call RefreshPCArt
-     ret
-  }
-
-}
-*/
-
-
-
-// Load Appearance data from GCD file------------
-void _stdcall LoadGCDAppearance(void *FileStream) {
- CurrentRaceVal=0;
- CurrentStyleVal=0;
- DWORD temp;
- if(FReadDword(FileStream, &temp)!=-1) {
-    CurrentRaceVal=(int)temp;
-    if(FReadDword(FileStream, &temp)!=-1)
-    CurrentStyleVal=(int)temp;
+  push 0x5016A0                             // '%s%s'
+  push edi                                  // buf
+  call sprintf_
+  add  esp, 9*4
+  pop  edx
+  retn
  }
-
-     //reset hero appearance
-     RefreshArtCache();
-     LoadHeroDat(CurrentRaceVal, CurrentStyleVal);
-  RefreshPCArt();
-
- FCloseFile(FileStream);
 }
 
-
-// Save Appearance data to GCD file--------------
-void _stdcall SaveGCDAppearance(void *FileStream) {
-
-
- if(FWriteDword(FileStream, (DWORD)CurrentRaceVal)!=-1)
-    FWriteDword(FileStream, (DWORD)CurrentStyleVal);
-
- FCloseFile(FileStream);
+static void __declspec(naked) xaddpath() {
+// eax = *filename
+ __asm {
+  push esi
+  push edx
+  push ecx
+  push ebx
+  xchg esi, eax
+  mov  eax, 16                              // size
+  mov  ebx, eax                             // size
+  call nmalloc_
+  test eax, eax
+  jz   end
+  xor  edx, edx                             // val
+  call memset_
+  xchg ecx, eax
+  mov  eax, esi
+  call strdup_
+  test eax, eax
+  jnz  skip
+  xchg ecx, eax
+  call nfree_
+  xchg ecx, eax
+  jmp  end
+skip:
+  mov  [ecx], eax                           // sPath.path
+  xchg esi, eax
+  call dbase_open_
+  test eax, eax                             // Открыли dat-файл?
+  jz   notDat                               // Нет
+  mov  [ecx+0x4], eax                       // sPath.pDat
+  xor  eax, eax
+  inc  eax
+  mov  [ecx+0x8], eax                       // sPath.isDat
+  inc  eax
+notDat:
+  mov  edx, ds:[_paths]
+  mov  ds:[_paths], ecx
+  mov  [ecx+0xC], edx                       // sPath.next
+  dec  eax
+end:
+// eax: 0 = фейл, но память освобождать не надо; 1 = всё хорошо; -1 = не смогли открыть dat-файл, нужно освободить память
+  pop  ebx
+  pop  ecx
+  pop  edx
+  pop  esi
+  retn
+ }
 }
 
-
-// Reset Appearance when selecting "Create Character" from the New Char screen------
-static void __declspec(naked) CreateCharReset() {
-
-  __asm {
-     mov CurrentRaceVal, 0//reset race and style to defaults
-     mov CurrentStyleVal, 0
-
-     push CurrentStyleVal
-     push CurrentRaceVal
-     call LoadHeroDat
-     call RefreshPCArt
-
-  mov eax, 1
-     ret
-  }
- 
+static void __declspec(naked) LoadHeroDat() {
+// eax = Race, ebx = Style
+ __asm {
+  push edi
+  push esi
+  push edx
+  push ecx
+  push ebx
+  sub  esp, 260+260                         // [0]filename, [260]filename_dat
+  xchg ecx, eax
+  lea  esi, [esp+0]                         // filename
+  lea  edi, [esp+260]                       // filename_dat
+  call art_flush_
+// unload previous Dats
+  mov  eax, ds:[_master_db_handle]
+  test eax, eax
+  jz   noHero
+  mov  eax, [eax]                           // sPath.path
+  call xremovepath_
+  dec  eax
+  mov  ds:[_master_db_handle], eax
+noHero:
+  mov  eax, ds:[_critter_db_handle]
+  test eax, eax
+  jz   noRace
+  mov  eax, [eax]                           // sPath.path
+  call xremovepath_
+  dec  eax
+  mov  ds:[_critter_db_handle], eax
+noRace:
+  call makeDataPath
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, edi
+  call access_
+  test eax, eax                             // Есть dat-файл?
+  jnz  noDatFile                            // Нет
+  mov  eax, edi
+  call xaddpath
+  dec  eax                                  // Открыли dat-файл?
+  jz   goodDat                              // Да
+  inc  eax                                  // Ничего не добавили?
+  jz   noDatFile                            // Да
+  mov  eax, edi
+  call xremovepath_
+noDatFile:
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, esi
+  call access_
+  test eax, eax                             // Есть каталог?
+  jnz  shortFail                            // Нет
+  mov  eax, esi
+  call xaddpath
+  inc  eax                                  // Удачно добавили путь?
+shortFail:
+  jnz  fail
+goodDat:
+  mov  eax, ds:[_paths]
+  mov  ds:[_master_db_handle], eax          // set path for selected appearance
+  test ebx, ebx
+  jz   skip
+  xor  ebx, ebx                             // Style
+  call makeDataPath
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, edi
+  call access_
+  test eax, eax                             // Есть dat-файл?
+  jnz  noStyleDatFile                       // Нет
+  mov  eax, edi
+  call xaddpath
+  dec  eax                                  // Открыли dat-файл?
+  jz   goodStyleDat                         // Да
+  inc  eax                                  // Ничего не добавили?
+  jz   noStyleDatFile                       // Да
+  mov  eax, edi
+  call xremovepath_
+noStyleDatFile:
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, esi
+  call access_
+  test eax, eax                             // Есть каталог?
+  jnz  end                                  // Нет
+  mov  eax, esi
+  call xaddpath
+  inc  eax                                  // Удачно добавили путь?
+  jnz  skip
+goodStyleDat:
+  mov  eax, ds:[_paths]                     // _critter_db_handle -> _master_db_handle -> _paths
+  mov  ds:[_critter_db_handle], eax         // eax = _critter_db_handle
+  mov  edx, [eax+0xC]                       // edx = _master_db_handle
+  mov  ecx, [edx+0xC]                       // ecx = _paths
+  mov  [eax+0xC], ecx                       // _critter_db_handle -> _paths
+  mov  [edx+0xC], eax                       // _master_db_handle -> _critter_db_handle
+  mov  ds:[_paths], edx                     // _master_db_handle -> _critter_db_handle -> _paths
+skip:
+  xor  eax, eax
+  jmp  end
+fail:
+  xor  eax, eax
+  dec  eax
+end:
+  add  esp, 260+260
+  pop  ebx
+  pop  ecx
+  pop  edx
+  pop  esi
+  pop  edi
+  retn
+ }
 }
 
-
-//---------------------------------
-void HeroAppearanceModExit() {
-   if(!AppModEnabled)return;
-
-   if(HeroPathPtr) {
-   delete[] HeroPathPtr->path;
-      delete HeroPathPtr;
-   }
-   if(RacePathPtr) {
-   delete[] RacePathPtr->path;
-      delete RacePathPtr;
-   }
+static void __declspec(naked) SetHeroArt() {
+// eax: 0 = normal range, 1 = hero range
+ __asm {
+  push edx
+  push ecx
+  push ebx
+  xchg ecx, eax
+  mov  eax, ds:[_obj_dude]                  // hero state struct
+  mov  ebx, critterListCount
+  mov  edx, [eax+0x20]                      // get hero FrmID
+  and  edx, 0xFFF                           // Index
+  cmp  edx, ebx                             // check if critter LST index is in Hero range
+  ja   IsHero
+  jecxz end
+  add  [eax+0x20], ebx                      // shift index up into hero range
+  jmp  end
+IsHero:
+  dec  ecx
+  jecxz end
+  sub  [eax+0x20], ebx                      // shift index down into normal critter range
+end:
+  pop  ebx
+  pop  ecx
+  pop  edx
+  retn
+ }
 }
 
-
-//-------------------------------------------------
-static void __declspec(naked) FixPcCriticalHitMsg() {
-  __asm {
-     and eax, 0x00000FFF
-     cmp eax, critterListSize//check if critter art in PC range
-   jle EndFunc
-     sub eax, critterListSize//shift critter art index down out of hero range
-   EndFunc:
-     ret
-  }
- 
+static void __declspec(naked) DrawPC() {
+ __asm {
+  push edx
+  push ebx
+  push eax
+  sub  esp, 16
+  mov  ebx, esp
+  mov  eax, ds:[_obj_dude]
+  mov  edx, [eax+0x20]
+  call obj_change_fid_
+  xchg ebx, eax
+  mov  edx, ds:[_map_elevation]
+  call tile_refresh_rect_
+  add  esp, 16
+  pop  eax
+  pop  ebx
+  pop  edx
+  retn
+ }
 }
 
+static void __declspec(naked) display_body() {
+// eax = GNWID, ebx = x, ecx = y, edx = noWearFlag
+ __asm {
+  push edi
+  push esi
+  push ebp
+  sub  esp, 16+4+4+4+4                      // [0]rect, [16]frm_ptr, [20]from, [24]width, [28]height
+  xchg ebp, eax                             // ebp = GNWID
+  mov  eax, ds:[_ticker]
+  call elapsed_time_
+  cmp  eax, cs:[0x47066B]                   // inventory rotation speed
+  jb   end
+  mov  edi, ds:[_curr_rot]
+  inc  edi
+  cmp  edi, 6
+  jb   setRotation
+  xor  edi, edi
+setRotation:
+  mov  ds:[_curr_rot], edi
+  mov  [esp], ebx                           // rect.x
+  mov  [esp+4], ecx                         // rect.y
+  add  ebx, 59
+  add  ecx, 99
+  mov  [esp+8], ebx                         // rect.offx
+  mov  [esp+12], ecx                        // rect.offy
+  mov  eax, ds:[_art_vault_guy_num]         // current base dude model
+  test edx, edx
+  jnz  noWear
+  mov  eax, ds:[_obj_dude]
+  mov  eax, [eax+0x20]                      // pobj.fid (pointer to current armored hero critter FrmId)
+  and  eax, 0xFFF                           // Index
+  inc  edx
+noWear:
+  xchg edx, eax                             // eax = ObjType_Critter, edx = Index
+  push edi                                  // ID3
+  xor  ebx, ebx                             // ID2
+  xor  ecx, ecx                             // ID1
+  call art_id_
+  lea  edx, [esp+16]
+  call art_ptr_lock_
+  test eax, eax
+  jz   setTime
+  xor  edx, edx                             // frame
+  mov  ebx, edi                             // rotation
+  mov  ecx, eax                             // frm_ptr
+  call art_frame_data_
+  mov  [esp+20], eax                        // from
+  xor  edx, edx                             // frame
+  mov  ebx, edi                             // rotation
+  mov  eax, ecx                             // frm_ptr
+  call art_frame_width_
+  mov  esi, eax                             // from_width
+  mov  ebx, 60
+  cmp  eax, ebx
+  jbe  skipWidth
+  xchg ebx, eax
+skipWidth:
+  mov  [esp+24], eax                        // width
+  xor  edx, edx                             // frame
+  mov  ebx, edi                             // rotation
+  mov  eax, ecx                             // frm_ptr
+  call art_frame_length_
+  mov  ebx, 100
+  cmp  eax, ebx
+  jbe  skipHeight
+  xchg ebx, eax
+skipHeight:
+  mov  [esp+28], eax                        // height
+  mov  eax, ebp                             // GNWID
+  call win_get_buf_
+  xchg edi, eax                             // edi = toSurface
+  xchg ebp, eax                             // GNWID
+  push eax
+  call win_width_
+  mov  ecx, eax                             // ToWidth
+  push ecx
+  mov  ebx, 100                             // Height
+  push ebx
+  movzx edx, byte ptr ds:[_DARK_GREY_Color]
+  push edx                                  // ColorIndex
+  imul eax, [esp+4+(4*4)]                   // eax = ToWidth * rect.y
+  add  eax, [esp+0+(4*4)]                   // eax = ToWidth * rect.y + rect.x
+  add  eax, edi                             // ToSurface
+  mov  edx, 60                              // Width
+  call buf_fill_
+  pop  ecx
+  pop  eax                                  // ToWidth
+  mov  edx, [esp+28+(1*4)]                  // height
+  mov  ebx, [esp+24+(1*4)]                  // width
+  push edx                                  // height
+  push ebx                                  // width
+  push esi                                  // from_width
+  push dword ptr [esp+20+(4*4)]             // from
+  push eax                                  // to_width
+  sub  ecx, edx                             // y = win_height - height
+  shr  ecx, 1                               // y = y/2
+  add  ecx, [esp+4+(6*4)]                   // y = rect.y + y
+  imul eax, ecx                             // to_width * y
+  add  edi, eax
+  mov  eax, 60
+  sub  eax, ebx                             // x = win_width - width
+  shr  eax, 1                               // x = x/2
+  add  eax, [esp+0+(6*4)]                   // x = rect.x + x
+  add  edi, eax                             // edi = to_width * y + x
+  push edi                                  // to
+  call transSrcCopy_
+  add  esp, 6*4
+  pop  eax                                  // eax = GNWID
+  mov  edx, esp                             // edx = *WinRect
+  call win_draw_rect_
+  mov  eax, [esp+16]
+  call art_ptr_unlock_
+setTime:
+  call get_time_
+  mov  ds:[_ticker], eax
+end:
+  add  esp, 16+4+4+4+4
+  pop  ebp
+  pop  esi
+  pop  edi
+  retn
+ }
+}
 
-//--------------------------------------------------------------------------
-void EnableHeroAppearanceMod()
-{
-  AppModEnabled=true;
+static void __declspec(naked) DrawCard() {
+// eax = GNWID, ebx = x, ecx = y, edx = Style, esi = fromSurface
+ __asm {
+  push edi
+  push ebp
+  sub  esp, 4+4+4+4+4+8+260                 // [0]x, [4]y, [8]GNWID, [12]filename, [16]frm_ptr, [20]msgfile, [28]fullname
+  mov  [esp+0], ebx                         // x
+  mov  [esp+4], ecx                         // y
+  mov  [esp+8], eax                         // GNWID
+  mov  ebp, eax
+  call win_get_buf_
+  xchg edi, eax                             // edi = toSurface
+  mov  eax, StyleName
+  dec  edx
+  jz   notRace
+  mov  eax, RaceName
+notRace:
+  mov  [esp+12], eax                        // filename
+  xchg ebp, eax                             // GNWID
+  call win_width_
+  mov  ebp, eax                             // ebp = to_width
+  sub  ecx, 8
+  sub  ebx, 8
+  imul eax, ecx                             // eax = to_width * y
+  add  eax, ebx                             // eax = to_width * y + x
+  add  esi, eax
+  add  eax, edi
+  push 186                                  // height
+  push 293                                  // width
+  push ebp                                  // from_width
+  push esi                                  // from
+  push ebp                                  // to_width
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  lea  edx, [esp+28]                        // fullname
+  mov  ecx, _str
+  push 0x5002FF                             // '.frm'
+  push dword ptr [esp+12+4]
+  push 0x5016A0                             // '%s%s'
+  push ecx                                  // buf
+  call sprintf_
+  add  esp, 4*4
+  push ecx
+  push _art_skilldex+4                      // _art_skilldex.name
+  push 0x5003A8                             // 'art\%s\%s'
+  push edx                                  // buf
+  call sprintf_
+  add  esp, 4*4
+  lea  eax, [esp+16]                        // frm_ptr
+  xchg edx, eax                             // eax = fullname, edx = frm_ptr
+  call load_frame_
+  test eax, eax
+  jnz  skipFRM
+  mov  eax, [esp+16]                        // frm_ptr
+  xor  edx, edx                             // frame
+  xor  ebx, ebx                             // rotation
+  mov  ecx, eax                             // frm_ptr
+  call art_frame_data_
+  xchg esi, eax
+  xor  edx, edx                             // frame
+  xor  ebx, ebx                             // rotation
+  mov  eax, ecx                             // frm_ptr
+  call art_frame_width_
+  xor  edx, edx                             // frame
+  xor  ebx, ebx                             // rotation
+  xchg ecx, eax                             // frm_ptr
+  call art_frame_length_
+  push eax                                  // height
+  mov  ebx, [esp+0+(1*4)]                   // x
+  add  ebx, 139
+  mov  eax, [esp+4+(1*4)]                   // y
+  add  eax, 42
+  imul eax, ebp                             // eax = to_width * y
+  add  eax, ebx                             // eax = to_width * y + x
+  add  eax, edi
+  lea  ebx, [ecx-5]                         // из-за Олимп 2207
+  push ebx                                  // width
+//  push ecx                                  // width
+  push ecx                                  // from_width
+  push esi                                  // from
+  push ebp                                  // to_width
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  mov  eax, [esp+16]                        // frm_ptr
+  call mem_free_
+skipFRM:
+  lea  esi, [esp+20]                        // msgfile
+  xor  eax, eax
+  mov  [esi], eax
+  mov  [esi+4], eax
+  lea  edx, [esp+28]                        // fullname
+  mov  ecx, _str
+  mov  ebx, 0x5016A0                        // '%s%s'
+  push 0x50D174                             // '.msg'
+  push dword ptr [esp+12+4]
+  push ebx                                  // '%s%s'
+  push ecx                                  // buf
+  call sprintf_
+  add  esp, 4*4
+  push ecx
+  push dword ptr ds:[_msg_path]
+  push ebx                                  // '%s%s'
+  push edx                                  // buf
+  call sprintf_
+  add  esp, 4*4
+  mov  eax, esi                             // msgfile
+  call message_load_
+  dec  eax
+  jnz  end
+  mov  ebx, 100                             // number
+  mov  edx, _mesg                           // msgdata
+  push edx
+  mov  eax, esi                             // msgfile
+  call getmsg_
+  mov  ds:[_folder_card_title], eax
+  inc  ebx                                  // number
+  pop  edx                                  // msgdata
+  xchg esi, eax                             // msgfile
+  call getmsg_
+  mov  ds:[_folder_card_desc], eax
+  push dword ptr ds:[_curr_font_num]        // store current font
+  mov  eax, 102
+  call text_font_                           // set font for title
+  movzx eax, byte ptr ds:[_colorTable]
+  push eax                                  // Color
+  push eax                                  // Color
+  push eax                                  // ColorIndex
+  mov  eax, [esp+4+(4*4)]                   // y
+  add  eax, 5
+  imul eax, ebp                             // eax = to_width * y
+  add  eax, 3
+  add  eax, [esp+0+(4*4)]                   // x
+  mov  edx, esi                             // DisplayText
+  mov  ecx, ebp                             // ToWidth
+  mov  ebx, 272                             // TxtWidth
+  add  eax, edi                             // eax = ToSurface
+  call ds:[_text_to_buf]
+  call ds:[_text_height]
+  xchg esi, eax
+  mov  eax, [esp+8+(3*4)]                   // GNWID
+  mov  ebx, [esp+4+(3*4)]                   // y
+  add  ebx, 5
+  add  ebx, esi                             // y_start
+  mov  edx, [esp+0+(3*4)]                   // x
+  add  edx, 3                               // x_start
+  lea  ecx, [edx+265]                       // x_end
+  push ebx
+  call win_line_
+  mov  eax, [esp+8+(2*4)]                   // GNWID
+  mov  ebx, [esp+4+(2*4)]                   // y
+  add  ebx, 6
+  add  ebx, esi                             // y_start
+  mov  edx, [esp+0+(2*4)]                   // x
+  add  edx, 3                               // x_start
+  lea  ecx, [edx+265]                       // x_end
+  push ebx
+  call win_line_
+  mov  eax, 101
+  call text_font_                           // set font for info
+  call ds:[_text_height]
+  inc  eax
+  mov  [esp+12+(1*4)], eax                  // Style
+  add  [esp+4+(1*4)], 48                    // y
+  mov  edx, 160                             // maxWidth
+  lea  ecx, [esp+16+(1*4)]                  // count
+  lea  ebx, [esp+28+(1*4)]                  // buf
+  mov  eax, ds:[_folder_card_desc]          // text
+  call _word_wrap_
+  test eax, eax
+  jnz  skip
+  cmp  word ptr [esp+16+(1*4)], 12
+  jbe  noLimit
+  mov  word ptr [esp+16+(1*4)], 12
+noLimit:
+  xor  esi, esi
+  xor  ecx, ecx
+  inc  ecx
+loopText:
+  mov  eax, [esp+4+(1*4)]                   // y
+  imul eax, ebp                             // eax = to_width * y
+  add  eax, 3
+  add  eax, [esp+0+(1*4)]                   // eax = to_width * y + x
+  lea  ebx, [edi+eax]                       // ToSurface
+  xor  edx, edx
+  mov  dx, [esp+esi+28+2+(1*4)]
+  add  edx, ds:[_folder_card_desc]
+  xor  eax, eax
+  xchg [edx], al
+  push edx
+  push eax
+  xor  edx, edx
+  mov  dx, [esp+esi+28+(3*4)]
+  add  edx, ds:[_folder_card_desc]          // DisplayText
+  push ecx
+  movzx eax, byte ptr ds:[_colorTable]
+  push eax                                  // ColorIndex
+  mov  ecx, ebp                             // ToWidth
+  mov  eax, 160                             // TxtWidth
+  xchg ebx, eax                             // eax = ToSurface, ebx = TxtWidth
+  call ds:[_text_to_buf]
+  pop  ecx
+  pop  eax
+  pop  edx
+  mov  [edx], al
+  mov  eax, [esp+12+(1*4)]                  // font_height
+  add  [esp+4+(1*4)], eax                   // y
+  add  esi, 2
+  inc  ecx
+  cmp  cx, [esp+16+(1*4)]
+  jl   loopText
+skip:
+  xor  ecx, ecx
+  mov  esi, ds:[_folder_card_title]
+  mov  edi, _old_str1
+  mov  edx, esi
+  mov  eax, edi
+  call strcmp_
+  test eax, eax
+  jz   skipSound
+  cmp  ds:[_frstc_draw1], ecx
+  je   skipSound
+  mov  eax, 0x501890                        // 'isdxxxx1'
+  call gsound_play_sfx_file_
+skipSound:
+  xchg edi, eax                             // destination
+  mov  edx, esi                             // source
+  mov  ebx, 48                              // num
+  call strncpy_
+  inc  ecx
+  mov  ds:[_frstc_draw1], ecx
+  dec  ecx
+  dec  ecx
+  mov  ds:[_old_fid1], ecx
+  pop  eax
+  call text_font_                           // restore previous font
+  lea  eax, [esp+20]                        // msgfile
+  call message_exit_
+end:
+  add  esp, 4+4+4+4+4+8+260
+  pop  ebp
+  pop  edi
+  retn
+ }
+}
 
-  //setup paths
-  HeroPathPtr=new sPath;
-  RacePathPtr=new sPath;
-  HeroPathPtr->path=new char[64];
-  RacePathPtr->path=new char[64];
+static void __declspec(naked) CreateButtons() {
+// eax = GNWID, ebx = x, ecx = y, edx = toSurface, esi = LeftButtUp, edi = RightButtUp
+ __asm {
+  push ebp
+  sub  esp, 4+4+4+4+4+4                     // [0]x, [4]y, [8]toSurface, [12]GNWID, [16]LeftButtUp, [20]RightButtUp
+  mov  [esp+0], ebx                         // x
+  mov  [esp+4], ecx                         // y
+  mov  [esp+8], edx                         // toSurface
+  mov  [esp+12], eax                        // GNWID
+  mov  [esp+16], esi                        // LeftButtUp
+  mov  [esp+20], edi                        // RightButtUp
+  call win_width_
+  xchg ebp, eax                             // ebp = to_width
+  mov  edi, edx                             // toSurface
+  xchg ecx, eax                             // eax = y
+  imul eax, ebp                             // eax = to_width * y
+  add  eax, ebx                             // eax = to_width * y + x
+  add  edi, eax                             // to
+  mov  esi, ds:[_grphbmp+30*4]              // art_pic (DONEBOX.FRM)
+  mov  edx, ds:[_GInfo+30*8]                // from_width
+  mov  ecx, ds:[_GInfo+30*8+4]              // from_height
+  mov  ebx, 9
+// button backround left
+  push ecx                                  // height
+  push ebx                                  // width
+  push edx                                  // from_width
+  push esi                                  // from
+  push ebp                                  // to_width
+  push edi                                  // to
+  call srcCopy_
+  add  esp, 6*4
+// button backround center
+  push ecx                                  // height
+  push 50                                   // width
+  push edx                                  // from_width
+  lea  eax, [esi+37]
+  push eax                                  // from
+  push ebp                                  // to_width
+  lea  eax, [edi+9]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+// button backround right
+  push ecx                                  // height
+  push ebx                                  // width
+  push edx                                  // from_width
+  sub  edx, ebx
+  lea  eax, [esi+edx]
+  push eax                                  // from
+  push ebp                                  // to_width
+  lea  eax, [edi+9+50]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  xor  esi, esi
+  mov  edi, 0x20
+  mov  ebp, [esp+12]                        // GNWID
+  mov  ebx, [esp+4]                         // y
+  inc  ebx
+  inc  ebx
+  mov  edx, [esp+0]                         // x
+  push edx
+  push ebx
+  push edi                                  // flags
+  push esi
+  push dword ptr ds:[_grphbmp+37*4]         // PicDown (sld.frm)
+  push dword ptr ds:[_grphbmp+36*4]         // PicUp (slu.frm)
+  dec  esi
+  push dword ptr [esp+16+(6*4)]             // ButtUp
+  push esi                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  mov  eax, ds:[_GInfo+36*8+4]              // Height
+  push eax                                  // Height
+  mov  ecx, ds:[_GInfo+36*8]                // Width
+  add  edx, 31
+  sub  edx, ecx                             // Xpos
+  mov  eax, ebp                             // GNWID
+  call win_register_button_
+  inc  esi
+  pop  ebx                                  // Ypos
+  pop  edx                                  // x
+  push edi                                  // flags
+  push esi
+  push dword ptr ds:[_grphbmp+39*4]         // PicDown (srd.frm)
+  push dword ptr ds:[_grphbmp+38*4]         // PicUp (sru.frm)
+  dec  esi
+  push dword ptr [esp+20+(4*4)]             // ButtUp
+  push esi                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  mov  eax, ds:[_GInfo+38*8+4]              // Height
+  push eax                                  // Height
+  mov  ecx, ds:[_GInfo+38*8]                // Width
+  add  edx, 37                              // Xpos
+  xchg ebp, eax                             // GNWID
+  call win_register_button_
+  add  esp, 4+4+4+4+4+4
+  pop  ebp
+  retn
+ }
+}
 
-  HeroPathPtr->isDat=0;
-  RacePathPtr->isDat=0;
-  HeroPathPtr->pDat=NULL;
-  RacePathPtr->pDat=NULL;
+static const DWORD pic_id[9] = {
+ 10,                                        // SEXOFF.FRM (Character editor)
+ 30,                                        // DONEBOX.FRM (Character editor)
+ 36,                                        // slu.frm (Left arrow up)
+ 37,                                        // sld.frm (Left arrow down)
+ 38,                                        // sru.frm (Right arrow up)
+ 39,                                        // srd.frm (Right arrow down)
+ 41,                                        // OPBASE.FRM (Character editor)
+ 42,                                        // OPBTNOFF.FRM (Character editor)
+ 43,                                        // OPBTNON.FRM (Character editor)
+};
 
-  //Check if new Appearance char scrn button pushed
-  SafeWrite32(0x431E9E, (DWORD)&CheckCharScrnButtons - 0x431EA2);
+static void __declspec(naked) CreateHeroWindow() {
+// eax = GNWID, ebx = x, ecx = y, edx = toSurface
+ __asm {
+  push edi
+  push esi
+  push ebp
+  sub  esp, 4+4+4+4                         // [0]x, [4]y, [8]toSurface, [12]GNWID
+  mov  [esp+0], ebx                         // x
+  mov  [esp+4], ecx                         // y
+  mov  [esp+8], edx                         // toSurface
+  mov  [esp+12], eax                        // GNWID
+  call win_width_
+  xchg ebp, eax                             // ebp = to_width
+  xor  esi, esi
+loopInit:
+  mov  edi, pic_id[esi*4]
+  xor  ecx, ecx                             // ID1
+  xor  ebx, ebx                             // ID2
+  push ebx                                  // ID3
+  mov  edx, ds:[_grph_id][edi*4]            // Index
+  mov  eax, ObjType_Intrface                // ObjType
+  call art_id_
+  lea  edx, ds:[_grph_key][edi*4]           // *frm_ptr
+  lea  ecx, ds:[_GInfo][edi*8+4]            // *Height
+  lea  ebx, ds:[_GInfo][edi*8]              // *Width
+  call art_lock_
+  mov  ds:[_grphbmp][edi*4], eax            // art_pic
+  test eax, eax
+  jz   failInit
+  inc  esi
+  cmp  esi, 9
+  jb   loopInit
+  je   goodInit
+failInit:
+  mov  ecx, esi
+  xor  esi, esi
+loopFail:
+  mov  eax, pic_id[esi*4]
+  mov  eax, ds:[_grph_key][eax*4]           // eax = frm_ptr
+  call art_ptr_unlock_
+  inc  esi
+  loop loopFail
+  xchg ecx, eax
+  dec  eax
+  jmp  end
+goodInit:
+  mov  edi, [esp+8]                         // toSurface
+  mov  eax, [esp+4]                         // eax = y
+  add  eax, 32                              // eax = y + 32
+  imul eax, ebp                             // eax = to_width * (y + 32)
+  add  eax, [esp]                           // eax = to_width * (y + 32) + x
+  add  eax, edi
+  mov  esi, ds:[_grphbmp+41*4]              // art_pic (OPBASE.FRM)
+  mov  ecx, 98                              // height
+  mov  ebx, 40                              // width
+  mov  edx, ds:[_GInfo+41*8]                // from_width
+// Верхний левый фон
+  push ecx                                  // height
+  push ebx                                  // width
+  push edx                                  // from_width
+  push esi                                  // from
+  push ebp                                  // to_width
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  push ecx                                  // height
+  push ebx                                  // width
+  push edx                                  // from_width
+  push ecx                                  // height
+  push ebx                                  // width
+  push edx                                  // from_width
+// Верхний правый фон
+  push ecx                                  // height
+  push ebx                                  // width
+  push edx                                  // from_width
+  add  eax, ebx                             // eax = to_width * (y + 32) + x + 40
+  lea  ebx, [esi+edx-40]
+  push ebx                                  // from
+  push ebp                                  // to_width
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+// Нижний левый фон
+  mov  eax, ds:[_GInfo+41*8+4]              // eax = from_height
+  sub  eax, ecx                             // eax = from_height - 98
+  imul eax, edx                             // eax = from_width * (from_height - 98)
+  add  esi, eax
+  mov  eax, [esp+4+(6*4)]                   // eax = y
+  add  eax, 32+98                           // eax = y + 130
+  imul eax, ebp                             // eax = to_width * (y + 130)
+  add  eax, [esp+0+(6*4)]                   // eax = to_width * (y + 130) + x
+  add  eax, edi
+  push esi                                  // from
+  push ebp                                  // to_width
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+// Нижний правый фон
+  pop  edx                                  // from_width
+  push edx                                  // from_width
+  lea  esi, [esi+edx-40]                    // esi = from_width * (from_height - 98) + from_width - 40
+  push esi                                  // from
+  push ebp                                  // to_width
+  add  eax, 40                              // eax = to_width * (y + 130) + x + 40
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  mov  eax, [esp+4]                         // eax = y
+  imul eax, ebp                             // eax = to_width * (y + 0)
+  add  eax, [esp+0]                         // eax = to_width * (y + 0) + x
+  lea  eax, [eax+edi+40]                    // eax = to_width * (y + 0) + x + 40
+  mov  esi, ds:[_grphbmp+10*4]              // art_pic (SEXOFF.FRM)
+  mov  ecx, ds:[_GInfo+10*8+4]              // Height
+  mov  ebx, ds:[_GInfo+10*8+0]              // Width
+  mov  edx, ebx
+  shr  ebx, 1                               // width/2
+  sub  eax, ebx                             // eax = to_width * (y + 0) + x + 40 - width/2
+  push ecx                                  // Height
+  push edx                                  // Width
+  push ecx                                  // height
+  push edx                                  // width
+  push edx                                  // from_width
+  push esi                                  // from (SEXOFF.FRM)
+  push ebp                                  // to_width
+  push ecx                                  // height
+  push edx                                  // width
+  push edx                                  // from_width
+  push esi                                  // from (SEXOFF.FRM)
+  push ebp                                  // to_width
+// race button
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  mov  eax, [esp+4+(7*4)]                   // eax = y
+  add  eax, 228                             // eax = y + 228
+  imul eax, ebp                             // eax = to_width * (y + 228)
+  add  eax, [esp+0+(7*4)]                   // eax = to_width * (y + 228) + x
+  lea  eax, [eax+edi+40]                    // eax = to_width * (y + 228) + x + 40
+  sub  eax, ebx                             // eax = to_width * (y + 228) + x + 40 - width/2
+// style button
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  pop  ecx                                  // Width
+  pop  edx                                  // Height
+  push edx                                  // Height
+  push ecx                                  // Width
+  xor  esi, esi
+  push esi                                  // flags
+  push esi                                  // Unk
+  push esi                                  // PicDown
+  push esi                                  // PicUp
+  dec  esi
+  push esi                                  // ButtUp
+  push 572                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  push edx                                  // Height
+  mov  esi, [esp+0+(11*4)]                  // x
+  add  esi, 40                              // esi = x + 40
+  sub  esi, ebx                             // esi = x + 40 - width/2
+  mov  edx, esi                             // Xpos
+  mov  ebx, [esp+4+(11*4)]                  // Ypos
+  mov  eax, [esp+12+(11*4)]                 // GNWID
+  call win_register_button_
+  pop  ecx                                  // Width
+  pop  ebx                                  // Height
+  mov  edx, esi                             // Xpos
+  xor  esi, esi
+  push esi                                  // flags
+  push esi                                  // Unk
+  push esi                                  // PicDown
+  push esi                                  // PicUp
+  dec  esi
+  push esi                                  // ButtUp
+  push 573                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  push ebx                                  // Height
+  mov  ebx, [esp+4+(9*4)]                   // y
+  add  ebx, 228                             // Ypos
+  mov  eax, [esp+12+(9*4)]                  // GNWID
+  call win_register_button_
+  movzx eax, byte ptr ds:[_DARK_GREY_Color]
+  push eax                                  // ColorIndex
+  mov  eax, [esp+4+4]                       // eax = y
+  add  eax, 79                              // eax = y + 79
+  imul eax, ebp                             // eax = to_width * (y + 79)
+  add  eax, [esp+0+4]                       // eax = to_width * (y + 79) + x
+  lea  eax, [eax+edi+9]                     // eax = to_width * (y + 79) + x + 9
+  mov  edx, 62                              // Width
+  mov  ecx, ebp                             // ToWidth
+  mov  ebx, 102                             // Height
+  call buf_fill_
+  movzx eax, byte ptr ds:[_LIGHT_GREY_Color]
+  push eax                                  // Color
+  mov  eax, [esp+4+4]                       // y
+  lea  ecx, [eax+78]                        // Ypos
+  lea  eax, [ecx+103]
+  push eax                                  // Ypos_size
+  mov  eax, [esp+0+8]                       // x
+  lea  ebx, [eax+8]                         // Xpos
+  lea  eax, [ebx+63]
+  push eax                                  // Xpos_size
+  mov  edx, ebp                             // ToWidth
+  mov  eax, edi                             // toSurface
+  call draw_box_
+  push dword ptr ds:[_curr_font_num]
+  mov  eax, 103
+  call text_font_
+  mov  ecx, ds:[_GInfo+10*8+4]              // Height
+  call ds:[_text_height]
+  sub  ecx, eax
+  shr  ecx, 1
+  inc  ecx
+  mov  ebx, ds:[_GInfo+10*8+0]              // TxtWidth
+  mov  eax, [esp+4+4]                       // eax = y
+  add  eax, ecx                             // eax = y + 0
+  imul eax, ebp                             // eax = to_width * (y + 0)
+  add  eax, [esp+0+4]                       // eax = to_width * (y + 0) + x
+  lea  esi, [eax+edi+40]                    // eax = to_width * (y + 0) + x + 40
+  movzx eax, byte ptr ds:[_PeanutButter]
+  push eax                                  // ColorIndex
+  push ebx                                  // TxtWidth
+  push ecx
+  push eax                                  // ColorIndex
+  mov  eax, offset RaceText
+  mov  edx, eax                             // *DisplayText
+  call ds:[_text_width]
+  shr  eax, 1                               // TxtWidth/2
+  mov  ecx, ebp                             // ToWidth
+  sub  esi, eax
+  xchg esi, eax                             // eax = ToSurface
+  call ds:[_text_to_buf]
+  pop  eax
+  pop  ebx                                  // TxtWidth
+  add  eax, [esp+4+8]                       // eax = y
+  add  eax, 228                             // eax = y + 228
+  imul eax, ebp                             // eax = to_width * (y + 228)
+  add  eax, [esp+0+8]                       // eax = to_width * (y + 228) + x
+  lea  esi, [eax+edi+40]                    // eax = to_width * (y + 228) + x + 40
+  mov  eax, offset StyleText
+  mov  edx, eax                             // *DisplayText
+  call ds:[_text_width]
+  shr  eax, 1                               // TxtWidth/2
+  mov  ecx, ebp                             // ToWidth
+  sub  esi, eax
+  xchg esi, eax                             // eax = ToSurface
+  call ds:[_text_to_buf]
+  pop  eax
+  call text_font_
+  xor  ebx, ebx
+  cmp  IsControllingNPC, ebx                // Контроль персонажей?
+  jne  skipButtons                          // Да
+  mov  eax, [esp+12]                        // GNWID
+  cmp  eax, ds:[_edit_win]
+  jne  createButtons
+  cmp  ds:[_glblmode], ebx                  // Редактирование персонажа?
+  je   skipButtons                          // Да
+createButtons:
+  mov  edx, [esp+8]                         // toSurface
+  mov  ecx, [esp+4]                         // y
+  mov  ebx, [esp+0]                         // x
+  add  ebx, 6
+  cmp  byte ptr raceExist, 0
+  je   skip
+  push edx
+  push ecx
+  push ebx
+  push eax
+  mov  edi, 576                             // RightButtUp
+  mov  esi, 574                             // LeftButtUp
+  add  ecx, 49
+  call CreateButtons                        // race selection buttons
+  pop  eax
+  pop  ebx
+  pop  ecx
+  pop  edx
+skip:
+  cmp  byte ptr styleExist, 0
+  je   skipButtons
+  add  ecx, 187
+  mov  edi, 577                             // RightButtUp
+  mov  esi, 575                             // LeftButtUp
+  call CreateButtons                        // style selection buttons
+skipButtons:
+  xor  eax, eax
+end:
+  add  esp, 4+4+4+4
+  pop  ebp
+  pop  esi
+  pop  edi
+  retn
+ }
+}
 
-  //Destroy new Appearance button mem after use
-  SafeWrite16(0x4329D8, 0xE890);
-  SafeWrite32(0x4329DA, (DWORD)&CharScrnEnd - 0x4329DE);
+static void __declspec(naked) DestroyHeroWindow() {
+ __asm {
+  push esi
+  push ecx
+  push eax
+  mov  ecx, 9
+  xor  esi, esi
+loopUnlock:
+  mov  eax, pic_id[esi*4]
+  mov  eax, ds:[_grph_key][eax*4]           // eax = frm_ptr
+  call art_ptr_unlock_
+  inc  esi
+  loop loopUnlock
+  pop  eax
+  pop  ecx
+  pop  esi
+  retn
+ }
+}
 
-  //Check if sex has changed and reset char appearance
-  SafeWrite8(0x4322E8, 0xe8);
-  SafeWrite32(0x4322E9, (DWORD)&SexScrnEnd - 0x4322ED);
+static void __declspec(naked) art_init_hook() {
+ __asm {
+  push edi
+  push esi
+// edi = _art_critters.mem, ebp = _art_critters.count, esi = _art_critters.name
+  mov  eax, [ebp]                           // eax = _art_critters.count
+  mov  ecx, eax
+  imul ebx, eax, 13                         // ebx = _art_critters.count * 13
+  shl  eax, 1                               // double critter list count to add room for hero art
+  mov  [ebp], eax
+  mov  eax, ebx
+  shl  eax, 1                               // (_art_critters.count * 13) * 2
+  call mem_malloc_
+  test eax, eax                             // Удачно выделили память?
+  jnz  skip                                 // Да
+  mov  [ebp], ecx                           // Восстановим _art_critters.count
+  mov  raceExist, al
+  mov  styleExist, al
+  xchg ecx, eax
+  jmp  end
+skip:
+  mov  critterListCount, ecx
+  mov  critterArraySize, ebx
+  mov  edx, [edi]                           // source
+  push edx
+  call memmove_                             // eax = destination, edx = source, ebx = num
+  mov  [edi], eax                           // _art_critters.mem указывает на выделенный блок памяти
+  lea  edi, [eax+ebx]                       // edi = *HeroList (set start of hero critter list after regular critter list)
+  xchg esi, eax                             // esi = *CritList
+  pop  eax
+  call mem_free_                            // eax = mem
+  xor  edx, edx                             // value
+  mov  eax, edi
+  call memset_                              // eax = destination, edx = value, ebx = num
+loopCopy:                                   // copy critter name list to hero name list 
+  mov  byte ptr [edi], '_'                  // insert a '_' char at the front of new hero critt names (fallout wont load the same name twice)
+  lea  eax, [edi+1]                         // destination
+  mov  edx, esi                             // source
+  mov  ebx, 11                              // num
+  call strncpy_
+  add  esi, 13
+  add  edi, 13
+  loop loopCopy
+end:
+  inc  ecx
+  pop  esi
+  pop  edi
+  retn
+ }
+}
 
-  //Load New Hero Art
-  SafeWrite16(0x4DEEE5, 0xE890);
-  SafeWrite32(0x4DEEE7, (DWORD)&LoadNewHeroArt - 0x4DEEEB);
+// adjust base hero art
+static void __declspec(naked) art_init_hook1() {
+ __asm {
+  mov  eax, critterListCount
+  mov  ecx, 5
+  mov  esi, _art_vault_guy_num
+loopArt:
+  add  [esi], eax
+  add  esi, 4
+  loop loopArt
+  retn
+ }
+}
 
-  //Divert critter frm file name function exit for file checking
-  SafeWrite8(0x419520, 0xEB);//divert func exit
-  SafeWrite32(0x419521, 0x9090903E);
+// insert main path structure in front when not loading
+static void __declspec(naked) xfopen_hook() {
+ __asm {
+  mov  ecx, ds:[_paths]
+  cmp  byte ptr [esi], 'r'
+  je   isReading
+  mov  eax, ds:[_critter_db_handle]
+  test eax, eax
+  jnz  skip
+  mov  eax, ds:[_master_db_handle]
+  test eax, eax
+  jz   isReading
+skip:
+  mov  ecx, [eax+0xC]                       // sPath.next = _paths
+isReading:
+  push 0x4DEEEB
+  retn
+ }
+}
 
-  //Check if new hero art exists otherwise use regular art
-  SafeWrite8(0x419560, 0xE8);
-  SafeWrite32(0x419561, (DWORD)&CheckHeroExist - 0x419565);
+static void __declspec(naked) art_get_name_hook() {
+ __asm {
+  mov  eax, _art_name
+  mov  ecx, critterArraySize
+  jecxz end
+  cmp  esi, ecx                             // check if loading hero art
+  jbe  end
+  push eax
+  sub  esp, 4
+  mov  edx, esp
+  call db_dir_entry_
+  add  esp, 4
+  inc  eax
+  pop  eax
+  jnz  end
+// if file not found load regular critter art instead
+  sub  esi, ecx
+  pop  eax                                  // drop func ret address
+  push 0x4194E2
+end:
+  retn
+ }
+}
 
-  //Double size of critter art index creating a new area for hero art
-  SafeWrite16(0x4196AA, 0xE890);
-  SafeWrite32(0x4196AC, (DWORD)&DoubleArt - 0x4196B0);
+//adjust armor art if num below hero art range
+static void __declspec(naked) adjust_fid_hook() {
+ __asm {
+  call art_id_
+  mov  edx, eax
+  and  edx, 0xFFF
+  cmp  edx, critterListCount                // check if critter art in PC range
+  ja   end
+  add  eax, critterListCount                // shift critter art index up into hero range
+end:
+  push 0x4717D6
+  retn
+ }
+}
+
+static void __declspec(naked) editor_design_hook() {
+ __asm {
+  mov  ds:[_frame_time], eax
+  xor  edx, edx                             // noWearFlag
+  mov  eax, ds:[_edit_win]                  // GNWID
+  mov  ebx, 341                             // x
+  mov  ecx, 80                              // y
+  jmp  display_body
+ }
+}
+
+static void __declspec(naked) checkHeroButtons() {
+// eax = button, ebp = _info_line
+ __asm {
+  push ebp
+  push edx
+  push ecx
+  push ebx
+//  mov  ebp, ds:[_info_line]
+  lea  ecx, [ebp-98]                        // 98 (Race)
+  jecxz switchSetButton
+  dec  ecx                                  // 99 (Style)
+  jnz  afterSetButton
+  inc  ecx
+switchSetButton:
+  cmp  eax, 0x14B                           // button left?
+  je   buttonSetLeftRight
+  cmp  eax, 0x14D                           // button right?
+  jne  afterSetButton
+buttonSetLeftRight:
+  lea  eax, [eax+0xF3]
+  jecxz afterSetButton
+  inc  eax
+afterSetButton:
+  mov  ebx, CurrentAppearance[4]            // styleVal
+  mov  ecx, CurrentAppearance[0]            // raceVal
+  xor  edx, edx                             // drawFlag
+  mov  ebp, 98
+  sub  eax, 572
+  jz   redraw                               // race button pushed (572)
+  inc  ebp
+  dec  eax
+  jz   redraw                               // style button pushed (573)
+  cmp  IsControllingNPC, edx                // Контроль персонажей?
+  jne  afterSwitchButton                    // Да
+  cmp  ds:[_glblmode], edx                  // Редактирование персонажа?
+  je   afterSwitchButton                    // Да
+  dec  eax
+  jz   raceLeftButton                       // race left button pushed (574)
+  dec  eax
+  jz   styleLeftButton                      // style left button pushed (575)
+  dec  eax
+  jz   raceRightButton                      // race right button pushed (576)
+  dec  eax
+  jnz  afterSwitchButton
+// style right button pushed (577)
+  cmp  styleExist, dl
+  je   afterSwitchButton
+  inc  ebx
+  mov  eax, ecx
+  call LoadHeroDat
+  inc  eax
+  jnz  redraw
+  dec  ebx
+  jmp  loadPrevious
+styleLeftButton:
+  cmp  styleExist, dl
+  je   afterSwitchButton
+  test ebx, ebx
+  jz   firstStyle
+  dec  ebx
+firstStyle:
+  mov  eax, ecx
+  call LoadHeroDat
+  inc  eax
+  jnz  redraw
+  xchg ebx, eax
+  jmp  loadPrevious
+raceRightButton:
+  cmp  raceExist, dl
+  je   afterSwitchButton
+  dec  ebp
+  xor  ebx, ebx
+  inc  ecx
+  mov  eax, ecx
+  call LoadHeroDat
+  inc  eax
+  jnz  redraw
+  dec  ecx
+  jmp  loadPrevious
+raceLeftButton:
+  cmp  raceExist, dl
+  je   afterSwitchButton
+  dec  ebp
+  xor  ebx, ebx                             // todo: решить - сбрасывать ли стиль если раса уже первая
+  jecxz firstRace
+  dec  ecx
+firstRace:
+  mov  eax, ecx
+  call LoadHeroDat
+  inc  eax
+  jnz  redraw
+  xchg ecx, eax
+loadPrevious:
+  mov  eax, ecx
+  call LoadHeroDat
+redraw:
+  inc  edx
+  mov  ds:[_info_line], ebp
+afterSwitchButton:
+  mov  CurrentAppearance[4], ebx            // styleVal
+  mov  CurrentAppearance[0], ecx            // raceVal
+  xchg edx, eax
+  pop  ebx
+  pop  ecx
+  pop  edx
+  pop  ebp
+  retn
+ }
+}
+
+static void __declspec(naked) editor_design_Tab_hook() {
+// ebp = _info_line
+ __asm {
+  push 0x4326C0
+  cmp  ebp, 78
+  ja   skip
+  mov  ebp, 98
+  retn
+skip:
+/*  cmp  ebp, 98
+  ja   end
+  inc  ebp
+  retn
+end:*/
+  xor  ebp, ebp
+  retn
+ }
+}                
+
+static void __declspec(naked) editor_design_Up_hook() {
+// ebp = _info_line
+ __asm {
+  cmp  ebp, 82
+  je   skip
+  cmp  ebp, 98
+  jne  end
+  sub  ebp, 14
+skip:
+  add  ebp, 16
+end:
+  dec  ebp
+  push 0x4327A9
+  retn
+ }
+}                
+
+static void __declspec(naked) editor_design_Down_hook() {
+// ebp = _info_line
+ __asm {
+  cmp  ebp, 97
+  je   skip
+  cmp  ebp, 99
+  jne  end
+  add  ebp, 14
+skip:
+  sub  ebp, 16
+end:
+  inc  ebp
+  push 0x4328B4
+  retn
+ }
+}                
+
+static void __declspec(naked) editor_design_Other_hook() {
+// edx = button, ebp = _info_line
+ __asm {
+  xchg edx, eax
+  call checkHeroButtons
+  dec  eax
+  jnz  end
+  pop  eax                                  // Уничтожаем адрес возврата
+  push 0x4328CC
+end:
+  mov  eax, ds:[_edit_win]
+  retn
+ }
+}                
+
+static void __declspec(naked) SexWindow_call() {
+ __asm {
+  mov  edx, STAT_gender
+  mov  eax, ds:[_obj_dude]
+  push eax
+  push edx
+  call stat_level_
+  pop  edx
+  xchg ecx, eax
+  call SexWindow_                           // call gender selection window
+  pop  eax
+  call stat_level_
+  cmp  ecx, eax                             // check if gender has been changed
+  je   end
+  movzx ecx, byte ptr ds:[_gmovie_played_list+3]//check if wearing vault suit
+  jecxz skip
+  inc  eax
+  inc  eax
+skip:
+  shl  eax, 2
+  mov  eax, ds:[_art_vault_person_nums][eax]// Порядковый номер имени файла в _art_critters для базовой модели
+  mov  ds:[_art_vault_guy_num], eax         // current base dude model
+  xor  eax, eax
+  mov  CurrentAppearance[4], eax            // reset style and race to defaults
+  mov  CurrentAppearance[0], eax
+  call RefreshPCArt
+  pop  eax                                  // Уничтожаем адрес возврата
+  push 0x431E85
+end:
+  retn
+ }
+}
+
+// Отрисовка описания
+static void __declspec(naked) DrawInfoWin_hook() {
+ __asm {
+  cmp  ecx, 81
+  je   end
+  sub  ecx, 98                              // Check If Race or Style selected to redraw info note
+  jecxz skip
+  dec  ecx
+  jnz  end
+  inc  ecx
+skip:
+  mov  edx, ecx
+  mov  eax, ds:[_edit_win]
+  mov  ebx, 345
+  mov  ecx, 267
+  mov  esi, ds:[_bckgnd]
+  call DrawCard
+  pop  eax                                  // Уничтожаем адрес возврата
+  push 0x436C3C
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) CharEditStart_hook() {
+ __asm {
+  mov  ds:[_edit_win], eax
+  inc  eax                                  // Удачно создано окно?
+  jz   skip                                 // Нет
+  dec  eax
+  xchg ebp, eax                             // ebp = GNWID
+  mov  eax, 640*480
+  mov  ebx, eax
+  call mem_malloc_
+  test eax, eax                             // Удачно выделили память?
+  jz   fail                                 // Нет
+  push ebp
+  mov  ebp, 640
+  mov  edx, ds:[_bckgnd]
+  mov  ds:[_bckgnd], eax
+// Копируем оригинал
+  mov  esi, edx
+  call memmove_                             // eax = destination, edx = source, ebx = num
+  xchg edi, eax
+// shift behind button rail
+  push 258                                  // height
+  push 52                                   // width
+  push ebp                                  // from_width
+  lea  eax, [esi+640*0+331]
+  push eax                                  // from
+  push ebp                                  // to_width
+  lea  eax, [edi+640*0+411]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+// copy a blank part of the Tag Skill Bar hiding the old counter
+  mov  ecx, 27
+  push ecx                                  // height
+  push 113                                  // width
+  push ebp                                  // from_width
+  lea  eax, [esi+640*227+381]
+  push eax                                  // from
+  push ebp                                  // to_width
+  lea  eax, [edi+640*227+454]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+// copy Tag Skill Counter background to the right
+  push ecx                                  // height
+  push 33                                   // width
+  push ebp                                  // from_width
+  lea  eax, [esi+640*227+519]
+  push eax                                  // from
+  push ebp                                  // to_width
+  lea  eax, [edi+640*227+567]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+// Сдвиг верхнего описания (из-за Олимп 2207)
+  push 19                                   // height
+  push 155                                  // width
+  push ebp                                  // from_width
+  lea  eax, [esi+640*0+413]
+  push eax                                  // from
+  push ebp                                  // to_width
+  lea  eax, [edi+640*0+450]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  pop  ebp                                  // GNWID
+  mov  ebx, 331                             // x
+  xor  ecx, ecx                             // y
+  mov  edx, edi                             // toSurface
+  mov  eax, ebp                             // GNWID
+  call CreateHeroWindow
+  inc  eax
+  mov  eax, ebp
+  jnz  end
+  xchg edi, eax
+  call mem_free_
+fail:
+  xchg ebp, eax
+  call win_delete_
+  xor  eax, eax
+skip:
+  dec  eax
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) CharEditEnd_hook() {
+ __asm {
+  call art_ptr_unlock_
+  call DestroyHeroWindow
+  mov  eax, ds:[_bckgnd]
+  jmp  mem_free_
+ }
+}
+
+// Reset Appearance when selecting "Create Character" from the New Char screen
+static void __declspec(naked) select_character_hook() {
+ __asm {
+  dec  eax
+  mov  CurrentAppearance[4], eax            // reset style and race to defaults
+  mov  CurrentAppearance[0], eax
+  call RefreshPCArt
+  inc  eax
+  jmp  editor_design_
+ }
+}
+
+// Load Appearance data from GCD file
+static void __declspec(naked) pc_load_data_hook() {
+ __asm {
+  xor  ebx, ebx
+  inc  ebx
+  inc  ebx
+  mov  edx, offset CurrentAppearance
+  call db_freadIntCount_
+  inc  eax
+  jnz  skip
+  mov  CurrentAppearance[4], eax            // Style
+  mov  CurrentAppearance[0], eax            // Race
+skip:
+  call RefreshPCArt
+  xchg esi, eax
+  jmp  db_fclose_
+ }
+}
+
+// Save Appearance data to GCD file
+static void __declspec(naked) pc_save_data_hook() {
+ __asm {
+  xor  ebx, ebx
+  inc  ebx
+  inc  ebx
+  mov  edx, offset CurrentAppearance
+  call db_fwriteIntCount_
+  xchg esi, eax
+  jmp  db_fclose_
+ }
+}
+
+//Adjust PC SFX Name
+static void __declspec(naked) gsound_load_sound_hook() {
+ __asm {
+//Skip Underscore char at the start of PC App Name
+  cmp  byte ptr [ebx], 0x5F                 // check if Name begins with an '_' character
+  jne  end
+  inc  ebx                                  // shift address to next char
+end:
+  jmp  gsound_get_sound_ready_for_effect_
+ }
+}
+
+//return hero art val to normal before saving
+static void __declspec(naked) obj_save_dude_call() {
+ __asm {
+  push eax
+  xor  eax, eax                             // set hero FrmID LST index to normal range before saving
+  call SetHeroArt
+  pop  eax
+  call obj_save_dude_                       // save current hero state structure fuction
+  push eax
+  xor  eax, eax
+  inc  eax                                  // return hero FrmID LST index back to hero art range after saving hero state structure
+  call SetHeroArt
+  pop  eax
+  retn
+ }
+}
+
+static void __declspec(naked) combat_get_loc_name_hook() {
+ __asm {
+  cmp  eax, critterListCount                // check if critter art in PC range
+  jbe  end
+  sub  eax, critterListCount                // shift critter art index down out of hero range
+end:
+  jmp  art_alias_num_
+ }
+}
+
+void __declspec(naked) HeroSelectWindow() {
+// eax = RaceStyleFlag
+ __asm {
+  pushad
+  test dword ptr InLoop, WORLDMAP+ESCMENU+SAVEGAME+LOADGAME+OPTIONS+HELP+CHARSCREEN+PIPBOY+AUTOMAP+SKILLDEX+INTFACELOOT+BARTER+HEROWIN
+  jnz  end
+  xchg ecx, eax
+  mov  eax, ds:[_intfaceEnabled]
+  dec  eax
+  jnz  end
+  cmp  critterListCount, eax
+  je   end
+  cmp  IsControllingNPC, eax                // Контроль персонажей?
+  jne  end                                  // Да
+  or   dword ptr InLoop, HEROWIN            // Чтобы исключить повторный вызов
+  movzx eax, byte ptr styleExist
+  push eax
+  movzx eax, byte ptr raceExist
+  push eax
+  jecxz disableStyle
+  mov  raceExist, ah
+  jmp  checkRun
+disableStyle:
+  mov  styleExist, ah
+checkRun:
+  call map_disable_bk_processes_
+  push eax
+  test eax, eax
+  jz   skip_gmouse_3d_is_on
+  call gmouse_3d_is_on_
+skip_gmouse_3d_is_on:
+  push eax
+  dec  eax
+  jnz  skip_gmouse_3d_off
+  call gmouse_3d_off_
+skip_gmouse_3d_off:
+  mov  eax, ds:[_mouse_is_hidden]
+  push eax
+  dec  eax
+  jnz  skip_mouse_show
+  call mouse_show_
+skip_mouse_show:
+  push dword ptr ds:[_gmouse_current_cursor]// get current mouse pic ref
+  push dword ptr ds:[_info_line]
+  push dword ptr ds:[_glblmode]
+  push dword ptr ds:[_curr_font_num]        // store current font
+  xor  eax, eax
+  inc  eax
+  call gmouse_set_cursor_                   // set mouse pic
+  sub  esp, 4+4+4+4+8+16+4+4+4+4            // [0]WinMem, [4]frm_ptr, [8]Width, [12]Height, [16]msgfile, [24]msgdata, [40]UpDone, [44]UpCancel, [48]DownDone, [52]DownCancel
+  mov  eax, (80+314)*260
+  call mem_malloc_
+  test eax, eax                             // Удачно выделили память?
+  jz   restore                              // Нет
+  mov  [esp+0], eax
+  xor  edi, edi
+  xchg edi, eax
+  mov  ds:[_frstc_draw1], eax
+  inc  eax
+  mov  ds:[_glblmode], eax
+  lea  eax, [ecx+98]
+  mov  ds:[_info_line], eax
+  mov  esi, 314
+  mov  ebp, 80+314
+  xor  ecx, ecx                             // ID1
+  xor  ebx, ebx                             // ID2
+  push ebx                                  // ID3
+  mov  edx, 86                              // Index (PERKWIN.FRM)
+  mov  eax, ObjType_Intrface                // ObjType
+  call art_id_
+  lea  edx, [esp+4]                         // *frm_ptr
+  lea  ecx, [esp+12]                        // *Height
+  lea  ebx, [esp+8]                         // *Width
+  call art_lock_
+  test eax, eax
+  jz   freeBuffer
+  push dword ptr [esp+12]                   // height
+  push esi                                  // width
+  mov  edx, [esp+8+(2*4)]                   // from_width
+  push edx
+  sub  edx, esi
+  add  eax, edx
+  push eax                                  // from
+  push ebp                                  // to_width
+  lea  eax, [edi+80]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  mov  eax, [esp+4]                         // eax = frm_ptr
+  call art_ptr_unlock_
+  xor  ecx, ecx                             // ID1
+  xor  ebx, ebx                             // ID2
+  push ebx                                  // ID3
+  mov  edx, 362                             // Index (WMINFCE3.FRM)
+  mov  eax, ObjType_Intrface                // ObjType
+  call art_id_
+  lea  edx, [esp+4]                         // *frm_ptr
+  lea  ecx, [esp+12]                        // *Height
+  lea  ebx, [esp+8]                         // *Width
+  call art_lock_
+  test eax, eax
+  jz   freeBuffer
+  mov  ebx, [esp+12]                        // Height
+  mov  edx, [esp+8]                         // Width
+  push 15                                   // height
+  push esi                                  // width
+  push edx                                  // from_width
+  imul edx, edx, 12                         // edx = from_width * y
+  lea  eax, [eax+edx+20]                    // eax = from_width * y + x
+  push eax                                  // from
+  push ebp                                  // to_width
+  imul eax, ebp, 230                        // eax = to_width * y
+  lea  eax, [edi+eax+80]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  mov  eax, [esp+4]                         // eax = frm_ptr
+  call art_ptr_unlock_
+  xor  ecx, ecx                             // ID1
+  xor  ebx, ebx                             // ID2
+  push ebx                                  // ID3
+  mov  edx, 359                             // Index (WMINFCE0.FRM)
+  mov  eax, ObjType_Intrface                // ObjType
+  call art_id_
+  lea  edx, [esp+4]                         // *frm_ptr
+  lea  ecx, [esp+12]                        // *Height
+  lea  ebx, [esp+8]                         // *Width
+  call art_lock_
+  test eax, eax
+  jz   freeBuffer
+  mov  edx, [esp+8]                         // Width
+  push 15                                   // height
+  push esi                                  // width
+  push edx                                  // from_width
+  imul edx, edx, 5                          // edx = from_width * y
+  lea  eax, [eax+edx+20]                    // eax = from_width * y + x
+  push eax                                  // from
+  push ebp                                  // to_width
+  imul eax, ebp, 245                        // eax = to_width * y
+  lea  eax, [edi+eax+80]
+  push eax                                  // to
+  call srcCopy_
+  add  esp, 6*4
+  mov  eax, [esp+4]                         // eax = frm_ptr
+  call art_ptr_unlock_
+  mov  eax, ds:[_scr_size+12]               // _scr_size.offy
+  sub  eax, ds:[_scr_size+4]                // _scr_size.y
+  sub  eax, 259
+  shr  eax, 1
+  inc  eax
+  xchg edx, eax                             // edx = y
+  mov  eax, ds:[_scr_size+8]                // _scr_size.offx
+  sub  eax, ds:[_scr_size]                  // _scr_size.x
+  inc  eax                                  // win_width
+  sub  eax, ebp
+  shr  eax, 1
+  inc  eax                                  // eax = x
+  push 0x1C                                 // flags (MoveOnTop + Hidden + Exclusive)
+  mov  ecx, 260                             // height
+  mov  ebx, ebp                             // width
+  push 0x100                                // color
+  call win_add_
+  mov  [esp+4], eax
+  inc  eax
+  jz   freeBuffer
+  dec  eax
+  mov  esi, eax
+  call win_get_buf_
+  xor  ebx, ebx                             // x
+  xor  ecx, ecx                             // y
+  mov  edx, edi                             // toSurface
+  xchg esi, eax                             // eax = GNWID, esi = buffer
+  call CreateHeroWindow
+  inc  eax
+  jz   deleteWin
+  mov  ebx, (80+314)*260
+  mov  edx, edi
+  mov  eax, esi
+  call memmove_                             // eax = destination, edx = source, ebx = num
+  push _editor_msg
+  push dword ptr ds:[_msg_path]
+  push 0x5016A0                             // '%s%s'
+  mov  edx, _str
+  push edx
+  call sprintf_
+  add  esp, 4*4
+  lea  eax, [esp+16]                        // msgfile
+  xor  ecx, ecx
+  mov  [eax], ecx
+  mov  [eax+4], ecx
+  call message_load_
+  dec  eax
+  jnz  deleteWin
+  inc  ecx
+  inc  ecx
+  lea  esi, [esp+40]
+  mov  ebx, ds:[_GInfo+42*8]                // Width
+  imul ebx, ds:[_GInfo+42*8+4]              // Height
+  mov  edx, ds:[_grphbmp+42*4]              // OPBTNOFF.FRM
+loopUp:
+  mov  eax, ebx
+  call mem_malloc_
+  mov  [esi], eax
+  test eax, eax
+  jz   deleteMemUp
+  push edx
+  call memmove_                             // eax = destination, edx = source, ebx = num
+  pop  edx
+  add  esi, 4
+  loop loopUp
+  inc  ecx
+  inc  ecx
+  mov  edx, ds:[_grphbmp+43*4]              // OPBTNON.FRM
+loopDown:
+  mov  eax, ebx
+  call mem_malloc_
+  mov  [esi], eax
+  test eax, eax
+  jz   deleteMemDown
+  push edx
+  call memmove_                             // eax = destination, edx = source, ebx = num
+  pop  edx
+  add  esi, 4
+  loop loopDown
+  mov  eax, 103
+  call text_font_
+  mov  edi, ds:[_GInfo+42*8+4]              // Height
+  call ds:[_text_height]
+  sub  edi, eax
+  shr  edi, 1
+  inc  edi                                  // edi = y
+  imul edi, ds:[_GInfo+42*8]                // edi = to_width * y
+  mov  ebx, 100                             // number (DONE)
+  lea  edx, [esp+24]                        // msgdata
+  lea  eax, [esp+16]                        // msgfile
+  call getmsg_
+  mov  edx, eax                             // edx = DisplayText
+  call ds:[_text_width]
+  xchg ebx, eax                             // ebx = TxtWidth
+  mov  eax, ds:[_GInfo+42*8]
+  mov  ecx, eax                             // ToWidth
+  sub  eax, ebx
+  shr  eax, 1                               // eax = x = (ToWidth - TxtWidth) / 2
+  movzx ebp, byte ptr ds:[_PeanutButter]
+  push ebp                                  // ColorIndex
+  push eax
+  push edx
+  push ecx
+  push ebx
+  push ebp                                  // ColorIndex
+  add  eax, [esp+40+(6*4)]                  // [40]UpDone
+  add  eax, edi                             // eax = x + buffer + to_width * y
+  call ds:[_text_to_buf]
+  pop  ebx                                  // TxtWidth
+  pop  ecx                                  // ToWidth
+  pop  edx                                  // DisplayText
+  pop  eax                                  // x
+  add  eax, [esp+48+(1*4)]                  // [48]DownDone
+  add  eax, edi                             // eax = x + buffer + to_width * y
+  call ds:[_text_to_buf]
+  mov  ebx, 102                             // number (CANCEL)
+  lea  edx, [esp+24]                        // msgdata
+  lea  eax, [esp+16]                        // msgfile
+  call getmsg_
+  mov  edx, eax                             // edx = DisplayText
+  call ds:[_text_width]
+  xchg ebx, eax                             // ebx = TxtWidth
+  mov  eax, ds:[_GInfo+42*8]
+  mov  ecx, eax                             // ToWidth
+  sub  eax, ebx
+  shr  eax, 1                               // eax = x = (ToWidth - TxtWidth) / 2
+  push ebp                                  // ColorIndex
+  push eax
+  push edx
+  push ecx
+  push ebx
+  push ebp
+  add  eax, [esp+44+(6*4)]                  // [44]UpCancel
+  add  eax, edi                             // eax = x + buffer + to_width * y
+  call ds:[_text_to_buf]
+  pop  ebx
+  pop  ecx
+  pop  edx
+  pop  eax
+  add  eax, [esp+52+4]                      // [52]DownCancel
+  add  eax, edi                             // eax = x + buffer + to_width * y
+  call ds:[_text_to_buf]
+  xor  esi, esi
+  mov  edi, 0x20
+  mov  eax, ds:[_GInfo+42*8+4]              // Height
+  mov  ebp, ds:[_GInfo+42*8]                // Width
+  push edi                                  // flags
+  push esi                                  // Unk
+  push dword ptr [esp+52+(2*4)]             // PicDown (DownDone)
+  push dword ptr [esp+44+(3*4)]             // PicUp (UpDone)
+  dec  esi
+  push 0x1F6                                // ButtUp (Esc)
+  push esi                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  push eax                                  // Height
+  inc  esi
+  push edi                                  // flags
+  push esi                                  // Unk
+  push dword ptr [esp+48+(11*4)]            // PicDown (DownDone)
+  push dword ptr [esp+40+(12*4)]            // PicUp (UpDone)
+  dec  esi
+  push 0x1F4                                // ButtUp (Enter)
+  push esi                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  push eax                                  // Height
+  mov  esi, 260
+  sub  esi, eax                             // YPos = 260 - Height
+  mov  edi, 314/2
+  sub  edi, ebp
+  shr  edi, 1
+  lea  edx, [edi+80+0]                      // XPos
+  mov  ecx, ebp                             // Width
+  mov  ebx, esi                             // YPos
+  mov  eax, [esp+4+(18*4)]                  // GNWID
+  call win_register_button_
+  lea  edx, [edi+80+314/2]                  // XPos
+  mov  ecx, ebp                             // Width
+  mov  ebx, esi                             // YPos
+  mov  eax, [esp+4+(9*4)]                   // GNWID
+  mov  ebp, eax
+  call win_register_button_
+  mov  eax, ds:[_info_line]
+  xchg ebp, eax
+  call win_show_
+  mov  eax, CurrentAppearance[0]
+  mov  [esp+8], eax
+  mov  eax, CurrentAppearance[4]
+  mov  [esp+12], eax
+  xor  eax, eax
+  inc  eax
+loopButton:
+  mov  ds:[_info_line], ebp
+  dec  eax
+  mov  eax, [esp+4]                         // GNWID
+  jnz  skipRedraw
+  lea  edx, [ebp-98]                        // Check If Race or Style selected to redraw info note
+  mov  ebx, 96                              // x
+  mov  ecx, 24                              // y
+  mov  esi, [esp+0]
+  push eax
+  call DrawCard
+  pop  eax
+  push eax
+  call win_draw_
+  pop  eax
+skipRedraw:
+  xor  edx, edx
+  inc  edx                                  // noWearFlag
+  mov  ebx, 10                              // x
+  mov  ecx, 80                              // y
+  call display_body
+  call get_input_
+  inc  eax
+  jnz  haveKey
+  cmp  ds:[_game_user_wants_to_quit], eax
+  jne  restoreAppearance
+haveKey:
+  dec  eax
+  cmp  eax, 0x1F4                           // button = done
+  je   saveAppearance
+  cmp  eax, 0xD                             // button = return
+  je   saveAppearance
+  cmp  eax, 'd'                             // button = done
+  je   saveAppearance
+  cmp  eax, 'D'                             // button = done
+  je   saveAppearance
+  cmp  eax, 0x1F6                           // button = cancel
+  je   restoreAppearance
+  cmp  eax, 0x1B                            // button = esc
+  je   restoreAppearance
+  cmp  eax, 'c'                             // button = cancel
+  je   restoreAppearance
+  cmp  eax, 'C'                             // button = cancel
+  je   restoreAppearance
+//  cmp  eax, 0x9                             // tab button pushed
+//  je   itsChange
+  cmp  eax, 0x148                           // button up?
+  je   itsChange
+  cmp  eax, 0x150                           // button down?
+  je   itsChange
+  call checkHeroButtons
+  mov  ebp, ds:[_info_line]
+  jmp  loopButton
+itsChange:
+  xor  eax, eax
+  inc  eax
+  cmp  ebp, 98
+  je   itsRace
+  dec  ebp
+  dec  ebp
+itsRace:
+  inc  ebp
+  jmp  loopButton
+restoreAppearance:
+  mov  eax, [esp+8]
+  mov  CurrentAppearance[0], eax
+  mov  eax, [esp+12]
+  mov  CurrentAppearance[4], eax
+saveAppearance:
+  mov  ebx, CurrentAppearance[4]
+  mov  eax, CurrentAppearance[0]
+  push ebx                                  // Style
+  push eax                                  // Race
+  call LoadHeroDat
+  call SetAppearanceGlobals
+  call DrawPC
+  lea  eax, [esp+16]                        // msgfile
+  call message_exit_
+  dec  eax
+  call DestroyHeroWindow
+  xor  ecx, ecx
+deleteMemDown:
+  inc  eax
+  inc  eax
+deleteMemUp:
+  inc  eax
+  inc  eax
+  sub  eax, ecx
+  xchg ecx, eax
+  jecxz deleteWin
+  lea  esi, [esp+40]
+freeMem:
+  mov  eax, [esi]
+  call mem_free_
+  add  esi, 4
+  loop freeMem
+deleteWin:
+  mov  eax, [esp+4]
+  call win_delete_
+freeBuffer:
+  mov  eax, [esp+0]
+  call mem_free_
+restore:
+  add  esp, 4+4+4+4+8+16+4+4+4+4
+  pop  eax                                  // _curr_font_num
+  call text_font_
+  pop  dword ptr ds:[_glblmode]
+  pop  dword ptr ds:[_info_line]
+  pop  eax                                  // _gmouse_current_cursor
+  call gmouse_set_cursor_                   // set mouse pic
+  test dword ptr InLoop, INVENTORY+INTFACEUSE
+  jz   notInventory
+  xor  eax, eax
+  call inven_set_mouse_
+notInventory:
+  pop  ecx
+  jecxz skip_mouse_hide
+  call mouse_hide_
+skip_mouse_hide:
+  pop  ecx
+  jecxz skip_gmouse_3d_on
+  call gmouse_3d_on_
+skip_gmouse_3d_on:
+  pop  ecx
+  jecxz skipbk
+  call map_enable_bk_processes_
+skipbk:
+  pop  eax
+  mov  raceExist, al
+  pop  eax
+  mov  styleExist, al
+  and  dword ptr InLoop, (-1^HEROWIN)
+end:
+  popad
+  retn
+ }
+}
+
+void __declspec(naked) SetHeroStyle() {
+// eax = newStyleVal
+ __asm {
+  pushad
+  movzx ecx, byte ptr styleExist
+  jecxz end
+  cmp  IsControllingNPC, ecx                // Контроль персонажей?
+  je   end                                  // Да
+  mov  edx, CurrentAppearance[4]            // edx = Style
+  cmp  eax, edx
+  je   end
+  mov  ecx, CurrentAppearance[0]            // ecx = Race
+  mov  ebx, ecx
+  xchg ebx, eax                             // eax = Race, ebx = Style
+  call LoadHeroDat
+  inc  eax
+  jnz  setAppearance
+// if new style cannot be set
+  test ebx, ebx
+  jnz  skip
+  jecxz setAppearance                       // ignore(???) error if appearance = default (Race=0. Style=0)
+skip:
+  mov  ebx, edx                             // ebx = Style
+  mov  eax, ecx                             // eax = Race
+  call LoadHeroDat                          // reload original style
+setAppearance:
+  mov  CurrentAppearance[4], ebx
+  push ebx                                  // Style
+  push ecx                                  // Race
+  call SetAppearanceGlobals
+  call DrawPC
+end:
+  popad
+  retn
+ }
+}
+
+void __declspec(naked) SetHeroRace() {
+// eax = newRaceVal
+ __asm {
+  pushad
+  movzx ecx, byte ptr raceExist
+  jecxz end
+  cmp  IsControllingNPC, ecx                // Контроль персонажей?
+  je   end                                  // Да
+  mov  edx, CurrentAppearance[0]
+  cmp  eax, edx
+  je   end
+  mov  ecx, eax                             // ecx = newRaceVal
+  xor  ebx, ebx                             // Style
+  call LoadHeroDat
+  inc  eax
+  jnz  setAppearance
+// if new race fails with style at 0
+  jecxz setAppearance                       // ignore(???) error if appearance = default (Race=0. Style=0)
+  mov  ebx, CurrentAppearance[4]            // ebx = Style
+  mov  ecx, edx
+  xchg edx, eax                             // eax = Race
+  call LoadHeroDat                          // reload original race & style
+setAppearance:
+  mov  CurrentAppearance[4], ebx
+  mov  CurrentAppearance[0], ecx
+  push ebx                                  // Style
+  push ecx                                  // Race
+  call SetAppearanceGlobals                 // store new globals
+  call DrawPC
+end:
+  popad
+  retn
+ }
+}
+
+void __declspec(naked) LoadHeroAppearance() {
+ __asm {
+  pushad
+  mov  ecx, critterListCount
+  jecxz end
+  push offset CurrentAppearance[4]
+  push offset CurrentAppearance[0]
+  call GetAppearanceGlobals
+  mov  ebx, CurrentAppearance[4]
+  mov  eax, CurrentAppearance[0]
+  call LoadHeroDat
+  xor  eax, eax
+  inc  eax
+  call SetHeroArt
+  call DrawPC
+end:
+  popad
+  retn
+ }
+}
+
+void __declspec(naked) SetNewCharAppearanceGlobals() {
+ __asm {
+  pushad
+  mov  ecx, critterListCount
+  jecxz end
+  mov  ecx, CurrentAppearance[4]            // Style
+  mov  eax, CurrentAppearance[0]            // Race
+  test eax, eax
+  jnz  skip
+  jecxz end
+skip:
+  push ecx
+  push eax
+  call SetAppearanceGlobals
+end:
+  popad
+  retn
+ }
+}
+
+//scan inventory items for armor and weapons currently being worn or wielded and setup matching FrmID for PC
+void __declspec(naked) RefreshPCArt() {
+ __asm{
+  pushad
+  xor  eax, eax
+  cmp  IsControllingNPC, eax                // Контроль персонажей?
+  jne  end                                  // Да
+  call proto_dude_update_gender_            // refresh PC base model art
+  push dword ptr ds:[_inven_dude]
+  push dword ptr ds:[_i_lhand]
+  push dword ptr ds:[_i_rhand]
+  push dword ptr ds:[_i_worn]
+  mov  eax, ds:[_obj_dude]                  // PC state struct
+  mov  ds:[_inven_dude], eax                // inventory temp pointer to PC state struct
+  mov  edx, eax
+  call inven_left_hand_
+  mov  ds:[_i_lhand], eax
+  mov  eax, edx
+  call inven_right_hand_
+  mov  ds:[_i_rhand], eax
+  mov  eax, edx
+  call inven_worn_
+  mov  ds:[_i_worn], eax
+  call adjust_fid_                          // inventory function - setup pc FrmID and store at address _i_fid
+// copy new FrmID to hero state struct
+  mov  [edx+0x20], eax                      // pobj.fid
+  pop  dword ptr ds:[_i_worn]
+  pop  dword ptr ds:[_i_rhand]
+  pop  dword ptr ds:[_i_lhand]
+  pop  dword ptr ds:[_inven_dude]
+  mov  ecx, critterListCount
+  jecxz end
+  mov  ebx, CurrentAppearance[4]
+  mov  eax, CurrentAppearance[0]
+  mov  edx, eax
+  call LoadHeroDat
+  inc  eax
+  jnz  skip
+// if load fails
+  xor  ebx, ebx                             // set style to default
+  mov  eax, edx
+  call LoadHeroDat
+  inc  eax
+  jnz  skip
+// if race fails with style at default
+  xor  edx, edx                             // set race to default
+  call LoadHeroDat
+skip:
+  mov  CurrentAppearance[4], ebx
+  mov  CurrentAppearance[0], edx
+  push ebx
+  push edx
+  call SetAppearanceGlobals                 // store new globals
+  call DrawPC
+end:
+  popad
+  retn
+ }
+}
+
+static void __declspec(naked) DrawCard_hook() {
+ __asm {
+  mov  esi, ecx
+  call _word_wrap_
+  test eax, eax
+  jnz  end
+  cmp  word ptr [esi], 12
+  jbe  end
+  mov  word ptr [esi], 12
+end:
+  retn
+ }
+}
+
+void EnableHeroAppearanceMod() {
+ int i;
+
+ if (GetPrivateProfileIntA("Misc", "EnableHeroAppearanceMod", 0, ini)) {
+  dlog("Setting up Appearance Char Screen buttons. ", DL_INIT);
+
+// check if Data exists for styles male or female
+  if (GetFileAttributes("Appearance\\hmR00S00") != INVALID_FILE_ATTRIBUTES ||
+      GetFileAttributes("Appearance\\hfR00S00") != INVALID_FILE_ATTRIBUTES ||
+      GetFileAttributes("Appearance\\hmR00S00.dat") != INVALID_FILE_ATTRIBUTES ||
+      GetFileAttributes("Appearance\\hfR00S00.dat") != INVALID_FILE_ATTRIBUTES) styleExist = true;
+
+// check if Data exists for other races male or female
+  if (GetFileAttributes("Appearance\\hmR01S00") != INVALID_FILE_ATTRIBUTES ||
+      GetFileAttributes("Appearance\\hfR01S00") != INVALID_FILE_ATTRIBUTES ||
+      GetFileAttributes("Appearance\\hmR01S00.dat") != INVALID_FILE_ATTRIBUTES ||
+      GetFileAttributes("Appearance\\hfR01S00.dat") != INVALID_FILE_ATTRIBUTES) raceExist = true;
+
+// Get alternate text from ini if available
+  GetPrivateProfileString("AppearanceMod", "RaceText", "Race", RaceText, 8, translationIni);
+  GetPrivateProfileString("AppearanceMod", "StyleText", "Style", StyleText, 8, translationIni);
+
+// Double size of critter art index creating a new area for hero art and add new hero critter names at end of critter list
+  HookCall(0x4189E4, &art_init_hook);
+
+// Shift base hero critter art offset up into hero section
+  HookCall(0x418CA2, &art_init_hook1);
+
+// Insert main path structure in front when not loading
+  MakeCall(0x4DEEE5, &xfopen_hook, true);
+
+// Check if new hero art exists otherwise use regular art
+  MakeCall(0x419560, &art_get_name_hook, false);
+
+// Adjust hero art index offset when changing armor
+  MakeCall(0x4717D1, &adjust_fid_hook, true);
   
-  //Add new hero critter names at end of critter list
-  SafeWrite8(0x418B39, 0xE8);
-  SafeWrite32(0x418B3A, (DWORD)&AddHeroCritNames - 0x418B3E);
+// Check if new Appearance char scrn button pushed
+  MakeCall(0x431E98, &editor_design_hook, false);
+  MakeCall(0x4326B6, &editor_design_Tab_hook, true);
+  MakeCall(0x43279C, &editor_design_Up_hook, true);
+  MakeCall(0x4328A7, &editor_design_Down_hook, true);
+  MakeCall(0x43297C, &editor_design_Other_hook, false);
 
-  //Shift base hero critter art offset up into hero section
-  SafeWrite8(0x49F9DA, 0xE8);
-  SafeWrite32(0x49F9DB, (DWORD)&AdjustHeroBaseArt - 0x49F9DF);
+// Check if sex has changed and reset char appearance
+  HookCall(0x4322E8, &SexWindow_call);
 
-  //Adjust hero art index offset when changing armor
-  //SafeWrite8(0x4717D6, 0xE8);
-  //SafeWrite32(0x4717D7, (DWORD)&AdjustHeroArmorArt - 0x4717DB);
-  SafeWrite32(0x4717D2, (DWORD)&AdjustHeroArmorArt - 0x4717D6);
-  
-  //Hijack Save Hero State Structure fuction address 9CD54800
-  //Return hero art index offset back to normal before saving
-  SafeWrite32(0x519400, (DWORD)&SavCritNumFix);
+// Для отрисовки описания
+  MakeCall(0x436BFF, &DrawInfoWin_hook, false);
 
+// Mod char scrn background and add new app mod graphics
+  MakeCall(0x432DED, &CharEditStart_hook, false);
 
+// Destroy mem after use
+  HookCall(0x433B23, &CharEditEnd_hook);
 
-  //Tag Skills text x pos
-  SafeWrite32(0x433372, 0x24826+36);//Tag Skills text x pos1
-  SafeWrite32(0x4362BE, 0x24826+36);//Tag Skills text x pos2
-  SafeWrite32(0x4362F2, 0x20A+36);//Tag Skills num counter2 x pos1
-  SafeWrite32(0x43631E, 0x20A+36);//Tag Skills num counter2 x pos2
+// make room for char view window
+  for (i = 0; i < 27; i++) SafeWrite32(write32[i][0], write32[i][1]);
+  for (i = 0; i < 10; i++) SafeWrite16(write16[i][0], (WORD)write16[i][1]);
+//  for (i = 0; i < 2; i++) SafeWrite8(write8[i][0], (BYTE)write8[i][1]);
+  SafeWrite8(0x4365C8, 100);                // Чтобы обрабатывались 98 и 99 _info_line в DrawInfoWin_
 
-  //Add new Appearance mod buttons
-  SafeWrite8(0x43A788, 0xe8);
-  SafeWrite32(0x43A789, (DWORD)&AddCharScrnButtons - 0x43A78D);
+// Reset Appearance when selecting "Create Character" from the New Char screen
+  HookCall(0x4A740A, &select_character_hook);
 
-  //Mod char scrn background and add new app mod graphics. also adjust tag/skill button x pos
-  SafeWrite8(0x432B92, 0xe8);
-  SafeWrite32(0x432B93, (DWORD)&FixCharScrnBack - 0x432B97);
+// Load Appearance data from GCD file
+  HookCall(0x42DF5F, &pc_load_data_hook);
 
-  //skill points
-  SafeWrite32(0x436262, 0x24810+36);//Skill Points text x pos
-  SafeWrite32(0x43628A, 0x20A+36);//Skill Points num counter x pos1
-  SafeWrite32(0x43B5B2, 0x20A+36);//Skill Points num counter x pos2
+// Save Appearance data to GCD file
+  HookCall(0x42E163, &pc_save_data_hook);
 
-  //make room for char view window
-  SafeWrite32(0x433678, 347+76);//shift skill buttons right 80
-  SafeWrite32(0x4363CE, 380+68);//shift skill name text right 80
-  SafeWrite32(0x43641C, 573+10);//shift skill % num text right 80
-  SafeWrite32(0x43A74C, 223-76+10);// skill list mouse area button width
-  SafeWrite32(0x43A75B, 370+76);// skill list mouse area button xpos
-  SafeWrite32(0x436220, 0x0DFC+68);//"skill" text xpos
-  SafeWrite32(0x43A71E, 0xDF-68);//skill button width
-  SafeWrite32(0x43A72A, 0x178+68);//skill button xpos
+// Adjust PC SFX Name
+  HookCall(0x45114C, &gsound_load_sound_hook);
 
-  //redraw area for skill list
-  SafeWrite32(0x4361C4, 370+76);//xpos
-  SafeWrite32(0x4361D9, 270-76);//width
-  SafeWrite32(0x4361DE, 370+76);//xpos
-
-  //skill slider thingy
-  SafeWrite32(0x43647C, 592+3);//xpos
-  SafeWrite32(0x4364FA, 614+3);//plus button xpos
-  SafeWrite32(0x436567, 614+3);//minus button xpos
-
-
-  //fix for Char Screen note position was x484 y309 now x383 y308
-  //SafeWrite32(0x43AB55, 308*640+483);//minus button xpos
-
-
-  //Adjust PC SFX Name
-  SafeWrite8(0x4510EB, 0xE8);
-  SafeWrite32(0x4510EC, (DWORD)&FixPcSFX - 0x4510F0);
-  SafeWrite16(0x4510F0, 0x9090);
-
-
-  //Set path to normal before printing or saving character details
-  //SafeWrite32(0x43235A, (DWORD)&FixCharScrnSaveNPrint - 0x43235E);
-
-
-
-// Load Appearance data from GCD file------------
-  SafeWrite16(0x42DF5D, 0x9056);//push esi "*FileStream"
-  SafeWrite32(0x42DF60, (DWORD)&LoadGCDAppearance - 0x42DF64);
-
-
-
-// Save Appearance data to GCD file------------
-  SafeWrite16(0x42E161, 0x9056);//push esi "*FileStream"
-  SafeWrite32(0x42E164, (DWORD)&SaveGCDAppearance - 0x42E168);
-
-
-// Reset Appearance when selecting "Create Character" from the New Char screen------
-  SafeWrite8(0x4A7405, 0xE8);
-  SafeWrite32(0x4A7406, (DWORD)&CreateCharReset - 0x4A740A);
+// Return hero art index offset back to normal before saving
+  SafeWrite32(0x519400, (DWORD)&obj_save_dude_call);
 
 // Fixes missing console critical hit messages when PC is attacked.
-//00426135  |.  25 FF0F0000                      AND EAX,00000FFF
-  SafeWrite8(0x426135, 0xE8);
-  SafeWrite32(0x426136, (DWORD)&FixPcCriticalHitMsg - 0x42613A);
+  HookCall(0x42613A, &combat_get_loc_name_hook);
 
 // Force Criticals For Testing
-//00423A8F  |. /2E:FF249D 7C374200    JMP DWORD PTR CS:[EBX*4+42377C]
-  //SafeWrite32(0x423A8F, 0x90909090);
-  //SafeWrite32(0x423A93, 0x90909090);
+//  SafeWrite16(0x423A8D, 0x08EB);            // jmps 0x423A97
+
+  dlogr(" Done", DL_INIT);
+ }
+
+ HookCall(0x43ACFC, &DrawCard_hook);
 
 }

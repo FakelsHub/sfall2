@@ -41,15 +41,15 @@ static int npcCount = 0;
 static char iniArmor[MAX_PATH];
 
 struct npcArmor {
- int Pid;
- int Default;
- int Leather;
- int Power;
- int Advanced;
- int Metal;
- int Cured;
- int Combat;
- int Robe;
+ DWORD Pid;
+ DWORD Default;
+ DWORD Leather;
+ DWORD Power;
+ DWORD Advanced;
+ DWORD Metal;
+ DWORD Cured;
+ DWORD Combat;
+ DWORD Robe;
 };
 
 static npcArmor armors[PartyMax];
@@ -189,8 +189,7 @@ static void __declspec(naked) op_set_critter_stat_hook() {
   cmp  dword ptr [esp+4+4], STAT_unused
   jne  end
   pop  ebx                                  // Уничтожаем адрес возврата
-  mov  ebx, 0x455D8A
-  push ebx
+  push 0x455D8A
 end:
   mov  ebx, 3
   retn
@@ -202,8 +201,7 @@ static void __declspec(naked) stat_set_base_hook() {
   cmp  ecx, STAT_unused
   jne  end
   pop  eax                                  // Уничтожаем адрес возврата
-  mov  eax, 0x4AF559
-  push eax
+  push 0x4AF559
 end:
   xor  eax, eax
   dec  eax
@@ -269,8 +267,8 @@ print:
   jge  noOverloaded                         // Нет
   mov  bl, ds:[_RedColor]
 noOverloaded:
-  mov  edx, 0x472626
-  jmp  edx
+  push 0x472626
+  retn
 SizeLimitMode:
   dec  eax
   push eax                                  // макс.размер
@@ -317,7 +315,7 @@ noRed:
 nextChar:
   xor  eax, eax
   mov  al, [edi]
-  call dword ptr ds:[_text_char_width]
+  call ds:[_text_char_width]
   inc  eax
   add  edx, eax
   inc  edi
@@ -328,8 +326,8 @@ nextChar:
   lea  eax, [esi+ebp+75]                    // ToSurface
   sub  eax, edx
   pop  edx                                  // DisplayText
-  mov  edi, 0x472677
-  jmp  edi
+  push 0x472677
+  retn
  }
 }
 
@@ -440,8 +438,7 @@ static void __declspec(naked) gdControlUpdateInfo_hook() {
   call sprintf_
   add  esp, 6*4
   pop  edx                                  // Уничтожаем адрес возврата
-  mov  edx, 0x449151
-  push edx
+  push 0x449151
   xor  edx, edx
 end:
   xchg ecx, eax
@@ -488,8 +485,7 @@ static void __declspec(naked) protinst_use_item_on_hook() {
   jne  end                                  // Нет
   pop  eax                                  // Уничтожаем адрес возврата
   mov  eax, offset SuperStimMsg
-  mov  esi, 0x49C478
-  jmp  esi
+  push 0x49C478
 end:
   xor  edx, edx
   retn
@@ -504,8 +500,8 @@ static void __declspec(naked) handle_inventory_hook() {
   movzx ebx, byte ptr invenapqpreduction
   mul  bl
   mov  edx, invenapcost
-  mov  ebx, 0x46E812
-  jmp  ebx
+  push 0x46E812
+  retn
  }
 }
 
@@ -592,8 +588,8 @@ useActiveHand:
   mov  ebx, 2
   xor  ecx, ecx
   mov  edx, ds:[_itemButtonItems][eax]
-  mov  eax, 0x460B85
-  jmp  eax
+  push 0x460B85
+  retn
 end:
   pop  edx
   pop  ecx
@@ -717,33 +713,33 @@ end:
 static int pobj;
 static int _stdcall ChangeArmorFid(DWORD* item, DWORD* npc) {
  int itm_pid = 0, npc_pid = PID_Player;
- if (item) itm_pid=item[0x64/4]&0xffffff;
- if (npc) npc_pid=npc[0x64/4];
- pobj=0;
- for (int k=0; k<npcCount; k++) {
-  if (armors[k].Pid==npc_pid) {
-   pobj=armors[k].Default;
+ if (item) itm_pid = item[0x64/4]&0xffffff;
+ if (npc) npc_pid = npc[0x64/4];
+ pobj = 0;
+ for (int k = 0; k < npcCount; k++) {
+  if (armors[k].Pid == npc_pid) {
+   pobj = armors[k].Default;
    switch (itm_pid) {
     case PID_LEATHER_ARMOR: case PID_LEATHER_ARMOR_MK_II:
-     if (armors[k].Leather!=0) pobj=armors[k].Leather;
+     if (armors[k].Leather != 0) pobj = armors[k].Leather;
      break;
     case PID_POWERED_ARMOR: case PID_HARDENED_POWER_ARMOR:
-     if (armors[k].Power!=0) pobj=armors[k].Power;
+     if (armors[k].Power != 0) pobj = armors[k].Power;
      break;
     case PID_ADVANCED_POWER_ARMOR: case PID_ADVANCED_POWER_ARMOR_MK2:
-     if (armors[k].Advanced!=0) pobj=armors[k].Advanced;
+     if (armors[k].Advanced != 0) pobj = armors[k].Advanced;
      break;
     case PID_METAL_ARMOR: case PID_TESLA_ARMOR: case PID_METAL_ARMOR_MK_II:
-     if (armors[k].Metal!=0) pobj=armors[k].Metal;
+     if (armors[k].Metal != 0) pobj = armors[k].Metal;
      break;
     case PID_LEATHER_JACKET: case PID_CURED_LEATHER_ARMOR:
-     if (armors[k].Cured!=0) pobj=armors[k].Cured;
+     if (armors[k].Cured != 0) pobj = armors[k].Cured;
      break;
     case PID_COMBAT_ARMOR: case PID_BROTHERHOOD_COMBAT_ARMOR: case PID_COMBAT_ARMOR_MK_II:
-     if (armors[k].Combat!=0) pobj=armors[k].Combat;
+     if (armors[k].Combat != 0) pobj = armors[k].Combat;
      break;
     case PID_PURPLE_ROBE: case PID_BRIDGEKEEPERS_ROBE:
-     if (armors[k].Robe!=0) pobj=armors[k].Robe;
+     if (armors[k].Robe != 0) pobj = armors[k].Robe;
      break;
    }
    __asm {
@@ -789,8 +785,8 @@ haveFid:
 canUse:
     mov  pobj, edx                          // Сохраним fid для выхода
     xor  ebx, ebx
-    mov  ecx, npc
-    mov  eax, ecx
+    mov  eax, npc
+    mov  ecx, eax
     call obj_change_fid_                    // Меняем вид
     pop  edx                                // Восстановим указатель на оружие, если оно конечно есть
     test edx, edx                           // Оружие было в руках?
@@ -822,7 +818,7 @@ nextArmor:
 noArmor:
   cmp  edi, -1                              // Это игрок?
   jnz  end                                  // Да
-  cmp  npcCount, 0
+  cmp  npcCount, eax
   je   end
   push esi                                  // указатель на нпс
   push eax                                  // новой брони нет
@@ -847,8 +843,7 @@ static void __declspec(naked) ControlWeapon_hook() {
   jecxz end                                 // Оружия в правой руке не было
 skip:
   pop  eax                                  // Уничтожаем адрес возврата
-  mov  eax, 0x44952E
-  push eax
+  push 0x44952E
 end:
   retn
  }
@@ -900,8 +895,8 @@ static void __declspec(naked) printFreeMaxWeightSize() {
   sar  eax, 0x18
   test eax, eax                             // Это ObjType_Item?
   jz   itsItem                              // Да
-  cmp  eax, ObjType_Critter
-  jne  noWeight                             // Нет
+  dec  eax                                  // Это ObjType_Critter?
+  jnz  noWeight                             // Нет
   mov  eax, ebx
   mov  edx, STAT_carry_amt
   call stat_level_
@@ -957,8 +952,8 @@ nextChar:
 itsItem:
   mov  eax, ebx
   call item_get_type_
-  cmp  eax, item_type_container
-  jne  noWeight                             // Нет
+  dec  eax                                  // item_type_container?
+  jnz  noWeight                             // Нет
   mov  eax, ebx
   call obj_top_environment_
   test eax, eax                             // Есть владелец?
@@ -1030,8 +1025,8 @@ static void __declspec(naked) display_inventory_hook() {
   xor  ebp, ebp
   call printFreeMaxWeightSize
   popad
-  mov  ecx, 0x4700C5
-  jmp  ecx
+  push 0x4700C5
+  retn
  }
 }
 
@@ -1053,8 +1048,8 @@ static void __declspec(naked) display_target_inventory_hook() {
   mov  ebp, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
   call printFreeMaxWeightSize
   popad
-  mov  eax, 0x470468
-  jmp  eax
+  push 0x470468
+  retn
  }
 }
 
@@ -1089,8 +1084,8 @@ static void __declspec(naked) display_table_inventories_hook1() {
   mov  edi, 10*480+169+32                   // Xpos=169, Ypos=10, max text width/2=32
   call printFreeMaxWeightSize
   popad
-  mov  eax, 0x47548C
-  jmp  eax
+  push 0x47548C
+  retn
  }
 }
 
@@ -1131,8 +1126,8 @@ static void __declspec(naked) display_table_inventories_hook3() {
 #ifndef TRACE
 end:
 #endif
-  mov  edx, 0x475612
-  jmp  edx
+  push 0x475612
+  retn
  }
 }
 
@@ -1208,8 +1203,8 @@ static void __declspec(naked) inven_action_cursor_hook() {
   mov  edx, [esp+0x1C]
   call SetDefaultAmmo
   cmp  dword ptr [esp+0x18], 0
-  mov  eax, 0x4736CB
-  jmp  eax
+  push 0x4736CB
+  retn
  }
 }
 
@@ -1244,23 +1239,27 @@ static void __declspec(naked) inven_pickup_hook2() {
   call useobjon_item_d_take_drug_           // item_d_take_drug_
   pop  edx
   pop  ebx
-  cmp  eax, 1
-  jne  notUsed
+  dec  eax
+  jnz  notUsed
+  inc  eax
   xchg ebx, eax
   push edx
   push eax
   call item_remove_mult_
+  inc  eax
   pop  eax
-  xor  ecx, ecx
   mov  ebx, [eax+0x28]
   mov  edx, [eax+0x4]
   pop  eax
+  jz   notUsed
+  xor  ecx, ecx
   push eax
   call obj_connect_
   pop  eax
   call obj_destroy_
 notUsed:
-  mov  eax, 1
+  xor  eax, eax
+  inc  eax
   call intface_update_hit_points_
 skip:
   xor  eax, eax
@@ -1279,8 +1278,8 @@ static void __declspec(naked) make_drop_button() {
   jnz  skip                                 // Нет
   xchg ebx, eax
   call item_get_type_
-  cmp  eax, item_type_container
-  je   goodTarget                           // Да
+  dec  eax                                  // item_type_container?
+  jz   goodTarget                           // Да
   jmp  noButton
 skip:
   cmp  eax, ObjType_Critter
@@ -1290,28 +1289,28 @@ skip:
   test eax, eax                             // Это Body_Type_Biped?
   jnz  noButton                             // Нет
 goodTarget:
-  push ebp
-  mov  edx, 255                             // DROPN.FRM (Action menu drop normal)
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
+  xor  ecx, ecx                             // ID1
+  xor  ebx, ebx                             // ID2
+  push ebx                                  // ID3
+  mov  edx, 255                             // Index (DROPN.FRM (Action menu drop normal))
+  mov  eax, ObjType_Intrface                // ObjType
   call art_id_
+  xor  edx, edx
   mov  ecx, 0x59E7E4
   xor  ebx, ebx
-  xor  edx, edx
   call art_ptr_lock_data_
   test eax, eax
   jz   noButton
   xchg esi, eax
-  push ebp
-  mov  edx, 254                             // DROPH.FRM (Action menu drop highlighted )
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
+  xor  ecx, ecx                             // ID1
+  xor  ebx, ebx                             // ID2
+  push ebx                                  // ID3
+  mov  edx, 254                             // Index (DROPH.FRM (Action menu drop highlighted))
+  mov  eax, ObjType_Intrface                // ObjType
   call art_id_
+  xor  edx, edx
   mov  ecx, 0x59E7E8
   xor  ebx, ebx
-  xor  edx, edx
   call art_ptr_lock_data_
   test eax, eax
   jz   noButton
@@ -1319,17 +1318,17 @@ goodTarget:
   push ebp
   push eax                                  // PicDown
   push esi                                  // PicUp
-  xor  ecx, ecx
-  dec  ecx
-  push ecx                                  // ButtUp
+  dec  ebp
+  push ebp                                  // ButtUp
   mov  edx, 68                              // Xpos
   push edx                                  // ButtDown
-  push ecx                                  // HovOff
-  push ecx                                  // HovOn
+  push ebp                                  // HovOff
+  push ebp                                  // HovOn
+  inc  ebp
   mov  ecx, 40                              // Width
   push ecx                                  // Height
   mov  ebx, 204                             // Ypos
-  mov  eax, ds:[_i_wid]                     // WinRef
+  mov  eax, ds:[_i_wid]                     // GNWID
   call win_register_button_
 noButton:
   mov  edx, 436
@@ -1342,15 +1341,15 @@ static void __declspec(naked) drop_all() {
  __asm {
   cmp  esi, 'a'
   jne  skip
-  mov  ebx, 0x4740DB
-  jmp  ebx
+  push 0x4740DB
+  retn
 skip:
   cmp  esi, 'D'
   je   dropKey
   cmp  esi, 'd'
   je   dropKey
-  mov  ebx, 0x4741B2
-  jmp  ebx
+  push 0x4741B2
+  retn
 dropKey:
   pushad
   cmp  dword ptr ds:[_gIsSteal], 0
@@ -1412,8 +1411,8 @@ itsCritter:
 itsItem:
   mov  eax, esi
   call item_get_type_
-  cmp  eax, item_type_container             // Это сумка/рюкзак?
-  jne  end                                  // Нет
+  dec  eax                                  // Это сумка/рюкзак?
+  jnz  end                                  // Нет
   mov  eax, esi
   call obj_top_environment_
   test eax, eax                             // Есть владелец?
@@ -1475,8 +1474,8 @@ cantDrop:
   call dialog_out_
 end:
   popad
-  mov  ebx, 0x474435
-  jmp  ebx
+  push 0x474435
+  retn
  }
 }
 
@@ -1899,16 +1898,12 @@ void InventoryInit() {
  invenapqpreduction = GetPrivateProfileInt("Misc", "QuickPocketsApCostReduction", 2, ini);
  MakeCall(0x46E80B, &handle_inventory_hook, true);
 
- if (GetPrivateProfileInt("Misc", "CheckWeaponAmmoCost", 0, ini)) {
-  HookCall(0x4266E9, &combat_check_bad_shot_hook);
- }
+ if (GetPrivateProfileInt("Misc", "CheckWeaponAmmoCost", 0, ini)) HookCall(0x4266E9, &combat_check_bad_shot_hook);
 
  ReloadWeaponKey = GetPrivateProfileIntA("Input", "ReloadWeaponKey", 0, ini);
  if (ReloadWeaponKey) HookCall(0x442DFF, &ReloadWeaponHotKey);
 
- if (GetPrivateProfileInt("Misc", "AutoReloadWeapon", 0, ini)) {
-  HookCall(0x422E8A, &AutoReloadWeapon);
- }
+ if (GetPrivateProfileInt("Misc", "AutoReloadWeapon", 0, ini)) HookCall(0x422E8A, &AutoReloadWeapon);
 
  HookCall(0x45419B, &correctFidForRemovedItem_hook);
  HookCall(0x4494FC, &ControlWeapon_hook);
@@ -1931,13 +1926,11 @@ void InventoryInit() {
   HookCall(0x475D93, &barter_inventory_hook);
  }
 
- if (GetPrivateProfileInt("Misc", "EquipArmor", 0, ini)) {
-  HookCall(0x4466CC, &gdProcess_hook);
- }
+ if (GetPrivateProfileInt("Misc", "EquipArmor", 0, ini)) HookCall(0x4466CC, &gdProcess_hook);
 
  char buf[MAX_PATH-3];
  int i, count;
- memset(armors,0,sizeof(npcArmor)*PartyMax);
+ memset(armors, 0, sizeof(npcArmor)*PartyMax);
  GetPrivateProfileString("Misc", "ArmorFile", "", buf, MAX_PATH, ini);
  if (strlen(buf) > 0) {
   sprintf(iniArmor, ".\\%s", buf);

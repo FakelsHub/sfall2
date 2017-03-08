@@ -385,7 +385,7 @@ static void __declspec(naked) funcSetShaderVector() {
 argloopstart:
   mov eax, ebp;
   call interpretPopShort_
-  mov word ptr [esp+ecx*2+0x16], ax;
+  mov [esp+ecx*2+0x16], ax;
   mov eax, ebp;
   call interpretPopLong_
   mov [esp+ecx*4-0x4], eax;
@@ -411,7 +411,7 @@ next:
   mov eax, ebp;
   mov ebx, [esp+4];
   xor edx, edx;
-  mov dx, word ptr [esp+0x1a];
+  mov dx, [esp+0x1a];
   call interpretGetString_
   mov [esp+4], eax;
   call SetShaderVector;

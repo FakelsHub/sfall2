@@ -61,13 +61,13 @@ static char CombatBlockedMessage[128];
 
 static void __declspec(naked) intface_use_item_hook() {
  __asm {
-  cmp  CombatDisabled, 0
+  xor  eax, eax
+  cmp  CombatDisabled, eax
   je   end
   mov  eax, offset CombatBlockedMessage
   call display_print_
   pop  eax                                  // ”ничтожаем адрес возврата
-  mov  eax, 0x45F6D7
-  jmp  eax
+  push 0x45F6D7
 end:
   mov  eax, 20
   retn

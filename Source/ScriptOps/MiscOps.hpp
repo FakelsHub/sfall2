@@ -242,7 +242,7 @@ static void __declspec(naked) SetPipBoyAvailable() {
   jl end;
   cmp eax, 1;
   jg end;
-  mov byte ptr ds:[_gmovie_played_list + 0x3], al;
+  mov  ds:[_gmovie_played_list + 0x3], al
 end:
   pop edx;
   pop ecx;
@@ -559,8 +559,8 @@ static void __declspec(naked) IncNPCLevel3() {
   push eax;
   call IncNPCLevel4;
   popad;
-  mov eax, 0x00495BF9;
-  jmp eax;
+  push 0x495BF9
+  retn
  }
 }
 static void _stdcall IncNPCLevel2(char* npc) {
@@ -1214,80 +1214,52 @@ end:
 
 static void __declspec(naked) funcHeroSelectWin() {//for opening the appearance selection window
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-  push esi;
-  mov ecx, eax;
+  push edx
+  push eax
   call interpretPopShort_
-  mov edx, eax;
-  mov eax, ecx;
+  xchg edx, eax
+  pop  eax
   call interpretPopLong_
-  push eax;
-  cmp dx, 0xC001;
-  jnz fail;
-  call HeroSelectWindow;
-  jmp end;
-fail:
-  pop eax;
+  cmp  dx, VAR_TYPE_INT
+  jnz  end
+  call HeroSelectWindow
 end:
-  pop esi;
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  pop edx
+  retn
  }
 }
+
 static void __declspec(naked) funcSetHeroStyle() {//for setting the hero style/appearance takes an 1 int
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-  push esi;
-  mov ecx, eax;
+  push edx
+  push eax
   call interpretPopShort_
-  mov edx, eax;
-  mov eax, ecx;
+  xchg edx, eax
+  pop  eax
   call interpretPopLong_
-  push eax;
-  cmp dx, 0xC001;
-  jnz fail;
-  call SetHeroStyle;
-  jmp end;
-fail:
-  pop eax;
+  cmp  dx, VAR_TYPE_INT
+  jnz  end
+  call SetHeroStyle
 end:
-  pop esi;
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  pop  edx
+  retn
  }
 }
+
 static void __declspec(naked) funcSetHeroRace() {// for setting the hero race takes an 1 int
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-  push esi;
-  mov ecx, eax;
+  push edx
+  push eax
   call interpretPopShort_
-  mov edx, eax;
-  mov eax, ecx;
+  xchg edx, eax
+  pop  eax
   call interpretPopLong_
-  push eax;
-  cmp dx, 0xC001;
-  jnz fail;
-  call SetHeroRace;
-  jmp end;
-fail:
-  pop eax;
+  cmp  dx, VAR_TYPE_INT
+  jnz  end
+  call SetHeroRace
 end:
-  pop esi;
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  pop  edx
+  retn
  }
 }
 
@@ -1304,18 +1276,13 @@ static void __declspec(naked) get_light_level() {
   retn;
  }
 }
+
 static void __declspec(naked) refresh_pc_art() {
  __asm {
-  push ebx;
-  push ecx;
-  push edx;
-  call RefreshPCArt;
-  pop edx;
-  pop ecx;
-  pop ebx;
-  retn;
+  jmp  RefreshPCArt
  }
 }
+
 static void __declspec(naked) get_attack_type() {
  __asm {
   push edx;
@@ -1604,7 +1571,7 @@ static void __declspec(naked) gdialog_get_barter_mod() {
   push edx;
   push ecx;
   mov ecx, eax;
-  mov edx, dword ptr ds:[_gdBarterMod]
+  mov edx, ds:[_gdBarterMod]
   call interpretPushLong_
   mov eax, ecx;
   mov edx, 0xc001;

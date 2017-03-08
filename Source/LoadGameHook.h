@@ -40,6 +40,7 @@ void LoadGameHookInit();
 #define INTFACEUSE  (1<<15) // 0x8000
 #define INTFACELOOT (1<<16) // 0x10000
 #define BARTER      (1<<17) // 0x20000
+#define HEROWIN     (1<<18) // 0x40000
 #define RESERVED    (1<<31)
 
 DWORD GetCurrentLoops();

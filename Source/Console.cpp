@@ -40,8 +40,8 @@ static void __declspec(naked) ConsoleHook() {
   push edx;
   push esi;
   push edi;
-  mov  ecx, 0x431871
-  jmp  ecx
+  push 0x431871
+  retn
  }
 }
 

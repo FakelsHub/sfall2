@@ -66,28 +66,6 @@ struct TGameObj
 };
 #pragma pack(pop)
 
-/*    9 */
-#pragma pack(push, 1)
-struct TComputeAttack
-{
- TGameObj *attacker;
- char gap_4[4];
- TGameObj *weapon;
- char gap_C[4];
- int damageAttacker;
- int flagsAttacker;
- int rounds;
- char gap_1C[4];
- TGameObj *target;
- int targetTile;
- int bodyPart;
- int damageTarget;
- int flagsTarget;
- int knockbackValue;
-};
-#pragma pack(pop)
-
-
 /*   22 */
 #pragma pack(push, 1)
 struct TScript
@@ -113,27 +91,6 @@ struct TScript
  int procedure_table[28];
 };
 #pragma pack(pop)
-
-enum ScriptTypes
-{
- SCRIPT_SYSTEM = 0,
- SCRIPT_SPATIAL = 1,
- SCRIPT_TIME = 2,
- SCRIPT_ITEM = 3,
- SCRIPT_CRITTER = 4,
-};
-
-/*   24 */
-enum ObjectTypes
-{
- OBJ_TYPE_ITEM = 0,
- OBJ_TYPE_CRITTER = 1,
- OBJ_TYPE_SCENERY = 2,
- OBJ_TYPE_WALL = 3,
- OBJ_TYPE_TILE = 4,
- OBJ_TYPE_MISC = 5,
- OBJ_TYPE_SPATIAL = 6,
-};
 
 /*   25 */
 #pragma pack(push, 1)

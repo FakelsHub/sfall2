@@ -54,7 +54,7 @@ static void __declspec(naked) stat_level_hook() {
  __asm {
   shl  esi, 3                               // esi*8
   cmp  ebx, ds:[_obj_dude]
-  je   player
+  je   itsPlayer
   mov  ebx, StatNPC[esi].min
   cmp  ecx, ebx
   jl   change
@@ -62,7 +62,7 @@ static void __declspec(naked) stat_level_hook() {
   cmp  ecx, ebx
   jle  end
   jmp  change
-player:
+itsPlayer:
   mov  ebx, StatPC[esi].min
   cmp  ecx, ebx
   jl   change
@@ -72,8 +72,8 @@ player:
 change:
   mov  ecx, ebx
 end:
-  mov  ebx, 0x4AF3D5
-  jmp  ebx
+  push 0x4AF3D5
+  retn
  }
 }
 
@@ -81,17 +81,17 @@ static void __declspec(naked) stat_set_base_hook() {
  __asm {
   mov  eax, 0x4AF59C
   cmp  esi, ds:[_obj_dude]
-  je   player
+  je   itsPlayer
   cmp  ebx, StatNPC[ecx*8].min
   jge  skip
 failMin:
-  mov  eax, 0x4AF57E
-  jmp  eax
+  push 0x4AF57E
+  retn
 skip:
   cmp  ebx, StatNPC[ecx*8].max
   jg   failMax
   jmp  eax
-player:
+itsPlayer:
   cmp  ebx, StatPC[ecx*8].min
   jl   failMin
   cmp  ebx, StatPC[ecx*8].max
@@ -143,8 +143,8 @@ skip:
   imul eax, edx
   add  eax, edi
   shr  eax, 2                               // eax/4
-  mov  edi, 0x4AF0A4
-  jmp  edi
+  push 0x4AF0A4
+  retn
  }
 }
 

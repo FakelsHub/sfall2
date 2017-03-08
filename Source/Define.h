@@ -297,7 +297,7 @@
 #define ANIM_fire_continuous (47)
 
 // types for script variables
-#define VAR_TYPE_INT (0xC001)
+#define VAR_TYPE_INT   (0xC001)
 #define VAR_TYPE_FLOAT (0xA001)
-#define VAR_TYPE_STR (0x9801)
-#define VAR_TYPE_STR2 (0x9001)
+#define VAR_TYPE_STR   (0x9801)
+#define VAR_TYPE_STR2  (0x9001)

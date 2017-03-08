@@ -49,7 +49,7 @@ static void __declspec(naked) SetPerkOwed() {
   and eax, 0xff;
   cmp eax, 250;
   jg end;
-  mov byte ptr ds:[_free_perk], al
+  mov  ds:[_free_perk], al
 end:
   popad
   retn;

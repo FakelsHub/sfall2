@@ -19,6 +19,7 @@
 
 #include "FalloutStructs.h"
 
+extern const DWORD access_;
 extern const DWORD action_get_an_object_;
 extern const DWORD action_loot_container_;
 extern const DWORD action_use_an_item_on_object_;
@@ -27,6 +28,7 @@ extern const DWORD AddHotLines_;
 extern const DWORD adjust_ac_;
 extern const DWORD adjust_fid_;
 extern const DWORD ai_search_inven_armor_;
+extern const DWORD art_alias_num_;
 extern const DWORD art_exists_;
 extern const DWORD art_flush_;
 extern const DWORD art_frame_data_;
@@ -58,30 +60,20 @@ extern const DWORD critter_is_dead_;
 extern const DWORD critter_kill_count_type_;
 extern const DWORD critter_name_;
 extern const DWORD critter_pc_set_name_;
-extern const DWORD critterClearObjDrugs_;
-extern const DWORD critterIsOverloaded_;
 extern const DWORD db_dir_entry_;
 extern const DWORD db_fclose_;
-extern const DWORD db_fgetc_;
 extern const DWORD db_fgets_;
 extern const DWORD db_fopen_;
-extern const DWORD db_fread_;
-extern const DWORD db_freadByte_;
 extern const DWORD db_freadByteCount_;
-extern const DWORD db_freadInt_;
 extern const DWORD db_freadIntCount_;
 extern const DWORD db_freadShort_;
-extern const DWORD db_freadShortCount_;
 extern const DWORD db_fseek_;
-extern const DWORD db_fwriteByte_;
 extern const DWORD db_fwriteByteCount_;
-extern const DWORD db_fwriteInt_;
+extern const DWORD db_fwriteIntCount_;
 extern const DWORD db_read_to_buf_;
-extern const DWORD dbase_close_;
 extern const DWORD dbase_open_;
 extern const DWORD debug_register_env_;
 extern const DWORD dialog_out_;
-extern const DWORD display_inventory_;
 extern const DWORD display_print_;
 extern const DWORD display_scroll_down_;
 extern const DWORD display_scroll_up_;
@@ -89,10 +81,10 @@ extern const DWORD display_stats_;
 extern const DWORD display_table_inventories_;
 extern const DWORD display_target_inventory_;
 extern const DWORD DOSCmdLineDestroy_;
+extern const DWORD draw_box_;
 extern const DWORD DrawCard_;
-extern const DWORD DrawFolder_;
-extern const DWORD DrawInfoWin_;
 extern const DWORD dude_stand_;
+extern const DWORD editor_design_;
 extern const DWORD elapsed_time_;
 extern const DWORD elevator_end_;
 extern const DWORD elevator_start_;
@@ -112,11 +104,14 @@ extern const DWORD get_input_;
 extern const DWORD get_time_;
 extern const DWORD getmsg_;
 extern const DWORD GetSlotList_;
+extern const DWORD gmouse_3d_is_on_;
+extern const DWORD gmouse_3d_off_;
+extern const DWORD gmouse_3d_on_;
 extern const DWORD gmouse_is_scrolling_;
 extern const DWORD gmouse_set_cursor_;
 extern const DWORD GNW_find_;
 extern const DWORD GNW95_process_message_;
-extern const DWORD gsnd_build_weapon_sfx_name_;
+extern const DWORD gsound_get_sound_ready_for_effect_;
 extern const DWORD gsound_play_sfx_file_;
 extern const DWORD gsound_red_butt_press_;
 extern const DWORD inc_game_time_;
@@ -142,13 +137,13 @@ extern const DWORD inven_display_msg_;
 extern const DWORD inven_left_hand_;
 extern const DWORD inven_pid_is_carried_ptr_;
 extern const DWORD inven_right_hand_;
+extern const DWORD inven_set_mouse_;
 extern const DWORD inven_unwield_;
 extern const DWORD inven_wield_;
 extern const DWORD inven_worn_;
 extern const DWORD is_within_perception_;
 extern const DWORD isPartyMember_;
 extern const DWORD item_add_force_;
-extern const DWORD item_add_mult_;
 extern const DWORD item_c_curr_size_;
 extern const DWORD item_c_max_size_;
 extern const DWORD item_caps_total_;
@@ -178,13 +173,11 @@ extern const DWORD item_w_max_ammo_;
 extern const DWORD item_w_range_;
 extern const DWORD item_w_rounds_;
 extern const DWORD item_w_try_reload_;
-extern const DWORD item_w_unload_;
 extern const DWORD item_weight_;
 extern const DWORD KillOldMaps_;
 extern const DWORD light_get_tile_;
-extern const DWORD ListDrvdStats_;
 extern const DWORD ListSkills_;
-extern const DWORD ListTraits_;
+extern const DWORD load_frame_;
 extern const DWORD loadColorTable_;
 extern const DWORD loadProgram_;
 extern const DWORD main_game_loop_;
@@ -197,22 +190,19 @@ extern const DWORD map_enable_bk_processes_;
 extern const DWORD mem_free_;
 extern const DWORD mem_malloc_;
 extern const DWORD mem_realloc_;
-extern const DWORD message_add_;
+extern const DWORD memmove_;
+extern const DWORD memset_;
 extern const DWORD message_exit_;
-extern const DWORD message_filter_;
-extern const DWORD message_find_;
-extern const DWORD message_init_;
 extern const DWORD message_load_;
-extern const DWORD message_make_path_;
 extern const DWORD mouse_click_in_;
 extern const DWORD mouse_get_position_;
 extern const DWORD mouse_hide_;
 extern const DWORD mouse_show_;
-extern const DWORD move_inventory_;
+extern const DWORD nfree_;
 extern const DWORD NixHotLines_;
+extern const DWORD nmalloc_;
 extern const DWORD obj_ai_blocking_at_;
 extern const DWORD obj_blocking_at_;
-extern const DWORD obj_bound_;
 extern const DWORD obj_change_fid_;
 extern const DWORD obj_connect_;
 extern const DWORD obj_destroy_;
@@ -227,14 +217,12 @@ extern const DWORD obj_outline_object_;
 extern const DWORD obj_pid_new_;
 extern const DWORD obj_remove_outline_;
 extern const DWORD obj_save_dude_;
-extern const DWORD obj_scroll_blocking_at_;
 extern const DWORD obj_set_light_;
 extern const DWORD obj_shoot_blocking_at_;
 extern const DWORD obj_sight_blocking_at_;
 extern const DWORD obj_top_environment_;
 extern const DWORD obj_use_book_;
 extern const DWORD obj_use_power_on_car_;
-extern const DWORD OptionWindow_;
 extern const DWORD palette_set_to_;
 extern const DWORD partyMemberCopyLevelInfo_;
 extern const DWORD partyMemberGetAIOptions_;
@@ -259,17 +247,13 @@ extern const DWORD pick_death_;
 extern const DWORD pip_back_;
 extern const DWORD pip_print_;
 extern const DWORD PipStatus_;
-extern const DWORD PrintBasicStat_;
-extern const DWORD PrintLevelWin_;
 extern const DWORD process_bk_;
-extern const DWORD protinst_use_item_;
 extern const DWORD proto_dude_update_gender_;
 extern const DWORD proto_ptr_;
 extern const DWORD pushLongStack_;
 extern const DWORD qsort_;
 extern const DWORD queue_add_;
 extern const DWORD queue_clear_type_;
-extern const DWORD queue_find_;
 extern const DWORD queue_find_first_;
 extern const DWORD queue_find_next_;
 extern const DWORD queue_remove_this_;
@@ -285,7 +269,6 @@ extern const DWORD register_object_light_;
 extern const DWORD register_object_must_erase_;
 extern const DWORD register_object_take_out_;
 extern const DWORD register_object_turn_towards_;
-extern const DWORD report_explosion_;
 extern const DWORD RestorePlayer_;
 extern const DWORD roll_random_;
 extern const DWORD runProgram_;
@@ -294,12 +277,9 @@ extern const DWORD scr_exec_map_update_scripts_;
 extern const DWORD scr_find_first_at_;
 extern const DWORD scr_find_next_at_;
 extern const DWORD scr_find_obj_from_program_;
-extern const DWORD scr_find_sid_from_program_;
 extern const DWORD scr_new_;
 extern const DWORD scr_ptr_;
 extern const DWORD scr_remove_;
-extern const DWORD scr_set_ext_param_;
-extern const DWORD scr_set_objs_;
 extern const DWORD scr_write_ScriptNode_;
 extern const DWORD set_game_time_;
 extern const DWORD SexWindow_;
@@ -311,6 +291,7 @@ extern const DWORD skill_points_;
 extern const DWORD skill_set_tags_;
 extern const DWORD sprintf_;
 extern const DWORD square_num_;
+extern const DWORD srcCopy_;
 extern const DWORD stat_get_base_direct_;
 extern const DWORD stat_get_bonus_;
 extern const DWORD stat_level_;
@@ -318,6 +299,8 @@ extern const DWORD stat_pc_add_experience_;
 extern const DWORD stat_pc_get_;
 extern const DWORD stat_pc_set_;
 extern const DWORD stat_set_bonus_;
+extern const DWORD strcmp_;
+extern const DWORD strdup_;
 extern const DWORD strncpy_;
 extern const DWORD talk_to_translucent_trans_buf_to_buf_;
 extern const DWORD text_font_;
@@ -331,6 +314,7 @@ extern const DWORD trait_get_;
 extern const DWORD trait_init_;
 extern const DWORD trait_level_;
 extern const DWORD trait_set_;
+extern const DWORD transSrcCopy_;
 extern const DWORD _word_wrap_;
 extern const DWORD win_add_;
 extern const DWORD win_delete_;
@@ -340,14 +324,13 @@ extern const DWORD win_draw_rect_;
 extern const DWORD win_enable_button_;
 extern const DWORD win_get_buf_;
 extern const DWORD win_get_num_i_;
-extern const DWORD win_hide_;
 extern const DWORD win_line_;
 extern const DWORD win_print_;
 extern const DWORD win_register_button_;
 extern const DWORD win_register_button_disable_;
 extern const DWORD win_register_text_button_;
 extern const DWORD win_show_;
-extern const DWORD wmInterfaceScrollTabsStart_;
+extern const DWORD win_width_;
 extern const DWORD wmPartyWalkingStep_;
 extern const DWORD wmWorldMapLoadTempData_;
 extern const DWORD xfclose_;
@@ -362,6 +345,7 @@ extern const DWORD xfread_;
 extern const DWORD xfseek_;
 extern const DWORD xftell_;
 extern const DWORD xfwrite_;
+extern const DWORD xremovepath_;
 extern const DWORD xrewind_;
 extern const DWORD xungetc_;
 extern const DWORD xvfprintf_;
@@ -369,7 +353,9 @@ extern const DWORD xvfprintf_;
 #define _aiInfoList                 0x510948
 #define _ambient_light              0x51923C
 #define _art                        0x510738
+#define _art_intrface               0x5107F8
 #define _art_name                   0x56C9E4
+#define _art_skilldex               0x510878
 #define _art_vault_guy_num          0x5108A4
 #define _art_vault_person_nums      0x5108A8
 #define _bckgnd                     0x5707A4
@@ -379,22 +365,28 @@ extern const DWORD xvfprintf_;
 #define _btncnt                     0x43EA1C
 #define _CarCurrArea                0x672E68
 #define _cmap                       0x51DF34
+#define _colorTable                 0x6A38D0
 #define _combat_free_move           0x56D39C
 #define _combat_list                0x56D390
 #define _combat_state               0x510944
 #define _combat_turn_running        0x51093C
 #define _combatNumTurns             0x510940
 #define _crit_succ_eff              0x510978
+#define _critter_db_handle          0x58E94C
 #define _crnt_func                  0x664508
 #define _curr_font_num              0x51E3B0
 #define _curr_pc_stat               0x6681AC
+#define _curr_rot                   0x5190F8
 #define _curr_stack                 0x59E96C
 #define _cursor_line                0x664514
+#define _custom_msg_file            0x58EA98
 #define _DARK_GREEN_Color           0x6A3A90
+#define _DARK_GREY_Color            0x6A59D8
 #define _dialog_target              0x518848
 #define _dialog_target_is_party     0x51884C
 #define _drugInfoList               0x5191CC
 #define _edit_win                   0x57060C
+#define _editor_msg                 0x501694
 #define _Educated                   0x57082C
 #define _Experience_                0x6681B4
 #define _fallout_game_time          0x51C720
@@ -403,21 +395,27 @@ extern const DWORD xvfprintf_;
 #define _folder_card_fid            0x5705B0
 #define _folder_card_title          0x5705B8
 #define _folder_card_title2         0x5705BC
+#define _frame_time                 0x5709C4
 #define _free_perk                  0x570A29
+#define _frstc_draw1                0x5707D8
 #define _game_global_vars           0x5186C0
 #define _game_user_wants_to_quit    0x5186CC
 #define _gcsd                       0x51094C
 #define _gdBarterMod                0x51873C
+#define _gdNumOptions               0x5186D8
+#define _GInfo                      0x5701C0
 #define _gIsSteal                   0x51D430
+#define _glblmode                   0x5709D0
 #define _gmouse_current_cursor      0x518C0C
 #define _gmovie_played_list         0x596C78
 #define _GreenColor                 0x6A3CB0
-#define _gsound_initialized         0x518E30
+#define _grph_id                    0x431C40
+#define _grph_key                   0x570350
+#define _grphbmp                    0x5704E0
 #define _hit_location_penalty       0x510954
 #define _holo_flag                  0x664529
 #define _holopages                  0x66445C
 #define _hot_line_count             0x6644F8
-#define _i_fid                      0x59E95C
 #define _i_lhand                    0x59E958
 #define _i_rhand                    0x59E968
 #define _i_wid                      0x59E964
@@ -431,7 +429,6 @@ extern const DWORD xvfprintf_;
 #define _inven_pid                  0x51905C
 #define _inven_scroll_dn_bid        0x5190E8
 #define _inven_scroll_up_bid        0x5190E4
-#define _inventry_message_file      0x59E814
 #define _itemButtonItems            0x5970F8
 #define _itemCurrentItem            0x518F78
 #define _kb_lock_flags              0x51E2EA
@@ -440,32 +437,37 @@ extern const DWORD xvfprintf_;
 #define _last_level                 0x5707B4
 #define _Level_                     0x6681B0
 #define _Lifegiver                  0x570854
+#define _LIGHT_GREY_Color           0x6A76BF
 #define _list_com                   0x56D394
 #define _list_total                 0x56D37C
 #define _LSData                     0x613D30
-#define _lsgbuf                     0x614700
 #define _lsgmesg                    0x6142B0
 #define _lsgwin                     0x6142C4
 #define _main_ctd                   0x56D2B0
 #define _main_window                0x5194F0
 #define _map_elevation              0x519578
 #define _map_global_vars            0x51956C
+#define _master_db_handle           0x58E948
 #define _max                        0x56FB50
+#define _Meet_Frank_Horrigan        0x672E04
+#define _mesg                       0x5700E8
 #define _mouse_hotx                 0x6AC7D0
 #define _mouse_hoty                 0x6AC7CC
 #define _mouse_is_hidden            0x6AC790
 #define _mouse_x_                   0x6AC7A8
 #define _mouse_y                    0x664450
 #define _mouse_y_                   0x6AC7A4
+#define _msg_path                   0x5186C8
 #define _Mutate_                    0x5708B4
 #define _name_color                 0x56D744
 #define _name_font                  0x56D74C
-#define _name_sort_list             0x56FCB0
 #define _num_game_global_vars       0x5186C4
 #define _num_map_global_vars        0x519574
 #define _obj_dude                   0x6610B8
 #define _objectTable                0x639DA0
 #define _objItemOutlineState        0x519798
+#define _old_fid1                   0x5709EC
+#define _old_str1                   0x5700F8
 #define _optionRect                 0x58ECC0
 #define _outlined_object            0x518D94
 #define _partyMemberAIOptions       0x519DB8
@@ -482,6 +484,7 @@ extern const DWORD xvfprintf_;
 #define _pc_proto                   0x51C370
 #define _pc_trait                   0x66BE40
 #define _pc_trait2                  0x66BE44
+#define _PeanutButter               0x6A82F3
 #define _perk_data                  0x519DCC
 #define _perkLevelDataList          0x51C120
 #define _pip_win                    0x6644C4
@@ -496,6 +499,7 @@ extern const DWORD xvfprintf_;
 #define _read_callback              0x51DEEC
 #define _RedColor                   0x6AB4D0
 #define _retvals                    0x43EA7C
+#define _scr_size                   0x6AC9F0
 #define _skill_data                 0x51D118
 #define _slot_cursor                0x5193B8
 #define _sneak_working              0x56D77C
@@ -517,11 +521,9 @@ extern const DWORD xvfprintf_;
 #define _target_ypos                0x672E24
 #define _text_char_width            0x51E3C4
 #define _text_height                0x51E3BC
-#define _text_max                   0x51E3D4
-#define _text_mono_width            0x51E3C8
-#define _text_spacing               0x51E3CC
 #define _text_to_buf                0x51E3B8
 #define _text_width                 0x51E3C0
+#define _ticker                     0x5190F4
 #define _title_color                0x56D750
 #define _title_font                 0x56D748
 #define _trait_data                 0x51DB84
@@ -534,9 +536,6 @@ extern const DWORD xvfprintf_;
 #define _world_xpos                 0x672E0C
 #define _world_ypos                 0x672E10
 #define _WorldMapCurrArea           0x672E08
-#define _xres                       0x672D7C
-#define _yres                       0x672D88
-#define _YellowColor                0x6AB8BB
 
 struct sMessage {
  DWORD number;

@@ -60,8 +60,12 @@ static void __declspec(naked) SkillHookA() {
  push ecx;
  push esi;
  call SkillMaxHook2;
- mov ebx, 0x004AA64B;
- jmp ebx;
+ pop  ebp
+ pop  edi
+ pop  esi
+ pop  ecx
+ pop  ebx
+ retn
  }
 }
 static void __declspec(naked) SkillHookB() {
@@ -79,15 +83,14 @@ static void __declspec(naked) SkillHookB() {
  pop ecx;
  pop edx;
  jl win;
- mov eax, 0x4AA84E;
- jmp eax;
+ push 0x4AA84E
+ retn
 win:
- mov eax, 0x4AA85C;
- jmp eax;
+ push 0x4AA85C
+ retn
  }
 }
-static const DWORD SkillHookWin=0x4AA738;
-static const DWORD SkillHookFail=0x4AA72C;
+
 static void __declspec(naked) SkillHookC() {
  __asm {
  pushad;
@@ -99,9 +102,11 @@ static void __declspec(naked) SkillHookC() {
  cmp edx, eax;
  popad;
  jl win;
- jmp SkillHookFail;
+ push 0x4AA72C
+ retn
 win:
- jmp SkillHookWin;
+ push 0x4AA738
+ retn
  }
 }
 
@@ -124,7 +129,6 @@ void _stdcall SetSkillMax(DWORD critter, DWORD maximum) {
 }
 
 double* multipliers;
-static const DWORD StatBonusHookRet=0x4AA5D6;
 
 static int __declspec(naked) _stdcall stat_level(void* critter, int stat) {
  __asm {
@@ -159,11 +163,11 @@ static void __declspec(naked) GetStatBonusHook() {
   mov esi, eax;
   pop ecx;
   pop edx;
-  jmp StatBonusHookRet;
+  push 0x4AA5D6
+  retn
  }
 }
 
-static const DWORD SkillIncCostRet=0x4AA7C1;
 static void __declspec(naked) SkillIncCostHook() {
  __asm {
   //eax - current skill level, ebx - current skill, ecx - num free skill points
@@ -179,11 +183,11 @@ next:
   add edx, eax;
   movzx eax, skillCosts[edx];
   //eax - cost of the skill
-  jmp SkillIncCostRet;
+  push 0x4AA7C1
+  retn
  }
 }
 
-static const DWORD SkillDecCostRet=0x4AA98D;
 static void __declspec(naked) SkillDecCostHook() {
  __asm {
   //eax - current skill level, ebx - current skill, ecx - num free skill points
@@ -200,7 +204,8 @@ next:
   add edx, ecx;
   movzx eax, skillCosts[edx];
   //eax - cost of the skill
-  jmp SkillDecCostRet;
+  push 0x4AA98D
+  retn
  }
 }
 

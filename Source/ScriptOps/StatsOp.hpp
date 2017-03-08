@@ -537,7 +537,7 @@ static void __declspec(naked) get_available_skill_points() {
  __asm {
   pushad;
   mov ecx, eax;
-  mov edx, dword ptr ds:[_curr_pc_stat]
+  mov edx, ds:[_curr_pc_stat]
   call interpretPushLong_
   mov edx, 0xc001;
   mov eax, ecx;
@@ -1163,8 +1163,8 @@ static void __declspec(naked) SetXpMod3() {
   fmul xpmod;
   fistp xptmp;
   mov eax, xptmp;
-  mov ebx, 0x004AFABD;
-  jmp ebx;
+  push 0x4AFABD
+  retn
  }
 }
 static void _stdcall SetXpMod2(DWORD percent) {

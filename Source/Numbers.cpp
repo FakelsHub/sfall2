@@ -26,7 +26,6 @@ fail:
  }
 }
 
-static void LoadGameRet=0x480AFE;
 static void _declspec(naked) LoadGameHook() {
  _asm {
   pushad;
@@ -39,8 +38,9 @@ static void _declspec(naked) LoadGameHook() {
   call RunNumbers();
 fail:
   popad;
-  mov ecx, 0x1e0;
-  jmp LoadGameRet;
+  mov ecx, 0x1e0
+  push 0x480AFE
+  retn
  }
 }
 

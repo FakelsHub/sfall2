@@ -24,161 +24,155 @@
 static DWORD zone_number = 0;
 static DWORD QuestsScrollButtonsX = 220;
 static DWORD QuestsScrollButtonsY = 229;
+static DWORD memFrms;
+
+static void __declspec(naked) freeFrms() {
+ __asm {
+// eax = количество кнопок, edx = memFrms
+  push ecx
+  push ebx
+  xchg ecx, eax
+  mov  ebx, edx
+loopFrms:
+  mov  eax, [ebx+12]                        // eax = frm_ptr
+  call art_ptr_unlock_
+  add  ebx, 16
+  loop loopFrms
+  xchg edx, eax
+  call mem_free_
+  pop  ebx
+  pop  ecx
+  retn
+ }
+}
 
 static void __declspec(naked) StartPipboy_hook() {
  __asm {
-// load new texture for first (up) button. I used memory address for texture from buttons at
-// chracter screen. Everything fine, because this buttons can't use in one time, and they
-// everytime recreating
-  pushad
-  push 0
-  mov  edx, 49                              // INVUPOUT.FRM
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
-  call art_id_
-  mov  ecx, 0x59E7C4
-  xor  ebx, ebx
-  xor  edx, edx
-  call art_ptr_lock_data_
-  test eax, eax
-  jz   noUpButton
-  xchg ebp, eax
-  push 0
-  mov  edx, 50                              // INVUPIN.FRM
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
-  call art_id_
-  mov  ecx, 0x59E7C8
-  xor  ebx, ebx
-  xor  edx, edx
-  call art_ptr_lock_data_
-  test eax, eax
-  jz   noUpButton
-  xchg edi, eax
-  push 0
-  mov  edx, 53                              // INVUPDS.FRM
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
-  call art_id_
-  mov  ecx, 0x59E7CC
-  xor  ebx, ebx
-  xor  edx, edx
-  call art_ptr_lock_data_
-  test eax, eax
-  jz   noUpButton
-  mov  esi, eax
-// creating first button
-  xor  eax, eax
-  push eax                                  // ButType
-  push eax
-  push edi                                  // PicDown
-  push ebp                                  // PicUp
-  push 0x149                                // ButtUp (Page Up)
+  mov  ds:[_pip_win], eax
+  inc  eax                                  // Удачно создано окно?
+  jz   end                                  // Нет
   dec  eax
-  push eax                                  // ButtDown
-  push eax                                  // HovOff
-  push eax                                  // HovOn
-  mov  ecx, 22                              // Width
-  push 23                                   // Height
+  xchg ebp, eax                             // ebp = GNWID
+  mov  eax, 6*16
+  call mem_malloc_
+  test eax, eax                             // Удачно выделили память?
+  jz   deleteWin                            // Нет
+  xor  esi, esi
+  xchg edi, eax
+  push edi
+loopFrms:
+  xor  ecx, ecx                             // ID1
+  xor  ebx, ebx                             // ID2
+  push ebx                                  // ID3
+  lea  edx, [esi+49]                        // Index
+  mov  eax, ObjType_Intrface                // ObjType
+  call art_id_
+  lea  edx, [edi+12]                        // *frm_ptr
+  lea  ecx, [edi+8]                         // *Height
+  lea  ebx, [edi+4]                         // *Width
+  call art_lock_
+  mov  [edi], eax                           // art_pic
+  test eax, eax
+  jz   fail
+  inc  esi
+  add  edi, 16
+  cmp  esi, 6
+  jb   loopFrms
+  pop  edi
+  mov  memFrms, edi
+// creating first button
   mov  edx, QuestsScrollButtonsX            // Xpos
   mov  ebx, QuestsScrollButtonsY            // Ypos
-  mov  eax, ds:[_pip_win]                   // WinRef
+  push edx
+  push ebx
+  xor  esi, esi
+  push esi                                  // flags
+  push esi
+  dec  esi
+  push [edi+(1*16)]                         // PicDown
+  push [edi+(0*16)]                         // PicUp
+  push 0x149                                // ButtUp (Page Up)
+  push esi                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  mov  ecx, [edi+4+(0*16)]                  // Width
+  push [edi+8+(0*16)]                       // Height
+  mov  eax, ebp                             // GNWID
   call win_register_button_
   mov  ds:[_inven_scroll_up_bid], eax
-  cmp  eax, -1
-  je   noUpButton
-  mov  edi, eax
-  mov  ecx, esi
-  mov  ebx, esi
-  mov  edx, esi
+  inc  eax
+  jz   noUpButton
+  dec  eax
+  push eax
+  mov  edx, [edi+(4*16)]
+  mov  ecx, edx
+  mov  ebx, edx
   call win_register_button_disable_
-  mov  eax, edi
+  pop  eax
   call win_disable_button_
 noUpButton:
-// load new texture for second (down) button
-  push 0
-  mov  edx, 51                              // INVDNOUT.FRM
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
-  call art_id_
-  mov  ecx, 0x59E7D0
-  xor  ebx, ebx
-  xor  edx, edx
-  call art_ptr_lock_data_
-  test eax, eax
-  jz   noDownButton
-  xchg ebp, eax
-  push 0
-  mov  edx, 52                              // INVDNIN.FRM
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
-  call art_id_
-  mov  ecx, 0x59E7D4
-  xor  ebx, ebx
-  xor  edx, edx
-  call art_ptr_lock_data_
-  test eax, eax
-  jz   noDownButton
-  xchg edi, eax
-  push 0
-  mov  edx, 54                              // INVDNDS.FRM
-  mov  eax, ObjType_Intrface
-  xor  ecx, ecx
-  xor  ebx, ebx
-  call art_id_
-  mov  ecx, 0x59E7D8
-  xor  ebx, ebx
-  xor  edx, edx
-  call art_ptr_lock_data_
-  test eax, eax
-  jz   noDownButton
-  mov  esi, eax
+  pop  ebx                                  // Ypos
+  pop  edx                                  // Xpos
 // creating second button
-  xor  eax, eax
-  push eax                                  // ButType
-  push eax
-  push edi                                  // PicDown
-  push ebp                                  // PicUp
+  inc  esi
+  push esi                                  // flags
+  push esi
+  dec  esi
+  push [edi+(3*16)]                         // PicDown
+  push [edi+(2*16)]                         // PicUp
   push 0x151                                // ButtUp (Page Down)
-  dec  eax
-  push eax                                  // ButtDown
-  push eax                                  // HovOff
-  push eax                                  // HovOn
-  mov  ecx, 22                              // Width
-  mov  ebx, 23                              // Height
-  push ebx                                  // Height
-  mov  edx, QuestsScrollButtonsX            // Xpos
-  add  ebx, QuestsScrollButtonsY            // Ypos
-  mov  eax, ds:[_pip_win]                   // WinRef
+  push esi                                  // ButtDown
+  push esi                                  // HovOff
+  push esi                                  // HovOn
+  mov  ecx, [edi+4+(2*16)]                  // Width
+  mov  eax, [edi+8+(2*16)]                  // Height
+  push eax                                  // Height
+  add  ebx, eax                             // Ypos
+  mov  eax, ebp                             // GNWID
   call win_register_button_
   mov  ds:[_inven_scroll_dn_bid], eax
-  cmp  eax, -1
-  je   noDownButton
-  mov  edi, eax
-  mov  ecx, esi
-  mov  ebx, esi
-  mov  edx, esi
+  inc  eax
+  jz   skip
+  dec  eax
+  push eax
+  mov  edx, [edi+(5*16)]
+  mov  ecx, edx
+  mov  ebx, edx
   call win_register_button_disable_
-  mov  eax, edi
+  pop  eax
   call win_disable_button_
-noDownButton:
-  popad
-  cmp  dword ptr [esp+0x118], 1
-  mov  eax, 0x49754C
-  jmp  eax
+skip:
+  xchg ebp, eax
+  retn
+fail:
+  pop  edx
+  xchg esi, eax
+  call freeFrms
+deleteWin:
+  xchg ebp, eax
+  call win_delete_
+  xor  eax, eax
+end:
+  dec  eax
+  retn
+ }
+}
+
+static void __declspec(naked) EndPipboy_hook() {
+ __asm {
+  mov  edx, memFrms
+  mov  eax, 6
+  call freeFrms
+  jmp  NixHotLines_
  }
 }
 
 static void __declspec(naked) pipboy_hook() {
  __asm {
-  cmp  byte ptr ds:[_stat_flag], 0
+  xor  eax, eax
+  cmp  ds:[_stat_flag], al
   je   end
-  cmp  zone_number, 0
+  cmp  zone_number, eax
   je   end
   mov  eax, ds:[_view_page]
   cmp  ebx, 0x149                           // Page Up?
@@ -218,17 +212,18 @@ static void __declspec(naked) pipboy_hook1() {
   mov  edx, ds:[_crnt_func]
   test edx, edx
   jnz  end
-  cmp  zone_number, 0
+  cmp  zone_number, edx
   mov  zone_number, ebx
   mov  ds:[_holopages], edx
   jne  end
   mov  eax, ds:[_inven_scroll_up_bid]
-  cmp  eax, -1
-  je   end
+  inc  eax
+  jz   end
+  dec  eax
   call win_enable_button_
 end:
-  mov  eax, 0x4971B8
-  jmp  eax
+  push 0x4971B8
+  retn
  }
 }
 
@@ -248,9 +243,9 @@ static void __declspec(naked) PipStatus_hook() {
   mov  dword ptr ds:[_cursor_line], 3
   inc  dword ptr ds:[_holopages]
   mov  eax, 20
-  sub  dword ptr [esp+0x490], eax
+  sub  [esp+0x490], eax
   dec  dword ptr [esp+0x494]                // Номер текущего квеста
-  sub  dword ptr [esp+0x498], eax
+  sub  [esp+0x498], eax
   dec  dword ptr [esp+0x4A0]                // Номер квеста в списке квестов
   jmp  noWrite
 currentPage:
@@ -271,8 +266,9 @@ static void __declspec(naked) DownButton() {
   push eax
   push edx
   mov  eax, ds:[_inven_scroll_dn_bid]
-  cmp  eax, -1
-  je   end
+  inc  eax
+  jz   end
+  dec  eax
   mov  edx, ds:[_view_page]
   cmp  edx, ds:[_holopages]
   je   disableButton
@@ -337,13 +333,15 @@ static void __declspec(naked) DisableButtons() {
   mov  zone_number, eax
   mov  ds:[_holopages], eax
   mov  eax, ds:[_inven_scroll_up_bid]
-  cmp  eax, -1
-  je   noUpButton
+  inc  eax
+  jz   noUpButton
+  dec  eax
   call win_disable_button_
 noUpButton:
   mov  eax, ds:[_inven_scroll_dn_bid]
-  cmp  eax, -1
-  je   noDownButton
+  inc  eax
+  jz   noDownButton
+  dec  eax
   call win_disable_button_
 noDownButton:
   pop  eax
@@ -366,8 +364,8 @@ static void __declspec(naked) PipAlarm_hook() {
 }
 
 void QuestListInit() {
-//<comments removed because they couldn't display correctly in this encoding>
- MakeCall(0x497544, &StartPipboy_hook, true);
+ MakeCall(0x49740A, &StartPipboy_hook, false);
+ HookCall(0x4978AD, &EndPipboy_hook);
  MakeCall(0x497088, &pipboy_hook, false);
  MakeCall(0x4971B2, &pipboy_hook1, true);
  HookCall(0x498186, &PipStatus_hook);

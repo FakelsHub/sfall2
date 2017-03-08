@@ -133,8 +133,8 @@ static void __declspec(naked) PickpocketHook() {
   pop ecx;
   pop edx;
   mov [esp+84], eax;
-  mov eax, 0x4ABC6F;
-  jmp eax;
+  push 0x4ABC6F
+  retn
  }
 }
 static int _stdcall HitChanceHook2(int base, DWORD critter) {
@@ -151,8 +151,8 @@ static void __declspec(naked) HitChanceHook() {
   push esi;
   call HitChanceHook2;
   mov esi, eax;
-  mov eax, 0x0042479B;
-  jmp eax;
+  push 0x42479B
+  retn
  }
 }
 
