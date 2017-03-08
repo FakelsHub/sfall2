@@ -3,6 +3,7 @@
 #include "Bugs.h"
 #include "Define.h"
 #include "FalloutEngine.h"
+#include "PartyControl.h"
 
 DWORD WeightOnBody = 0;
 DWORD SizeOnBody = 0;
@@ -355,6 +356,13 @@ noRightWeapon:
   call item_weight_
   add  WeightOnBody, eax
 noArmor:
+  mov  eax, [esp+0xF8+0x4]
+  push eax
+  call item_c_curr_size_
+  add  SizeOnBody, eax
+  pop  eax
+  call item_total_weight_
+  add  WeightOnBody, eax
   xor  eax, eax
   inc  eax
   inc  eax
@@ -391,7 +399,14 @@ haveWeapon:
   call item_weight_
   add  WeightOnBody, eax
 end:
-  mov  ebx, PID_JESSE_CONTAINER
+  mov  eax, [esp+0x10+0x4]
+  push eax
+  call item_c_curr_size_
+  add  SizeOnBody, eax
+  pop  eax
+  call item_total_weight_
+  add  WeightOnBody, eax
+  mov  eax, ds:[_inven_dude]
   retn
  }
 }
@@ -420,6 +435,15 @@ static void __declspec(naked) item_add_mult_hook() {
   je   end
   sub  eax, WeightOnBody                    // Учитываем вес одетой на цели брони и оружия
 end:
+  retn
+ }
+}
+
+static void __declspec(naked) exit_inventory_hook() {
+ __asm {
+  mov  ds:[_i_lhand], eax
+  mov  WeightOnBody, eax
+  mov  SizeOnBody, eax
   retn
  }
 }
@@ -472,25 +496,19 @@ end:
   mov  eax, 0x47125C
   jmp  eax
 found:
+  mov  ebx, 0x4711DF
   add  edx, [esp+0x40]                      // inventory_offset
   mov  eax, ds:[_pud]
-  push eax
-  mov  eax, [eax]                           // itemsCount
-  test eax, eax
-  jz   skip
-  dec  eax
-  cmp  edx, eax
-  jbe  inRange
+  mov  ecx, [eax]                           // itemsCount
+  jecxz skip
+  dec  ecx
+  cmp  edx, ecx
+  ja   skip
+  sub  ecx, edx
+  mov  edx, ecx
+  mov  ebx, 0x471181
 skip:
-  pop  eax
-  mov  ebx, 0x4711DF
   jmp  ebx
-inRange:
-  xchg edx, eax
-  sub  edx, eax
-  pop  eax
-  mov  ecx, 0x471181
-  jmp  ecx
  }
 }
 
@@ -506,7 +524,7 @@ static void __declspec(naked) drop_ammo_into_weapon_hook() {
   jge  skip                                 // Да
   lea  edx, [eax+0x2C]                      // Inventory
   mov  ecx, [edx]                           // itemsCount
-  jcxz skip                                 // инвентарь пустой (ещё лишняя проверка, но пусть будет)
+  jecxz skip                                // инвентарь пустой (ещё лишняя проверка, но пусть будет)
   mov  edx, [edx+8]                         // FirstItem
 nextItem:
   cmp  ebp, [edx]                           // Наше оружие?
@@ -834,6 +852,98 @@ end:
  }
 }
 
+static void __declspec(naked) switch_hand_hook() {
+ __asm {
+  mov  eax, ds:[_inven_dude]
+  push eax
+  mov  [edi], ebp
+  inc  ecx
+  jz   skip
+  xor  ebx, ebx
+  inc  ebx
+  mov  edx, ebp
+  call item_remove_mult_
+skip:
+  pop  edx
+  mov  eax, ebp
+  call item_get_type_
+  cmp  eax, item_type_container
+  jne  end
+  mov  [ebp+0x7C], edx                      // iobj.owner = _inven_dude
+end:
+  pop  ebp
+  pop  edi
+  pop  esi
+  retn
+ }
+}
+
+static void __declspec(naked) item_add_mult_hook1() {
+ __asm {
+  cmp  eax, ds:[_stack]
+  je   itsPlayer
+  cmp  eax, ds:[_target_stack]
+  jne  end
+  add  edx, WeightOnBody
+  jmp  end
+itsPlayer:
+  push ebp
+  push ecx
+  push ebx
+  mov  eax, HiddenArmor
+  call item_weight_
+  add  edx, eax
+  mov  ebp, ds:[_i_lhand]
+  mov  ecx, ds:[_i_rhand]
+  mov  ebx, ds:[_i_worn]
+  cmp  ds:[_curr_stack], 0
+  je   subItems
+  cmp  ebp, esi
+  je   skipLeft
+  xchg ebp, eax
+  call item_weight_
+  add  edx, eax
+skipLeft:
+  cmp  ecx, esi
+  je   skipRight
+  xchg ecx, eax
+  call item_weight_
+  add  edx, eax
+skipRight:
+  cmp  ebx, esi
+  je   noArmor
+  xchg ebx, eax
+  call item_weight_
+  add  edx, eax
+  jmp  noArmor
+subItems:
+  cmp  ebp, esi
+  jne  noLeft
+  xchg ebp, eax
+  call item_weight_
+  sub  edx, eax
+noLeft:
+  cmp  ecx, esi
+  jne  noRight
+  xchg ecx, eax
+  call item_weight_
+  sub  edx, eax
+noRight:
+  cmp  ebx, esi
+  jne  noArmor
+  xchg ebx, eax
+  call item_weight_
+  sub  edx, eax
+noArmor:
+  pop  ebx
+  pop  ecx
+  pop  ebp
+end:
+  mov  eax, edi
+  jmp item_total_weight_
+ }
+}
+
 static void __declspec(naked) combat_display_hook() {
  __asm {
   mov  ecx, [eax+0x20]                      // pobj.fid
@@ -902,10 +1012,11 @@ void BugsInit() {
 
 // Исправление ошибки неучёта веса одетых вещей
  MakeCall(0x473B4E, &loot_container_hook, false);
- MakeCall(0x47588A, &barter_inventory_hook, false);
+ MakeCall(0x4758B0, &barter_inventory_hook, false);
  HookCall(0x474CB8, &barter_attempt_transaction_hook);
  HookCall(0x4742AD, &move_inventory_hook);
  HookCall(0x4771B5, &item_add_mult_hook);
+ MakeCall(0x46FC8A, &exit_inventory_hook, false);
 
 // Ширина текста 64, а не 80 
  SafeWrite8(0x475541, 64);
@@ -918,8 +1029,7 @@ void BugsInit() {
 // и ошибки обратного порядка
  MakeCall(0x47114A, &inven_pickup_hook1, true);
 
-// Исправление ошибки использования только одной пачки патронов когда оружие находится перед
-// патронами
+// Исправление ошибки использования только одной пачки патронов когда оружие находится перед патронами
  HookCall(0x476598, &drop_ammo_into_weapon_hook);
 
  dlog("Applying black skilldex patch.", DL_INIT);
@@ -995,6 +1105,14 @@ void BugsInit() {
 // Исправление op_obj_can_see_obj_ и op_obj_can_hear_obj_
  MakeCall(0x456B63, &op_obj_can_see_obj_hook, true);
  MakeCall(0x4583D3, &op_obj_can_hear_obj_hook, true);
+
+// Исправление пропадания предметов в инвентаре при попытке поместить их во вложенную сумку если игрок перегружен
+ HookCall(0x4764FC, (void*)item_add_force_);
+// Восстановление принадлежности сумки игроку после помещения её в руку
+ MakeCall(0x4715DB, &switch_hand_hook, true);
+
+// Учитываем броню/оружие на игроке при проверке веса при помещении предмета во вложенную сумку
+ HookCall(0x477252, &item_add_mult_hook1);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook);

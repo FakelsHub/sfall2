@@ -218,6 +218,7 @@ skipPerks:
   mov  ds:[_inven_pid], eax
   mov  ds:[_obj_dude], ebx
   mov  ds:[_inven_dude], ebx
+  mov  ds:[_stack], ebx
   mov  esi, ds:[_game_global_vars]
   add  esi, 21*4                            // esi->GVAR_NUKA_COLA_ADDICT
   push esi
@@ -377,6 +378,7 @@ static void __declspec(naked) RestoreDudeState() {
   push ecx
   mov  ds:[_obj_dude], ecx
   mov  ds:[_inven_dude], ecx
+  mov  ds:[_stack], ecx
   mov  esi, [ecx+0x64]
   mov  ds:[_inven_pid], esi
   mov  ecx, PERK_count
@@ -547,9 +549,10 @@ static void _declspec(naked) handle_inventory_hook() {
   cmp  IsControllingNPC, 0
   je   end
   mov  HiddenArmor, eax
-  pushad
+  push eax
   push edx
-  mov  ebx, 1
+  xor  ebx, ebx
+  inc  ebx
   xchg edx, eax
   call item_remove_mult_
   pop  edx
@@ -561,7 +564,7 @@ nextArmor:
   and  byte ptr [eax+0x27], 0xFB            // Сбрасываем флаг одетой брони
   jmp  nextArmor
 noArmor:
-  popad
+  pop  eax
 end:
   retn
  }
@@ -571,36 +574,20 @@ static void _declspec(naked) handle_inventory_hook1() {
  __asm {
   cmp  IsControllingNPC, 0
   je   end
-  pushad
+  push eax
   mov  edx, HiddenArmor
   test edx, edx
   jz   skip
   or   byte ptr [edx+0x27], 4               // Устанавливаем флаг одетой брони
-  mov  ebx, 1
+  xor  ebx, ebx
+  inc  ebx
   call item_add_force_
   xor  edx, edx
 skip:
   mov  HiddenArmor, edx
-  popad
+  pop  eax
 end:
   jmp  inven_worn_
- }
-}
-
-static void _declspec(naked) display_stats_hook() {
- __asm {
-  call item_total_weight_
-  xchg edx, eax                             // edx = вес вещей
-  xor  eax, eax
-  cmp  IsControllingNPC, eax                // Контролируемый персонаж?
-  je   end                                  // Нет
-  mov  eax, HiddenArmor
-  test eax, eax                             // У него есть броня?
-  jz   end                                  // Нет
-  call item_weight_
-end:
-  add  eax, edx
-  retn
  }
 }
 
@@ -678,7 +665,6 @@ void PartyControlInit() {
   HookCall(0x46E8BA, &handle_inventory_hook);
   HookCall(0x46EC0A, &handle_inventory_hook1);
   SafeWrite32(0x471E48, 152);               // Ширина текста 152, а не 80 
-  HookCall(0x4725F0, &display_stats_hook);
   MakeCall(0x422879, &combat_input_hook, false);
   MakeCall(0x4124E0, &action_skill_use_hook, false);
   HookCall(0x41279A, &action_use_skill_on_hook);

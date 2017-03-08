@@ -13,7 +13,6 @@
 #define PID_DRIVABLE_CAR             33555441
 #define PID_HARDENED_POWER_ARMOR     232
 #define PID_JET                      259
-#define PID_JESSE_CONTAINER          467
 #define PID_LEATHER_ARMOR            1
 #define PID_LEATHER_ARMOR_MK_II      379
 #define PID_LEATHER_JACKET           74

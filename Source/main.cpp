@@ -1853,7 +1853,7 @@ static void DllMain2() {
  PartyControlInit();
  dlogr(" Done", DL_INIT);
 
- if (GetPrivateProfileIntA("Misc", "ObjCanSeeObj_ShootThru_Fix", 0, ini)) {
+ if (GetPrivateProfileIntA("Misc", "ObjCanSeeObj_ShootThru_Fix", 1, ini)) {
   dlog("Applying ObjCanSeeObj ShootThru Fix.", DL_INIT);
   HookCall(0x456BC6, &op_obj_can_see_obj_hook);
   dlogr(" Done", DL_INIT);

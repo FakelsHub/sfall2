@@ -55,6 +55,8 @@ static DWORD cArg;                          // how many arguments were taken by 
 static DWORD cRet;                          // how many return values were set by current hook script
 static DWORD cRetTmp;                       // how many return values were set by specific hook script (when using register_hook)
 
+extern void item_add_mult_call();
+
 #define hookbegin(a) __asm pushad __asm call BeginHook __asm popad __asm mov ArgCount, a
 #define hookend __asm pushad __asm call EndHook __asm popad
 
@@ -997,6 +999,37 @@ end:
  }
 }
 
+static void _declspec(naked) item_add_force_call() {
+ __asm {
+  cmp  dword ptr ds:[_curr_stack], 0
+  je   force
+// Была неудачная попытка поместить в сумку или зарядить оружие?
+  jmp  item_add_mult_call
+force:
+  hookbegin(3)
+  pushad
+  mov  args[4], edx                         // item being moved
+  xor  edx, edx
+  mov  args[0], edx                         // target slot (0 - main backpack)
+  mov  args[8], edx                         // no item being replaced here..
+  push HOOK_INVENTORYMOVE
+  call RunHookScript
+  popad
+  cmp  cRet, 0
+  je   defaulthandler
+  cmp  rets[0], -1
+  je   defaulthandler
+  xor  eax, eax
+  dec  eax
+  jmp  end
+defaulthandler:
+  call item_add_force_
+end:
+  hookend
+  retn
+ }
+}
+
 /*This hook is called every time an item is placed into either hand slot via inventory screen drag&drop
  If switch_hand_ function is not called, item is not placed anywhere (it remains in main inventory)*/
 static void _declspec(naked) switch_hand_hook() {
@@ -1091,32 +1124,6 @@ end:
  }
 }
 
-static void _declspec(naked) item_add_force_call() {
- __asm {
-  hookbegin(3)
-  pushad
-  mov  args[4], edx                         // item being moved
-  xor  edx, edx
-  mov  args[0], edx                         // target slot (0 - main backpack)
-  mov  args[8], edx                         // no item being replaced here..
-  push HOOK_INVENTORYMOVE
-  call RunHookScript
-  popad
-  cmp  cRet, 0
-  je   defaulthandler
-  cmp  rets[0], -1
-  je   defaulthandler
-  xor  eax, eax
-  dec  eax
-  jmp  end
-defaulthandler:
-  call item_add_force_
-end:
-  hookend
-  retn
- }
-}
-
 static void _declspec(naked) drop_ammo_into_weapon_hook() {
  __asm {
   hookbegin(3)
@@ -1142,6 +1149,39 @@ skip:
   pop  eax
   mov  eax, 0x476588
   push eax
+end:
+  hookend
+  retn
+ }
+}
+
+void _declspec(naked) item_add_mult_call() {
+ __asm {
+  cmp  eax, ds:[_stack]                     // container == main backpack?
+  jne  skip                                 // Нет
+// Перемещение брони/вещи из руки (при открытой вложенной сумке) или из открытой вложенной сумки в основной рюкзак
+  dec  dword ptr ds:[_curr_stack]
+  call item_add_force_call
+  inc  dword ptr ds:[_curr_stack]
+  retn
+skip:
+  hookbegin(3)
+  pushad
+  mov  args[0], 5                           // target slot (5 - container)
+  mov  args[4], edx                         // item being moved
+  mov  args[8], eax                         // other item (container)
+  push HOOK_INVENTORYMOVE
+  call RunHookScript
+  popad
+  cmp  cRet, 0
+  je   defaulthandler
+  cmp  rets[0], -1
+  je   defaulthandler
+  xor  eax, eax
+  dec  eax
+  jmp  end
+defaulthandler:
+  call item_add_mult_
 end:
   hookend
   retn
@@ -1462,10 +1502,11 @@ static void HookScriptInit2() {
  HookCall(0x456BA2, &op_obj_can_see_obj_hook);
 
  LoadHookScript("inventorymove", HOOK_INVENTORYMOVE);
+ HookCall(0x471200, &item_add_force_call);
  MakeCall(0x4714E0, &switch_hand_hook, true);
  HookCall(0x47139C, &inven_pickup_hook);
- HookCall(0x471200, &item_add_force_call);
  MakeCall(0x47657C, &drop_ammo_into_weapon_hook, false);
+ HookCall(0x4764BC, &item_add_mult_call);
 
  LoadHookScript("invenwield", HOOK_INVENWIELD);
  MakeCall(0x472768, &invenWieldFunc_hook, true);
