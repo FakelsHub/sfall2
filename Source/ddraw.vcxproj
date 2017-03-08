@@ -372,7 +372,7 @@
     <ClInclude Include="ScriptOps\StatsOp.hpp" />
     <ClInclude Include="ScriptOps\WorldmapOps.hpp" />
     <ClInclude Include="skills.h" />
-    <ClInclude Include="sound.h" />
+    <ClInclude Include="Sound.h" />
     <ClInclude Include="Stats.h" />
     <ClInclude Include="Tiles.h" />
     <ClInclude Include="timer.h" />
@@ -423,7 +423,7 @@
     <ClCompile Include="SafeWrite.cpp" />
     <ClCompile Include="ScriptExtender.cpp" />
     <ClCompile Include="skills.cpp" />
-    <ClCompile Include="sound.cpp" />
+    <ClCompile Include="Sound.cpp" />
     <ClCompile Include="Stats.cpp" />
     <ClCompile Include="Tiles.cpp" />
     <ClCompile Include="timer.cpp" />

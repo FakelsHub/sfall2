@@ -53,7 +53,7 @@
 #include "Reputations.h"
 #include "ScriptExtender.h"
 #include "skills.h"
-#include "sound.h"
+#include "Sound.h"
 #include "stats.h"
 #include "SuperSave.h"
 #include "Tiles.h"
@@ -699,8 +699,7 @@ notThree:
   mov  eax, 0x1F6
 click:
   push eax
-  mov  eax, 0x50CC50                        // 'ib1p1xx1'
-  call gsound_play_sfx_file_
+  call gsound_red_butt_press_
   pop  eax
 notFour:
   retn
@@ -744,7 +743,6 @@ end:
  }
 }
 
-sMessage cantdothat = {675, 0, 0, 0};       // 'Я не могу этого сделать.'
 static void __declspec(naked) FirstTurnCheckDist() {
  __asm {
   push eax
@@ -754,14 +752,7 @@ static void __declspec(naked) FirstTurnCheckDist() {
   pop  edx
   pop  eax
   jle  end                                  // Нет
-  lea  edx, cantdothat
-  mov  eax, _proto_main_msg_file
-  call message_search_
-  cmp  eax, 1
-  jne  skip
-  mov  eax, cantdothat.message
-  call display_print_
-skip:
+  call PartyControl_PrintWarning
   pop  eax                                  // Уничтожаем адрес возврата
   xor  eax, eax
   dec  eax
@@ -1681,11 +1672,7 @@ static void DllMain2() {
  dlogr("Running ConsoleInit().", DL_INIT);
  ConsoleInit();
 
- if (GetPrivateProfileIntA("Misc", "ExtraSaveSlots", 0, ini)) {
-  dlog("Running EnableSuperSaving()", DL_INIT);
-  EnableSuperSaving();
-  dlogr(" Done", DL_INIT);
- }
+ EnableSuperSaving();
 
  switch (GetPrivateProfileIntA("Misc", "SpeedInterfaceCounterAnims", 0, ini)) {
   case 1: MakeCall(0x460BA1, &intface_rotate_numbers_hook, true); break;
@@ -1897,9 +1884,8 @@ static void DllMain2() {
  AutoQuickSave = GetPrivateProfileIntA("Misc", "AutoQuickSave", 0, ini);
  if (AutoQuickSave >= 1 && AutoQuickSave <= 10) {
   AutoQuickSave--;
-  SafeWrite16(0x47B91C, 0xC031);            // xor  eax, eax
-  SafeWrite32(0x47B91E, 0x5193B8A3);        // mov  ds:_slot_cursor, eax
-  SafeWrite16(0x47B923, 0x04EB);            // jmp  0x47B929
+  SafeWrite8(0x47B923, 0x89);
+  SafeWrite32(0x47B924, 0x5193B83D);        // mov  ds:_slot_cursor, edi
   MakeCall(0x47B984, &SaveGame_hook, true);
  }
 
@@ -1974,7 +1960,6 @@ static void _stdcall OnExit() {
  ConsoleExit();
  AnimationsAtOnceExit();
  HeroAppearanceModExit();
- //SoundExit();
 }
 
 static void __declspec(naked) OnExitFunc() {

@@ -37,7 +37,7 @@
 #include "perks.h"
 #include "ScriptExtender.h"
 #include "skills.h"
-#include "sound.h"
+#include "Sound.h"
 #include "SuperSave.h"
 #include "version.h"
 
@@ -65,7 +65,7 @@ static void _stdcall ResetState(DWORD onLoad) {
 }
 
 void GetSavePath(char* buf, char* ftype) {
- sprintf(buf, "%s\\savegame\\slot%.2d\\sfall%s.sav", *(char**)_patches, *(int*)_slot_cursor + 1 + LSPageOffset, ftype);
+ sprintf(buf, "%s\\savegame\\slot%.2d\\sfall%s.sav", *(char**)_patches, *(DWORD*)_slot_cursor + 1 + LSPageOffset, ftype);
 }
 
 static char SaveSfallDataFailMsg[128];
@@ -95,8 +95,9 @@ static void _stdcall _SaveGame() {
   __asm {
    mov  eax, offset SaveSfallDataFailMsg
    call display_print_
+   mov  eax, 0x50CC04                       // 'iisxxxx1'
+   call gsound_play_sfx_file_
   }
-  PlaySfx("IISXXXX1");
  }
  GetSavePath(buf, "fs");
  h = CreateFileA(buf, GENERIC_WRITE, 0, 0, CREATE_ALWAYS, 0, 0);

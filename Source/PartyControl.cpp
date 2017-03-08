@@ -419,19 +419,19 @@ end:
  }
 }
 
-sMessage cantdo = {675, 0, 0, 0};       // 'I can't do that.'/'Я не могу этого сделать.'
 void __declspec(naked) PartyControl_PrintWarning() {
  __asm {
   push edx
-  lea  edx, cantdo
+  push ebx
+  sub  esp, 16
+  mov  edx, esp
+  mov  ebx, 675                             // 'I can't do that.'/'Я не могу этого сделать.'
   mov  eax, _proto_main_msg_file
-  call message_search_
-  cmp  eax, 1
-  jne  end
-  mov  eax, cantdo.message
+  call getmsg_
   call display_print_
-end:
   xor  eax, eax
+  add  esp, 16
+  pop  ebx
   pop  edx
   retn
  }

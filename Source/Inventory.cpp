@@ -876,7 +876,7 @@ static void __declspec(naked) fontHeight() {
   mov  ebx, ds:[_curr_font_num]
   mov  eax, 101
   call text_font_
-  call dword ptr ds:[_text_height]
+  call ds:[_text_height]
   xchg ebx, eax
   call text_font_
   xchg ebx, eax
@@ -1437,8 +1437,7 @@ compareSizeWeight:
   cmp  eax, edx
   jg   cantDrop
 cont:
-  mov  eax, 0x503E14                        // 'ib1p1xx1'
-  call gsound_play_sfx_file_
+  call gsound_red_butt_press_
   mov  edx, ebp
   mov  eax, ecx
   call item_move_all_
@@ -1461,8 +1460,7 @@ cont:
   call container_exit_
   jmp  end
 cantDrop:
-  mov  eax, 0x503E14                        // 'ib1p1xx1'
-  call gsound_play_sfx_file_
+  call gsound_red_butt_press_
   xor  eax, eax
   push eax
   mov  al, ds:[0x6AB718]                    // color

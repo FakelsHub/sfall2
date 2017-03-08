@@ -51,21 +51,21 @@ static void __declspec(naked) PipAlarm_hook() {
 static void __declspec(naked) scr_save_hook() {
  __asm {
   mov  ecx, 16
-  cmp  dword ptr [esp+0xEC+4], ecx          // number_of_scripts
+  cmp  [esp+0xEC+4], ecx                    // number_of_scripts
   jg   skip
-  mov  ecx, dword ptr [esp+0xEC+4]
+  mov  ecx, [esp+0xEC+4]
   cmp  ecx, 0
   jg   skip
   xor  eax, eax
   retn
 skip:
-  sub  dword ptr [esp+0xEC+4], ecx          // number_of_scripts
+  sub  [esp+0xEC+4], ecx                    // number_of_scripts
   push dword ptr [ebp+0xE00]                // num
-  mov  dword ptr [ebp+0xE00], ecx           // num
+  mov  [ebp+0xE00], ecx                     // num
   xor  ecx, ecx
-  xchg dword ptr [ebp+0xE04], ecx           // NextBlock
+  xchg [ebp+0xE04], ecx                     // NextBlock
   call scr_write_ScriptNode_
-  xchg dword ptr [ebp+0xE04], ecx           // NextBlock
+  xchg [ebp+0xE04], ecx                     // NextBlock
   pop  dword ptr [ebp+0xE00]                // num
   retn
  }
@@ -118,7 +118,7 @@ static void __declspec(naked) item_d_check_addict_hook() {
 loopQueue:
   test eax, eax                             // Есть что в списке?
   jz   end                                  // Нет
-  cmp  ebx, dword ptr [eax+0x4]             // drug_pid == queue_addict.drug_pid?
+  cmp  ebx, [eax+0x4]                       // drug_pid == queue_addict.drug_pid?
   je   end                                  // Есть конкретная зависимость
   mov  eax, esi                             // eax = source
   mov  edx, 2                               // type = зависимость
@@ -741,20 +741,25 @@ end:
  }
 }
 
-static void __declspec(naked) obj_load_func_hook1() {
+static void __declspec(naked) obj_save_hook() {
  __asm {
-  xor  edi, edi
-  cmp  [eax+0x54], edi                      // pobj.who_hit_me
-  jle  end
-  cmp  ds:[_loadingGame], edi
-  jne  end
-  xchg eax, ds:[_obj_dude]
-  push eax
-  call obj_fix_combat_cid_for_dude_
-  pop  dword ptr ds:[_obj_dude]
+  inc  eax
+  jz   end
+  dec  eax
+  mov  edx, [esp+0x1C]                      // combat_data
+  mov  eax, [eax+0x68]                      // pobj.who_hit_me.cid
+  test byte ptr ds:[_combat_state], 1       // В бою?
+  jz   clear                                // Нет
+  cmp  dword ptr [edx], 0                   // В бою?
+  jne  skip                                 // Да
+clear:
+  xor  eax, eax
+  dec  eax
+skip:
+  mov  [edx+0x18], eax                      // combat_data.who_hit_me
 end:
-  mov  eax, ds:[_preload_list_index]
-  retn
+  mov  eax, 0x489422
+  jmp  eax
  }
 }
 
@@ -1108,7 +1113,7 @@ void BugsInit() {
 
 // Fix explosives bugs
  MakeCall(0x422F05, &combat_ctd_init_hook, true);
- MakeCall(0x488E52, &obj_load_func_hook1, false);
+ MakeCall(0x489413, &obj_save_hook, true);
  MakeCall(0x4130C3, &action_explode_hook, false);
  MakeCall(0x4130E5, &action_explode_hook1, false);
 

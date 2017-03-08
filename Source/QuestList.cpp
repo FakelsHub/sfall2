@@ -71,18 +71,18 @@ static void __declspec(naked) StartPipboy_hook() {
   jz   noUpButton
   mov  esi, eax
 // creating first button
-  push 0                                    // ButType
-  push 0
+  xor  eax, eax
+  push eax                                  // ButType
+  push eax
   push edi                                  // PicDown
   push ebp                                  // PicUp
-  mov  ebp, 0x149                           // this number will return when button pressed (Page Up)
-  push ebp                                  // ButtUp
-  push -1                                   // ButtDown
-  push -1                                   // HovOff
-  push -1                                   // HovOn
+  push 0x149                                // ButtUp (Page Up)
+  dec  eax
+  push eax                                  // ButtDown
+  push eax                                  // HovOff
+  push eax                                  // HovOn
   mov  ecx, 22                              // Width
-  mov  ebx, 23                              // Height
-  push ebx                                  // Height
+  push 23                                   // Height
   mov  edx, QuestsScrollButtonsX            // Xpos
   mov  ebx, QuestsScrollButtonsY            // Ypos
   mov  eax, ds:[_pip_win]                   // WinRef
@@ -139,15 +139,16 @@ noUpButton:
   jz   noDownButton
   mov  esi, eax
 // creating second button
-  push 0                                    // ButType
-  push 0
+  xor  eax, eax
+  push eax                                  // ButType
+  push eax
   push edi                                  // PicDown
   push ebp                                  // PicUp
-  mov  ebp, 0x151                           // this number will return when button pressed (Page Down)
-  push ebp                                  // ButtUp
-  push -1                                   // ButtDown
-  push -1                                   // HovOff
-  push -1                                   // HovOn
+  push 0x151                                // ButtUp (Page Down)
+  dec  eax
+  push eax                                  // ButtDown
+  push eax                                  // HovOff
+  push eax                                  // HovOn
   mov  ecx, 22                              // Width
   mov  ebx, 23                              // Height
   push ebx                                  // Height
@@ -196,8 +197,7 @@ notPgUp:
   inc  eax
 click:
   mov  ds:[_view_page], eax
-  mov  eax, 0x50CC50                        // 'ib1p1xx1'
-  call gsound_play_sfx_file_
+  call gsound_red_butt_press_
   mov  ebx, zone_number
   jmp  end
 checkClickBug:

@@ -87,7 +87,7 @@
     <ClInclude Include="ScriptExtender.h">
       <Filter>Headers</Filter>
     </ClInclude>
-    <ClInclude Include="sound.h">
+    <ClInclude Include="Sound.h">
       <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="Stats.h">
@@ -267,7 +267,7 @@
     <ClCompile Include="ScriptExtender.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="sound.cpp">
+    <ClCompile Include="Sound.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Stats.cpp">

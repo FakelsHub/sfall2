@@ -39,6 +39,7 @@ const DWORD art_lock_ = 0x4191CC;
 const DWORD art_ptr_lock_ = 0x419160;
 const DWORD art_ptr_lock_data_ = 0x419188;
 const DWORD art_ptr_unlock_ = 0x419260;
+const DWORD buf_fill_ = 0x4D387C;
 const DWORD buf_to_buf_ = 0x4D36D4;
 const DWORD check_death_ = 0x410814;
 const DWORD Check4Keys_ = 0x43F73C;
@@ -111,12 +112,14 @@ const DWORD gdialogDisplayMsg_ = 0x445448;
 const DWORD get_input_ = 0x4C8B78;
 const DWORD get_time_ = 0x4C9370;
 const DWORD getmsg_ = 0x48504C;
+const DWORD GetSlotList_ = 0x47E5D0;
 const DWORD gmouse_is_scrolling_ = 0x44B54C;
 const DWORD gmouse_set_cursor_ = 0x44C840;
 const DWORD GNW_find_ = 0x4D7888;
 const DWORD GNW95_process_message_ = 0x4C9CF0;
 const DWORD gsnd_build_weapon_sfx_name_ = 0x451760;
 const DWORD gsound_play_sfx_file_ = 0x4519A8;
+const DWORD gsound_red_butt_press_ = 0x451970;
 const DWORD inc_game_time_ = 0x4A34CC;
 const DWORD insert_withdrawal_ = 0x47A290;
 const DWORD interpret_ = 0x46CCA4;
@@ -178,6 +181,7 @@ const DWORD item_w_rounds_ = 0x478D80;
 const DWORD item_w_try_reload_ = 0x478768;
 const DWORD item_w_unload_ = 0x478F80;
 const DWORD item_weight_ = 0x477B88;
+const DWORD KillOldMaps_ = 0x48000C;
 const DWORD light_get_tile_ = 0x47A980;
 const DWORD ListDrvdStats_ = 0x43527C;
 const DWORD ListSkills_ = 0x436154;
@@ -201,7 +205,6 @@ const DWORD message_find_ = 0x484D10;
 const DWORD message_init_ = 0x48494C;
 const DWORD message_load_ = 0x484AA4;
 const DWORD message_make_path_ = 0x484CB8;
-const DWORD message_search_ = 0x484C30;
 const DWORD mouse_click_in_ = 0x4CA934;
 const DWORD mouse_get_position_ = 0x4CA9DC;
 const DWORD mouse_hide_ = 0x4CA534;
@@ -220,7 +223,6 @@ const DWORD obj_find_first_at_ = 0x48B48C;
 const DWORD obj_find_first_at_tile_ = 0x48B5A8;
 const DWORD obj_find_next_at_ = 0x48B510;
 const DWORD obj_find_next_at_tile_ = 0x48B608;
-const DWORD obj_fix_combat_cid_for_dude_ = 0x48909C;
 const DWORD obj_new_sid_inst_ = 0x49AAC0;
 const DWORD obj_outline_object_ = 0x48C2B4;
 const DWORD obj_pid_new_ = 0x489C9C;
@@ -338,13 +340,14 @@ const DWORD win_draw_ = 0x4D6F5C;
 const DWORD win_draw_rect_ = 0x4D6F80;
 const DWORD win_enable_button_ = 0x4D9474;
 const DWORD win_get_buf_ = 0x4D78B0;
+const DWORD win_get_num_i_ = 0x4DCD68;
 const DWORD win_hide_ = 0x4D6E64;
 const DWORD win_line_ = 0x4D6B24;
 const DWORD win_print_ = 0x4D684C;
 const DWORD win_register_button_ = 0x4D8260;
 const DWORD win_register_button_disable_ = 0x4D8674;
+const DWORD win_register_text_button_ = 0x4D8308;
 const DWORD win_show_ = 0x4D6DAC;
-const DWORD wmAreaSetWorldPos_ = 0x4C4710;
 const DWORD wmInterfaceScrollTabsStart_ = 0x4C219C;
 const DWORD wmPartyWalkingStep_ = 0x4C1F90;
 const DWORD wmWorldMapLoadTempData_ = 0x4BD6B4;
@@ -363,13 +366,6 @@ const DWORD xfwrite_ = 0x4DF4E8;
 const DWORD xrewind_ = 0x4DF6E4;
 const DWORD xungetc_ = 0x4DF3F4;
 const DWORD xvfprintf_ = 0x4DF1AC;
-
-int _stdcall ItemGetType(TGameObj* item) {
- __asm {
-  mov  eax, item
-  call item_get_type_
- }
-}
 
 static DWORD mesg_buf[4] = {0, 0, 0, 0};
 const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId) {
