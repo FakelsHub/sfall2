@@ -23,3 +23,4 @@ extern bool UseScrollWheel;
 void _stdcall SetInvenApCost(int a);
 void InventoryInit();
 void InventoryReset();
+void item_add_check();

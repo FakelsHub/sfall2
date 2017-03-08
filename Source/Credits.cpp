@@ -29,7 +29,7 @@ static DWORD CreditsLine = 0;
 static const char* ExtraLines[] = {
  "#SFALL2 " VERSION_STRING,
  "",
- "sfall is free software, licensed under the GPL",
+ "sfall2 is free software, licensed under the GPL",
  "Copyright 2008-2016  The sfall team",
  "",
  "@Author",
@@ -53,6 +53,7 @@ static const char* ExtraLines[] = {
  "Tehnokrat",
  "Crafty",
  "Slider2k",
+ "Vennor",
  "",
  "@Additional thanks to",
  "Nirran",
@@ -65,6 +66,7 @@ static const char* ExtraLines[] = {
  "Lexx",
  "Sduibek",
  "burn",
+ "Foxx",
  "Anyone who has used sfall in their own mods",
  "The bug reporters and feature requesters",
  ""

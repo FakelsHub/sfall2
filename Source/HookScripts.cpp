@@ -1016,8 +1016,8 @@ force:
   xor  edx, edx
   mov  args[0], edx                         // target slot (0 - main backpack)
   mov  args[8], edx                         // no item being replaced here..
-//  push HOOK_INVENTORYMOVE
-//  call RunHookScript
+  push HOOK_INVENTORYMOVE
+  call RunHookScript
   popad
   cmp  cRet, 0
   je   defaulthandler
@@ -1035,7 +1035,7 @@ end:
 }
 
 /*This hook is called every time an item is placed into either hand slot via inventory screen drag&drop
- If switch_hand_ function is not called, item is not placed anywhere (it remains in main inventory)*/
+ If switch_hand_ function is not called, item is not placed anywhere*/
 static void _declspec(naked) switch_hand_hook() {
  _asm {
   hookbegin(3)
@@ -1049,6 +1049,36 @@ canUseWeapon:
   pop  eax
   jz   return
   pushad
+  mov  edi, eax                             // edi = item
+  mov  esi, [edx]
+  test esi, esi                             // Есть предмет в руке (смена одного предмета на другой?)
+  jz   dontCheck                            // Нет, простое взятие предмета в руку
+  cmp  eax, esi
+  je   fail
+  cmp  ecx, -1                              // Новый предмет перетаскивается из слота рук/брони?
+  je   dontCheck                            // Да
+  xor  ebx, ebx
+  inc  ebx                                  // ebx = count
+  push ebx
+  mov  edx, ds:[_inven_dude]
+  xchg edx, eax                             // eax = source, edx = item
+  push eax
+  call item_remove_mult_                    // Временно удаляем предмет из сумки
+  pop  eax                                  // eax = source
+  mov  edx, esi                             // edx = item
+  pop  ebx                                  // ebx = count
+  push eax
+  call item_add_check                       // Проверяем поместится ли предмет из руки в сумке
+  xchg edi, eax                             // eax = item, edi = код добавления
+  pop  edx
+  xchg edx, eax                             // eax = source, edx = item
+  call item_add_force_                      // Возвращаем предмет в сумку
+  cmp  edi, -2                              // Не хватит места в сумке/рюкзаке?
+fail:
+  popad
+  je   return                               // Да
+  pushad
+dontCheck:
   mov  args[4], eax                         // item being moved
   call item_get_type_
   cmp  eax, item_type_ammo
@@ -1068,8 +1098,8 @@ cont:
   inc  eax
 leftHand:
   mov  args[0], eax                         // target slot (1 - left hand, 2 - right hand)
-//  push HOOK_INVENTORYMOVE
-//  call RunHookScript
+  push HOOK_INVENTORYMOVE
+  call RunHookScript
 skip:
   popad
   cmp  cRet, 0
@@ -1093,27 +1123,53 @@ return:
 // This hack is called when an armor is dropped into the armor slot at inventory screen
 static void _declspec(naked) inven_pickup_hook() {
  __asm {
-  push eax
+  mov  edi, eax
   call item_get_type_
   test eax, eax                             // Это item_type_armor?
-  pop  eax
-  jnz  skip                                 // Нет
-  cmp  IsControllingNPC, 0
-  je   cont
+  jnz  fail                                 // Нет
+  cmp  IsControllingNPC, eax
+  je   itsPlayer
   call PartyControl_PrintWarning
-skip:
+fail:
   xor  eax, eax
   dec  eax
   retn
-cont:
+itsPlayer:
+  mov  eax, edi                             // eax = item
+  mov  ecx, ds:[_i_worn]                    // Броня одета? (смена одной брони на другую?)
+  jecxz skip                                // Нет, простое одевание брони
+  cmp  eax, ecx
+  je   fail
+  cmp  esi, -1                              // Новая броня перетаскивается из слота рук?
+  je   skip                                 // Да
+  xor  ebx, ebx
+  inc  ebx                                  // ebx = count
+  push ebx
+  mov  edx, ds:[_inven_dude]
+  xchg edx, eax                             // eax = source, edx = item
+  push eax
+  call item_remove_mult_                    // Временно удаляем одеваемую броню из сумки
+  pop  eax                                  // eax = source
+  mov  edx, ecx                             // edx = item
+  pop  ebx                                  // ebx = count
+  push eax
+  call item_add_check                       // Проверяем поместится ли снимаемая броня в сумке
+  xchg edi, eax                             // eax = item, edi = код добавления
+  pop  edx
+  xchg edx, eax                             // eax = source, edx = item
+  push edx
+  call item_add_force_                      // Возвращаем одеваемую броню в сумку
+  pop  eax                                  // eax = item
+  cmp  edi, -2                              // Не хватит места в сумке/рюкзаке?
+  je   fail                                 // Да
+skip:
   hookbegin(3)
   mov  args[0], 3                           // target slot (3 - armor slot)
   mov  args[4], eax                         // item being moved
-  mov  eax, ds:[_i_worn]
-  mov  args[8], eax                         // other item
+  mov  args[8], ecx                         // other item
   pushad
-//  push HOOK_INVENTORYMOVE
-//  call RunHookScript
+  push HOOK_INVENTORYMOVE
+  call RunHookScript
   popad
   xor  eax, eax
   cmp  cRet, eax
@@ -1133,13 +1189,21 @@ static void _declspec(naked) drop_ammo_into_weapon_hook() {
   hookbegin(3)
   cmp  esi, -1
   je   end
+  mov  eax, ebp
+  call item_w_max_ammo_
+  cmp  eax, [ebp+0x3C]                      // iobj.cur_ammo_quantity
+  jne  reload
+  xor  esi, esi
+  dec  esi
+  jmp  end
+reload:
   mov  args[0], 4                           // target slot (4 - weapon, when reloading it by dropping ammo)
   mov  eax, [esp+4]                         // ammo
   mov  args[4], eax                         // item being moved (ammo)
   mov  args[8], ebp                         // other item (weapon)
   pushad
-//  push HOOK_INVENTORYMOVE
-//  call RunHookScript
+  push HOOK_INVENTORYMOVE
+  call RunHookScript
   popad
   xor  eax, eax
   cmp  cRet, eax
@@ -1150,7 +1214,7 @@ static void _declspec(naked) drop_ammo_into_weapon_hook() {
   xchg esi, eax
   jmp  end
 skip:
-  pop  eax
+  pop  eax                                  // Уничтожаем адрес возврата
   mov  eax, 0x476588
   push eax
 end:
@@ -1169,34 +1233,24 @@ void _declspec(naked) item_add_mult_call() {
   inc  dword ptr ds:[_curr_stack]
   retn
 itsContainer:
-  push ebp
   hookbegin(3)
-  push edx                                  // item
-  push ebx                                  // count
-  push eax                                  // source
-  call item_add_mult_
-  xchg ebp, eax                             // ebp = код завершения
+  push eax
+  call item_add_check
+  cmp  eax, -2                              // Не хватит места в сумке/рюкзаке?
   pop  eax
-  pop  ebx
-  pop  edx
-  cmp  ebp, -2                              // Не хватит места в сумке/рюкзаке?
-  je   fail                                 // Да
+  je   skip                                 // Да
   pushad
   mov  args[0], 5                           // target slot (5 - container)
   mov  args[4], edx                         // item being moved
   mov  args[8], eax                         // container
-  test ebp, ebp                             // А вообще удачно добавили?
-  jnz  skip                                 // Нет
-  call item_remove_mult_                    // Да, удалим
-skip:
-//  push HOOK_INVENTORYMOVE
-//  call RunHookScript
+  push HOOK_INVENTORYMOVE
+  call RunHookScript
   popad
   cmp  cRet, 0
   je   defaulthandler
   cmp  rets[0], -1
   je   defaulthandler
-fail:
+skip:
   xor  eax, eax
   dec  eax
   jmp  end
@@ -1204,7 +1258,6 @@ defaulthandler:
   call item_add_force_
 end:
   hookend
-  pop  ebp
   retn
  }
 }
@@ -1522,8 +1575,7 @@ static void HookScriptInit2() {
  MakeCall(0x42BA04, &is_within_perception_hook, true);
  HookCall(0x456BA2, &op_obj_can_see_obj_hook);
 
-// нужно ДОПИЛИВАТЬ hs_inventorymove
-// LoadHookScript("inventorymove", HOOK_INVENTORYMOVE);
+ LoadHookScript("inventorymove", HOOK_INVENTORYMOVE);
  HookCall(0x471200, &item_add_force_call);
  MakeCall(0x4714E0, &switch_hand_hook, true);
  HookCall(0x47139C, &inven_pickup_hook);

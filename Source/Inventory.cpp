@@ -616,15 +616,15 @@ static void __declspec(naked) ReloadWeaponHotKey() {
   popad
   retn
 ourKey:
-  cmp  dword ptr ds:[_intfaceEnabled], ebx
+  cmp  ds:[_intfaceEnabled], ebx
   je   endReload
   xor  esi, esi
   dec  esi
-  cmp  dword ptr ds:[_interfaceWindow], esi
+  cmp  ds:[_interfaceWindow], esi
   je   endReload
   mov  edx, ds:[_itemCurrentItem]
   imul eax, edx, 24
-  cmp  byte ptr ds:[_itemButtonItems + 0x5][eax], bl// itsWeapon
+  cmp  ds:[_itemButtonItems + 0x5][eax], bl // itsWeapon
   jne  itsWeapon                            // Да
   call intface_use_item_
   jmp  endReload
@@ -672,11 +672,11 @@ static void __declspec(naked) AutoReloadWeapon() {
   call critter_is_dead_                     // Дополнительная проверка не помешает
   test eax, eax
   jnz  end
-  cmp  dword ptr ds:[_intfaceEnabled], eax
+  cmp  ds:[_intfaceEnabled], eax
   je   end
   xor  esi, esi
   dec  esi
-  cmp  dword ptr ds:[_interfaceWindow], esi
+  cmp  ds:[_interfaceWindow], esi
   je   end
   inc  eax
   mov  ebx, ds:[_itemCurrentItem]
@@ -837,20 +837,20 @@ end:
 
 static void __declspec(naked) ControlWeapon_hook() {
  __asm {
-  mov  edx, ds:[_dialog_target]
-  mov  eax, edx
+  push eax
   call inven_right_hand_
-  test eax, eax
-  mov  eax, edx                             // _dialog_target
-  jnz  haveWeapon
-  mov  edx, 0x4494FA
-  jmp  edx
-haveWeapon:
-  xor  edx, edx
-  inc  edx                                  // правая рука (INVEN_TYPE_RIGHT_HAND)
+  xchg ecx, eax
+  pop  eax
   call inven_unwield_
-  mov  edx, 0x44952E
-  jmp  edx
+  test eax, eax                             // Удачно сняли? (hs_invenwield)
+  jnz  skip                                 // Нет
+  jecxz end                                 // Оружия в правой руке не было
+skip:
+  pop  eax                                  // Уничтожаем адрес возврата
+  mov  eax, 0x44952E
+  push eax
+end:
+  retn
  }
 }
 
@@ -866,9 +866,7 @@ haveArmor:
   mov  ebx, 0x4000000                       // Worn
   xchg edx, eax                             // edx = указатель на снимаемую броню
   xchg ecx, eax                             // eax = _dialog_target
-  call correctFidForRemovedItem_
-  xor  eax, eax
-  retn
+  jmp  correctFidForRemovedItem_
  }
 }
 
@@ -1154,7 +1152,7 @@ static void __declspec(naked) gdProcess_hook() {
  __asm {
   mov  eax, ds:[_dialog_target]
   cmp  dword ptr [eax+0x64], PID_Marcus
-  jz   noArmor
+  je   noArmor
   mov  edx, eax
   call ai_search_inven_armor_
   test eax, eax
@@ -1642,11 +1640,14 @@ end:
  }
 }
 
-static void __declspec(naked) item_add_mult() {
+void __declspec(naked) item_add_check() {
  __asm {
-  push ebp
+  push edi
+  push esi
+  push edx
+  push ecx
+  push ebx
   mov  esi, eax
-  mov  ebp, eax
   mov  edi, edx
   cmp  ebx, 1
   jl   minus1
@@ -1777,17 +1778,30 @@ minus1:
   dec  eax
   jmp  end
 force:
-  mov  edx, edi
-  xchg ebp, eax
-  cmp  StackEmptyWeapons, 0
-  je   callForce
+  xor  eax, eax
+end:
+  pop  ebx
+  pop  ecx
+  pop  edx
+  pop  esi
+  pop  edi
+  retn
+ }
+}
+
+static void __declspec(naked) item_add_mult() {
+ __asm {
+  mov  ecx, eax
+  call item_add_check
+  test eax, eax                             // Можно добавить?
+  jnz  end                                  // Нет
+  xchg ecx, eax
+  cmp  StackEmptyWeapons, ecx
+  je   skip
   call SetDefaultAmmo
-callForce:
+skip:
   call item_add_force_
 end:
-  pop  ebp
-  pop  edi
-  pop  esi
   pop  ecx
   retn
  }
@@ -1795,38 +1809,20 @@ end:
 
 static void __declspec(naked) move_table_source() {
  __asm {
-  mov  ecx, eax
-  mov  ebp, edx
-  mov  edx, edi                             // edx = item
-  mov  ebx, esi                             // ebx = count
-  call item_remove_mult_
-  inc  eax
-  jz   skip
-  mov  eax, ebp                             // eax = source
-  mov  edx, edi                             // edx = item
-  mov  ebx, esi                             // ebx = count
-  call item_add_mult_
-  test eax, eax                             // Удачно?
-  jz   end                                  // Да
-  push eax
-  mov  eax, ecx                             // eax = source
-  mov  edx, edi                             // edx = item
-  mov  ebx, esi                             // ebx = count
-  call item_add_force_
-  pop  eax
+  xchg ecx, eax                             // ecx = source, eax = count
+  xchg ebx, eax                             // ebx = count, eax = item
+  xchg edx, eax                             // edx = item, eax = target
+  mov  ebp, eax                             // ebp = target
+  call item_add_check
   cmp  eax, -2                              // Не хватит места в сумке/рюкзаке?
-  je   skip                                 // Да
-  mov  eax, esi                             // eax = count
-  xchg ecx, eax                             // eax = source, ecx = count
-  mov  ebx, edi                             // ebx = item
-  mov  edx, ebp
+  je   end                                  // Да
+  xchg ebp, eax                             // eax = target
+  xchg edx, eax                             // edx = target, eax = item
+  xchg ebx, eax                             // ebx = item, eax = count
+  xchg ecx, eax                             // ecx = count, eax = source
   jmp  item_move_force_
-skip:
-  xor  eax, eax
-  dec  eax
-  retn
 end:
-  mov  [edi+0x7C], ebp                      // iobj.owner = target
+  inc  eax
   retn
  }
 }
@@ -1836,23 +1832,6 @@ static void __declspec(naked) move_table_target() {
   mov  edx, ds:[_target_curr_stack]
   mov  edx, ds:[_target_stack][edx*4]
   jmp  move_table_source
- }
-}
-
-static void __declspec(naked) checkContainerSize() {
- __asm {
-  call item_add_mult_
-  test eax, eax                             // Удачно?
-  jz   end                                  // Да
-  cmp  eax, -2                              // Не хватит места в сумке/рюкзаке?
-  je   end                                  // Да
-  xor  ebx, ebx
-  inc  ebx
-  mov  eax, ds:[_inven_dude]
-  mov  edx, ecx
-  jmp  item_add_force_
-end:
-  retn
  }
 }
 
@@ -1867,7 +1846,8 @@ static void __declspec(naked) proto_ptr_call() {
   jne  end
   mov  eax, [edx+0x24]                      // max_size
   shr  eax, 1                               // eax = max_size/2
-  mov  [edx+0x70], eax                      // container.size = max_size/2
+  inc  eax
+  mov  [edx+0x70], eax                      // container.size = max_size/2 + 1
 end:
   retn
  }
@@ -1933,7 +1913,7 @@ void InventoryInit() {
  }
 
  HookCall(0x45419B, &correctFidForRemovedItem_hook);
- MakeCall(0x4494F5, &ControlWeapon_hook, true);
+ HookCall(0x4494FC, &ControlWeapon_hook);
  HookCall(0x449570, &ControlArmor_hook);
 
  if (GetPrivateProfileInt("Misc", "FreeWeight", 0, ini)) {
@@ -2013,7 +1993,7 @@ void InventoryInit() {
  HookCall(0x46EB1E, &handle_inventory_hook1);
 
 // Надоело шинковать одну функцию
- MakeCall(0x47715B, &item_add_mult, true);
+ MakeCall(0x477159, &item_add_mult, true);
 
 // При подтверждении торговли использовать основной рюкзак игрока, а не открытую сумку
  SafeWrite32(0x475CF2, _stack);
@@ -2025,10 +2005,6 @@ void InventoryInit() {
 // Сообщать об отсутствии места не в окне монитора, а в окне торговли
  HookCall(0x47531F, (void*)gdialogDisplayMsg_);
  SafeWrite16(0x475300, 0x87EB);             // jmps 0x475289
-
-// Нельзя менять вещь из сумки на вещь в руке/броню если последняя не влезет в сумку
- HookCall(0x471572, &checkContainerSize);
- HookCall(0x4713F0, &checkContainerSize);
 
  if (GetPrivateProfileIntA("Misc", "ContainerSizeFix", 0, ini)) {
   HookCall(0x477B75, &proto_ptr_call);

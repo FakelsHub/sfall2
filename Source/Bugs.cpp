@@ -256,13 +256,13 @@ static void __declspec(naked) partyMemberIncLevels_hook() {
   mov  edi, _drugInfoList
   mov  esi, ebx
 loopAddict:
-  mov  eax, dword ptr [edi]                 // eax = drug pid
+  mov  eax, [edi]                           // eax = drug pid
   call item_d_check_addict_
   test eax, eax                             // Есть зависимость?
   jz   noAddict                             // Нет
   cmp  dword ptr [eax], 0                   // queue_addict.init
   jne  noAddict                             // Зависимость ещё не активна
-  mov  edx, dword ptr [eax+0x8]             // queue_addict.perk
+  mov  edx, [eax+0x8]                       // queue_addict.perk
   mov  eax, ebx
   call perk_add_effect_
 noAddict:
@@ -295,7 +295,7 @@ static void __declspec(naked) invenWieldFunc_hook() {
   xor  ebx, ebx
   inc  ebx
   push ebx
-  mov  cl, byte ptr [edi+0x27]
+  mov  cl, [edi+0x27]
   and  cl, 0x3
   xchg edx, eax                             // eax=source, edx=item
   call item_remove_mult_
@@ -386,7 +386,7 @@ noArmor:
   mov  eax, [esp+0x1C+0x4]
   test eax, eax
   jnz  haveWeapon
-  cmp  dword ptr ds:[_dialog_target_is_party], eax
+  cmp  ds:[_dialog_target_is_party], eax
   jne  end                                  // это собутыльник
   mov  eax, [esp+0x18+0x4]
   test eax, eax
@@ -928,6 +928,38 @@ end:
  }
 }
 
+static void __declspec(naked) combat_hook() {
+ __asm {
+  mov  eax, [ecx+eax]                       // eax = source
+  test eax, eax
+  jz   end
+  push eax
+  mov  edx, STAT_max_move_points
+  call stat_level_
+  mov  edx, ds:[_gcsd]
+  test edx, edx
+  jz   skip
+  add  eax, [edx+0x8]                       // gcsd.free_move
+skip:
+  pop  edx
+  xchg edx, eax                             // eax = source, edx = Макс. очки действия
+  mov  [eax+0x40], edx                      // pobj.curr_mp
+  test byte ptr ds:[_combat_state], 1       // В бою?
+  jz   end                                  // Нет
+  mov  edx, [eax+0x68]                      // pobj.cid
+  cmp  edx, -1
+  je   end
+  push eax
+  mov  eax, ds:[_aiInfoList]
+  shl  edx, 4
+  mov  dword ptr [edx+eax+0xC], 0           // aiInfo.lastMove
+  pop  eax
+end:
+  mov  edx, edi                             // dude_turn
+  retn
+ }
+}
+
 static void __declspec(naked) combat_display_hook1() {
  __asm {
   mov  ecx, [eax+0x20]                      // pobj.fid
@@ -1108,6 +1140,10 @@ void BugsInit() {
 
 // Исправление краша при попытке открыть сумку/рюкзак в окне обмена/торговли
  MakeCall(0x473191, &inven_action_cursor_hook, false);
+
+// Исправление неправильной инициализации очков действия в начале каждого хода
+ BlockCall(0x422E02);
+ MakeCall(0x422E1B, &combat_hook, false);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);
