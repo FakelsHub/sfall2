@@ -877,14 +877,17 @@ end:
  }
 }
 
-void _stdcall KeyPressHook( DWORD dxKey, bool pressed, DWORD vKey ) {
+DWORD _stdcall KeyPressHook(DWORD dxKey, bool pressed, DWORD vKey) {
+ DWORD result = 0;
  BeginHook();
  ArgCount = 3;
  args[0] = (DWORD)pressed;
  args[1] = dxKey;
  args[2] = vKey;
  RunHookScript(HOOK_KEYPRESS);
+ if (cRet != 0) result = rets[0];
  EndHook();
+ return result;
 }
 
 void _stdcall MouseClickHook(DWORD button, bool pressed) {

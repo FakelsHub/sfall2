@@ -147,9 +147,9 @@ public:
  HRESULT _stdcall Unacquire(void) {return RealDevice->Unacquire();}
 
  //Only called for the mouse
- HRESULT _stdcall GetDeviceState(DWORD a,LPVOID b) {
+ HRESULT _stdcall GetDeviceState(DWORD a, LPVOID b) {
   if (ForcingGraphicsRefresh) RefreshGraphics();
-  if (DeviceType != kDeviceType_MOUSE) return RealDevice->GetDeviceState(a,b);
+  if (DeviceType != kDeviceType_MOUSE) return RealDevice->GetDeviceState(a, b);
 
   DIMOUSESTATE2 MouseState;
   HRESULT hr;
@@ -157,6 +157,7 @@ public:
   if (formatLock) hr = RealDevice->GetDeviceState(sizeof(DIMOUSESTATE2), &MouseState);
   else hr = RealDevice->GetDeviceState(sizeof(DIMOUSESTATE), &MouseState);
   if (FAILED(hr)) return hr;
+
   if (ReverseMouse) {
    BYTE tmp = MouseState.rgbButtons[0];
    MouseState.rgbButtons[0] = MouseState.rgbButtons[1];
@@ -205,32 +206,38 @@ public:
  }
 
  //Only called for the keyboard
- HRESULT _stdcall GetDeviceData(DWORD a,DIDEVICEOBJECTDATA* b,DWORD* c,DWORD d) {
-  if(DeviceType!=kDeviceType_KEYBOARD) {
-   return RealDevice->GetDeviceData(a,b,c,d);
-  }
+ HRESULT _stdcall GetDeviceData(DWORD a, DIDEVICEOBJECTDATA* b, DWORD* c, DWORD d) {
+  if (DeviceType != kDeviceType_KEYBOARD) return RealDevice->GetDeviceData(a, b, c, d);
 
   RunGlobalScripts2();
 
-  if(!b||bufferedPresses.empty()||(d&DIGDD_PEEK)) {
-   HRESULT hr=RealDevice->GetDeviceData(a,b,c,d);
-   if(FAILED(hr)||!b||!(*c)) return hr;
-   for(DWORD i=0;i<*c;i++) {
-    KeysDown[b[i].dwOfs]=b[i].dwData&0x80;
-    KeyPressHook(b[i].dwOfs, (b[i].dwData & 0x80) > 0, MapVirtualKeyEx(b[i].dwOfs, MAPVK_VSC_TO_VK, keyboardLayout));
+  if (!b || bufferedPresses.empty() || (d&DIGDD_PEEK)) {
+   HRESULT hr = RealDevice->GetDeviceData(a, b, c, d);
+   if (FAILED(hr) || !b || !(*c)) return hr;
+   DWORD keyOverride, oldState;
+   for (DWORD i = 0; i < *c; i++) {
+    oldState = KeysDown[b[i].dwOfs];
+    KeysDown[b[i].dwOfs] = b[i].dwData&0x80;
+    keyOverride = KeyPressHook(b[i].dwOfs, (b[i].dwData&0x80) > 0, MapVirtualKeyEx(b[i].dwOfs, MAPVK_VSC_TO_VK, keyboardLayout));
+    if (keyOverride != 0) {
+     KeysDown[b[i].dwOfs] = oldState;
+     b[i].dwOfs = keyOverride;
+     KeysDown[b[i].dwOfs] = b[i].dwData&0x80;
+    }
    }
-   if(KeysDown[DebugEditorKey]) RunDebugEditor();
+   if (KeysDown[DebugEditorKey]) RunDebugEditor();
    return hr;
   }
   //Despite passing an array of 32 data objects, fallout cant seem to cope with a key being pressed and released in the same frame...
   //TODO: Fallouts behaviour when passing multiple keypresses makes it appear like it's expecting the DIDEVICEOBJECTDATA struct to be
   //      something other than 16 bytes. afaik, fallout uses DX3 for input, which is before the appData field was added, but it could
   //      be worth checking anyway.
-  *b=bufferedPresses.front();
+  *b = bufferedPresses.front();
   bufferedPresses.pop();
-  *c=1;
+  *c = 1;
   return DI_OK;
  }
+
     HRESULT _stdcall SetDataFormat(const DIDATAFORMAT* a) {
   if(formatLock&&oldFormat.dwSize) return RealDevice->SetDataFormat(&oldFormat);
   memcpy(&oldFormat, a, sizeof(DIDATAFORMAT));
