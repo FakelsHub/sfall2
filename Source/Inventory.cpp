@@ -34,6 +34,8 @@ static DWORD InvSizeLimitMode = 0;
 static int InvSizeLimit = 0;
 static DWORD ReloadWeaponKey = 0;
 
+static DWORD StackEmptyWeapons = 0;
+
 static const int PartyMax = 15;
 static int npcCount = 0;
 static char iniArmor[MAX_PATH];
@@ -101,17 +103,30 @@ static void __declspec(naked) critter_curr_size() {
   mov  eax, edi
   call inven_right_hand_
   mov  edx, eax
+  test eax, eax
+  jz   noRight
+  test byte ptr [eax+0x27], 2               // iobj.flags4 & Right_Hand_?
+  jnz  noRight
   call item_size_
   add  esi, eax
+noRight:
   mov  eax, edi
   call inven_left_hand_
+  test eax, eax
+  jz   skip
   cmp  edx, eax
   je   skip
+  test byte ptr [eax+0x27], 1               // iobj.flags4 & Left_Hand_?
+  jnz  skip
   call item_size_
   add  esi, eax
 skip:
   xchg edi, eax
   call inven_worn_
+  test eax, eax
+  jz   end
+  test byte ptr [eax+0x27], 4               // iobj.flags4 & Worn_?
+  jnz  end
   call item_size_
   add  esi, eax
 end:
@@ -333,35 +348,6 @@ static void __declspec(naked) critterIsOverloaded_hook() {
   call item_c_curr_size_
 end:
   retn
- }
-}
-
-static void __declspec(naked) item_add_mult_hook() {
- __asm {
-  mov  edi, 0x4772A6
-  mov  eax, ecx
-  call critter_max_size
-  inc  eax
-  jz   end
-  dec  eax
-  cmp  Looting, 0
-  je   skip
-  sub  eax, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
-skip:
-  push eax                                  // макс.размер
-  mov  eax, esi
-  call item_size_
-  xchg edx, eax
-  imul edx, ebx                             // edx = размер вещи * количество
-  mov  eax, ecx
-  call critter_curr_size
-  add  eax, edx
-  pop  edx
-  cmp  eax, edx                             // общий размер <= макс.размера?
-  jle  end                                  // Да
-  mov  edi, 0x4771C2                        // С вещами на выход
-end:
-  jmp  edi
  }
 }
 
@@ -1229,13 +1215,6 @@ static void __declspec(naked) inven_action_cursor_hook() {
  }
 }
 
-static void __declspec(naked) item_add_force_call() {
- __asm {
-  call SetDefaultAmmo
-  jmp  item_add_force_
- }
-}
-
 static void __declspec(naked) inven_pickup_hook2() {
  __asm {
   mov  eax, ds:[_i_wid]
@@ -1645,7 +1624,257 @@ static void __declspec(naked) handle_inventory_hook1() {
  }
 }
 
+static void __declspec(naked) itsLootBarterTarget() {
+ __asm {
+  push edx
+  xor  edx, edx
+  test eax, eax
+  jz   end
+  test InLoop, 0x30000                      // INTFACELOOT + BARTER
+  jz   end
+  cmp  eax, ds:[_target_stack]
+  jne  end
+  inc  edx
+end:
+  xchg edx, eax
+  pop  edx
+  retn
+ }
+}
+
+static void __declspec(naked) item_add_mult() {
+ __asm {
+  push ebp
+  mov  esi, eax
+  mov  ebp, eax
+  mov  edi, edx
+  cmp  ebx, 1
+  jl   minus1
+  mov  eax, [esi+0x20]                      // eax = pobj.fid
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  cmp  eax, ObjType_Critter
+  jne  notCritter
+  mov  eax, esi
+  call critter_body_type_
+  test eax, eax                             // Body_Type_Biped?
+  jz   itsCritter
+  mov  eax, -5
+  jmp  end
+itsCritter:
+  mov  eax, esi
+  call critter_max_size
+  inc  eax
+  jz   checkWeight
+  dec  eax
+  xchg ecx, eax                             // ecx = макс.размер
+  xchg edx, eax                             // eax = item
+  call item_size_
+  imul eax, ebx                             // eax = размер вещи * количество
+  xchg edx, eax                             // edx = размер вещи * количество
+  mov  eax, esi
+  call critter_curr_size
+  add  edx, eax
+  mov  eax, esi
+  call itsLootBarterTarget
+  test eax, eax
+  jz   noExtraSizeTarget
+  dec  eax
+  add  edx, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
+noExtraSizeTarget:
+  cmp  edx, ecx                             // общий размер <= макс.размера?
+  jle  checkWeight                          // Да
+  mov  eax, -4
+  jmp  end
+checkWeight:
+  xchg ecx, eax
+  mov  eax, edi
+  call item_weight_
+  imul eax, ebx                             // eax = вес вещи * количество
+  add  ecx, eax
+  mov  eax, esi
+  call item_total_weight_
+  add  ecx, eax
+  mov  eax, esi
+  call itsLootBarterTarget
+  test eax, eax
+  jz   noExtraWeightTarget
+  add  ecx, WeightOnBody
+noExtraWeightTarget:
+  mov  edx, STAT_carry_amt
+  mov  eax, esi
+  call stat_level_
+  cmp  ecx, eax                             // общий вес <= макс.веса?
+  jle  force                                // Да
+  mov  eax, -6
+  jmp  end
+notCritter:
+  test eax, eax                             // ObjType_Item?
+  jnz  force                                // Нет (стрёмно выглядит - лучше бы minus1 вместо force)
+  mov  eax, esi
+  call item_get_type_
+  cmp  eax, item_type_container
+  jne  notContainer
+  xchg edx, eax                             // eax = item
+  call item_size_
+  xchg edx, eax                             // edx = размер вещи
+  imul edx, ebx                             // edx = размер вещи * количество
+  mov  eax, esi
+  call item_c_curr_size_
+  add  edx, eax
+  mov  eax, esi
+  call item_c_max_size_
+  cmp  edx, eax                             // общий размер <= макс.размера?
+  jle  ownerContainer                       // Да
+  xor  eax, eax
+  dec  eax
+  dec  eax                                  // eax = -2 (нет места в контейнере)
+  jmp  end
+ownerContainer:
+  mov  eax, esi
+  call obj_top_environment_
+  test eax, eax                             // А есть владелец?
+  jz   force                                // Нет
+  xchg esi, eax                             // esi = владелец контейнера
+  mov  eax, [esi+0x20]                      // eax = pobj.fid
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  cmp  eax, ObjType_Critter
+  jne  force
+  dec  eax
+  cmp  esi, ds:[_stack]                     // Сумка принадлежит игроку?
+  jne  checkWeight                          // Нет
+  xchg ecx, eax
+  test InLoop, 0x1000                       // INVENTORY
+  jz   notFound
+  cmp  ds:[_curr_stack], ecx                // Перетаскивают вещь в руке или броню в сумку в главном рюкзаке?
+  jne  notFound                             // Нет
+  cmp  edi, ds:[_i_rhand]
+  je   found
+  cmp  edi, ds:[_i_lhand]
+  je   found
+  cmp  edi, ds:[_i_worn]
+  jne  notFound
+found:
+  mov  eax, edi                             // Нашли вещь
+  call item_weight_
+  imul eax, ebx                             // eax = вес вещи * количество
+  sub  ecx, eax                             // Корректируем вес
+notFound:
+  mov  eax, HiddenArmor
+  call item_weight_
+  add  eax, ecx
+  jmp  checkWeight
+notContainer:
+  cmp  eax, item_type_misc_item
+  jne  minus1
+  mov  eax, esi
+  call item_m_cell_pid_
+  cmp  eax, [edi+0x64]
+  je   force
+minus1:
+  xor  eax, eax
+  dec  eax
+  jmp  end
+force:
+  mov  edx, edi
+  xchg ebp, eax
+  cmp  StackEmptyWeapons, 0
+  je   callForce
+  call SetDefaultAmmo
+callForce:
+  call item_add_force_
+end:
+  pop  ebp
+  pop  edi
+  pop  esi
+  pop  ecx
+  retn
+ }
+}
+
+static void __declspec(naked) move_table_source() {
+ __asm {
+  mov  ecx, eax
+  mov  ebp, edx
+  mov  edx, edi                             // edx = item
+  mov  ebx, esi                             // ebx = count
+  call item_remove_mult_
+  inc  eax
+  jz   skip
+  mov  eax, ebp                             // eax = source
+  mov  edx, edi                             // edx = item
+  mov  ebx, esi                             // ebx = count
+  call item_add_mult_
+  test eax, eax                             // Удачно?
+  jz   end                                  // Да
+  push eax
+  mov  eax, ecx                             // eax = source
+  mov  edx, edi                             // edx = item
+  mov  ebx, esi                             // ebx = count
+  call item_add_force_
+  pop  eax
+  cmp  eax, -2                              // Не хватит места в сумке/рюкзаке?
+  je   skip                                 // Да
+  mov  eax, esi                             // eax = count
+  xchg ecx, eax                             // eax = source, ecx = count
+  mov  ebx, edi                             // ebx = item
+  mov  edx, ebp
+  jmp  item_move_force_
+skip:
+  xor  eax, eax
+  dec  eax
+  retn
+end:
+  mov  [edi+0x7C], ebp                      // iobj.owner = target
+  retn
+ }
+}
+
+static void __declspec(naked) move_table_target() {
+ __asm {
+  mov  edx, ds:[_target_curr_stack]
+  mov  edx, ds:[_target_stack][edx*4]
+  jmp  move_table_source
+ }
+}
+
+static void __declspec(naked) checkContainerSize() {
+ __asm {
+  call item_add_mult_
+  test eax, eax                             // Удачно?
+  jz   end                                  // Да
+  cmp  eax, -2                              // Не хватит места в сумке/рюкзаке?
+  je   end                                  // Да
+  xor  ebx, ebx
+  inc  ebx
+  mov  eax, ds:[_inven_dude]
+  mov  edx, ecx
+  jmp  item_add_force_
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) proto_ptr_call() {
+ __asm {
+  call proto_ptr_
+  mov  edx, [esp+0x4]
+  mov  eax, [edx+0x70]                      // eax = p_item.size
+  test eax, eax
+  jnz  end
+  cmp  dword ptr [edx+0x20], item_type_container
+  jne  end
+  mov  eax, [edx+0x24]                      // max_size
+  shr  eax, 1                               // eax = max_size/2
+  mov  [edx+0x70], eax                      // container.size = max_size/2
+end:
+  retn
+ }
+}
+
 void InventoryInit() {
+
  // Теперь STAT_unused при включённом InvSizeLimitMode является STAT_size для заданных персонажей
  MakeCall(0x4AF0CB, &stat_level_hook, true);
  // Чтобы можно было менять STAT_unused не только у игрока
@@ -1666,9 +1895,6 @@ void InventoryInit() {
    InvSizeLimit = GetPrivateProfileInt("Misc", "CritterInvSizeLimit", 50, ini);
 
    HookCall(0x42E67E, &critterIsOverloaded_hook);
-
-   //Check item_add_mult_ (picking stuff from the floor, etc.)
-   HookCall(0x4771BD, &item_add_mult_hook);
 
    //Check capacity of player and barteree when bartering
    HookCall(0x474C73, &barter_attempt_transaction_peon);
@@ -1755,10 +1981,8 @@ void InventoryInit() {
   if (npcCount > 0) HookCall(0x472833, &invenWieldFunc_hook);
  }
 
- if (GetPrivateProfileIntA("Misc", "StackEmptyWeapons", 0, ini)) {
-  MakeCall(0x4736C6, &inven_action_cursor_hook, true);
-  HookCall(0x4772AA, &item_add_force_call);
- }
+ StackEmptyWeapons = GetPrivateProfileIntA("Misc", "StackEmptyWeapons", 0, ini);
+ if (StackEmptyWeapons) MakeCall(0x4736C6, &inven_action_cursor_hook, true);
 
 // Не вызывать окошко выбора количества при перетаскивании патронов в оружие
  int ReloadReserve = GetPrivateProfileIntA("Misc", "ReloadReserve", 1, ini);
@@ -1787,6 +2011,29 @@ void InventoryInit() {
 
 // Обновление данных игрока (в частности веса вещей) при закрытии вложенной сумки
  HookCall(0x46EB1E, &handle_inventory_hook1);
+
+// Надоело шинковать одну функцию
+ MakeCall(0x47715B, &item_add_mult, true);
+
+// При подтверждении торговли использовать основной рюкзак игрока, а не открытую сумку
+ SafeWrite32(0x475CF2, _stack);
+
+// При перетаскивании предмета из окна торговли в сумку проверять её свободный размер, но игнорировать перегрузку
+ HookCall(0x475281, &move_table_source);
+ HookCall(0x4752F8, &move_table_target);
+
+// Сообщать об отсутствии места не в окне монитора, а в окне торговли
+ HookCall(0x47531F, (void*)gdialogDisplayMsg_);
+ SafeWrite16(0x475300, 0x87EB);             // jmps 0x475289
+
+// Нельзя менять вещь из сумки на вещь в руке/броню если последняя не влезет в сумку
+ HookCall(0x471572, &checkContainerSize);
+ HookCall(0x4713F0, &checkContainerSize);
+
+ if (GetPrivateProfileIntA("Misc", "ContainerSizeFix", 0, ini)) {
+  HookCall(0x477B75, &proto_ptr_call);
+  HookCall(0x479A4A, &proto_ptr_call);
+ }
 
 }
 

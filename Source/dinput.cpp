@@ -177,19 +177,23 @@ public:
   if (UseScrollWheel) {
    int count = 1;
    if (MouseState.lZ > 0) {
-    if (WheelMod) count = MouseState.lZ/WheelMod;
     if (*(DWORD*)_gmouse_current_cursor == 2 || *(DWORD*)_gmouse_current_cursor == 3) {
      __asm {
       call display_scroll_up_
      }
-    } else while (count--) TapKey(DIK_UP);
+    } else {
+     if (WheelMod) count = MouseState.lZ/WheelMod;
+     while (count--) TapKey(DIK_UP);
+    }
    } else if (MouseState.lZ < 0) {
-    if (WheelMod) count = (-MouseState.lZ)/WheelMod;
     if (*(DWORD*)_gmouse_current_cursor == 2 || *(DWORD*)_gmouse_current_cursor == 3) {
      __asm {
       call display_scroll_down_
      }
-    } else while (count--) TapKey(DIK_DOWN);
+    } else {
+     if (WheelMod) count = (-MouseState.lZ)/WheelMod;
+     while (count--) TapKey(DIK_DOWN);
+    }
    }
   }
 

@@ -43,7 +43,7 @@
 
 #define MAX_GLOBAL_SIZE (MaxGlobalVars*12 + 4)
 
-static DWORD InLoop = 0;
+DWORD InLoop = 0;
 
 DWORD GetCurrentLoops() {return InLoop;}
 
@@ -460,23 +460,6 @@ return:
  }
 }
 
-static void __declspec(naked) handle_inventory_hook() {
- __asm {
-  or   InLoop, INVENTORY
-  push offset return
-  push ebx
-  push ecx
-  push edx
-  push esi
-  push edi
-  mov  eax, 0x46E7B5
-  jmp  eax
-return:
-  and  InLoop, (-1^INVENTORY)
-  retn
- }
-}
-
 static void __declspec(naked) automap_hook() {
  __asm {
   or   InLoop, AUTOMAP
@@ -494,54 +477,26 @@ return:
  }
 }
 
-static void __declspec(naked) use_inventory_on_hook() {
+static void __declspec(naked) setup_inventory_hook() {
  __asm {
+  mov  esi, 6
+  test eax, eax
+  jnz  notZero
+  or   InLoop, INVENTORY
+  retn
+notZero:
+  dec  eax
+  jnz  notOne
   or   InLoop, INTFACEUSE
-  push offset return
-  push ebx
-  push ecx
-  push edx
-  push esi
-  push edi
-  mov  esi, 0x4717E9
-  jmp  esi
-return:
-  and  InLoop, (-1^INTFACEUSE)
   retn
- }
-}
-
-static void __declspec(naked) loot_container_hook() {
- __asm {
+notOne:
+  dec  eax
+  jnz  notTwo
   or   InLoop, INTFACELOOT
-  push offset return
-  push ebx
-  push ecx
-  push esi
-  push edi
-  push ebp
-  mov  ebx, 0x473909
-  jmp  ebx
-return:
-  and  InLoop, (-1^INTFACELOOT)
   retn
- }
-}
-
-static void __declspec(naked) barter_inventory_hook() {
- __asm {
+notTwo:
   or   InLoop, BARTER
-  push [esp+4]
-  push offset return
-  push esi
-  push edi
-  push ebp
-  sub  esp, 0x34
-  mov  edi, 0x4757F6
-  jmp  edi
-return:
-  and  InLoop, (-1^BARTER)
-  retn 4
+  retn
  }
 }
 
@@ -567,9 +522,6 @@ void LoadGameHookInit() {
  MakeCall(0x4465C0, &gdProcess_hook, true); // DIALOG
  MakeCall(0x497004, &pipboy_hook, true);    // PIPBOY
  MakeCall(0x4ABFD0, &skilldex_select_hook, true);// SKILLDEX
- MakeCall(0x46E7B0, &handle_inventory_hook, true);// INVENTORY
  MakeCall(0x41B8BC, &automap_hook, true);   // AUTOMAP
- MakeCall(0x4717E4, &use_inventory_on_hook, true);// INTFACEUSE
- MakeCall(0x473904, &loot_container_hook, true);// INTFACELOOT
- MakeCall(0x4757F0, &barter_inventory_hook, true);// BARTER
+ MakeCall(0x46EC9D, &setup_inventory_hook, false);// INVENTORY + INTFACEUSE + INTFACELOOT + BARTER
 }

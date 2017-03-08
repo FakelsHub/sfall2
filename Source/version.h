@@ -22,10 +22,10 @@
 
 #define VERSION_MAJOR 1
 #define VERSION_MINOR 6
-#define VERSION_BUILD 7
+#define VERSION_BUILD 16
 #define VERSION_REV 0
 #ifdef WIN2K
-#define VERSION_STRING "v1.6.7 win2k"
+#define VERSION_STRING "v1.6.16 win2k"
 #else
-#define VERSION_STRING "v1.6.7"
+#define VERSION_STRING "v1.6.16"
 #endif

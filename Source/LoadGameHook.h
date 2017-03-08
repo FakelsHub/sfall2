@@ -18,6 +18,8 @@
 
 #pragma once
 
+extern DWORD InLoop;
+
 void LoadGameHookInit();
 
 #define WORLDMAP    (1<<0)  // 0x1

@@ -114,14 +114,11 @@ end:
 static void __declspec(naked) in_world_map() {
  __asm {
   push edx
-  push eax
-  call GetCurrentLoops
   xor  edx, edx
-  test eax, 0x1
+  test InLoop, 0x1
   jz   skip
   inc  edx
 skip:
-  pop  eax
   push eax
   call interpretPushLong_
   mov  edx, VAR_TYPE_INT
@@ -135,9 +132,7 @@ skip:
 static void __declspec(naked) get_game_mode() {
  __asm {
   push edx
-  xchg edx, eax
-  call GetCurrentLoops
-  xchg edx, eax
+  mov  edx, InLoop
   push eax
   call interpretPushLong_
   mov  edx, VAR_TYPE_INT

@@ -3,11 +3,11 @@
 #include "Bugs.h"
 #include "Define.h"
 #include "FalloutEngine.h"
+#include "LoadGameHook.h"
 #include "PartyControl.h"
 
 DWORD WeightOnBody = 0;
 DWORD SizeOnBody = 0;
-DWORD Looting = 0;
 
 static void __declspec(naked) determine_to_hit_func_hook() {
  __asm {
@@ -419,26 +419,6 @@ static void __declspec(naked) barter_attempt_transaction_hook() {
  }
 }
 
-static void __declspec(naked) move_inventory_hook() {
- __asm {
-  inc  Looting
-  call move_inventory_
-  dec  Looting
-  retn
- }
-}
-
-static void __declspec(naked) item_add_mult_hook() {
- __asm {
-  call stat_level_                          // eax = Макс. груз
-  cmp  Looting, 0
-  je   end
-  sub  eax, WeightOnBody                    // Учитываем вес одетой на цели брони и оружия
-end:
-  retn
- }
-}
-
 static void __declspec(naked) exit_inventory_hook() {
  __asm {
   mov  ds:[_i_lhand], eax
@@ -446,6 +426,7 @@ static void __declspec(naked) exit_inventory_hook() {
   mov  SizeOnBody, eax
   mov  ds:[_curr_stack], eax
   mov  ds:[_target_stack], eax
+  and  InLoop, (-1^0x39000)                 // INVENTORY + INTFACEUSE + INTFACELOOT + BARTER
   retn
  }
 }
@@ -880,36 +861,6 @@ end:
  }
 }
 
-static void __declspec(naked) item_add_mult_hook1() {
- __asm {
-  cmp  eax, ds:[_stack]                     // Сумка принадлежит игроку?
-  je   itsPlayer                            // Да
-  cmp  eax, ds:[_target_stack]              // Сумка принадлежит цели?
-  jne  end                                  // Нет
-  add  edx, WeightOnBody                    // Учитываем одетые вещи
-  jmp  end
-itsPlayer:
-  mov  eax, HiddenArmor
-  call item_weight_
-  add  edx, eax
-  cmp  ds:[_curr_stack], 0                  // Перетаскивают вещь в руке или броню в сумку в главном рюкзаке?
-  jne  end                                  // Нет
-  cmp  esi, ds:[_i_rhand]
-  je   found
-  cmp  esi, ds:[_i_lhand]
-  je   found
-  cmp  esi, ds:[_i_worn]
-  jne  end
-found:
-  mov  eax, esi                             // Нашли вещь
-  call item_weight_
-  sub  edx, eax                             // Корректируем вес
-end:
-  mov  eax, edi
-  jmp item_total_weight_
- }
-}
-
 static void __declspec(naked) inven_item_wearing() {
  __asm {
   mov  esi, ds:[_inven_dude]
@@ -960,6 +911,18 @@ static void __declspec(naked) apply_damage_hook() {
   test [esi+0x15], dl                       // ctd.flags2Source & DAM_HIT_?
   jz   end                                  // Нет
   inc  ebx
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) inven_action_cursor_hook() {
+ __asm {
+  cmp  dword ptr [esp+0x44+0x4], item_type_container
+  jne  end
+  cmp  eax, ds:[_stack]
+  je   end
+  cmp  eax, ds:[_target_stack]
 end:
   retn
  }
@@ -1035,8 +998,6 @@ void BugsInit() {
  MakeCall(0x473B4E, &loot_container_hook, false);
  MakeCall(0x4758B0, &barter_inventory_hook, false);
  HookCall(0x474CB8, &barter_attempt_transaction_hook);
- HookCall(0x4742AD, &move_inventory_hook);
- HookCall(0x4771B5, &item_add_mult_hook);
  MakeCall(0x46FC8A, &exit_inventory_hook, false);
 
 // Ширина текста 64, а не 80 
@@ -1132,9 +1093,6 @@ void BugsInit() {
 // Восстановление принадлежности сумки игроку после помещения её в руку
  MakeCall(0x4715DB, &switch_hand_hook, true);
 
-// Учитываем броню/оружие на игроке при проверке веса при помещении предмета во вложенную сумку
- HookCall(0x477252, &item_add_mult_hook1);
-
 // Исправление неучёта одетых вещей на игроке при открытой вложенной сумке
  MakeCall(0x471B7F, &inven_item_wearing, false);// inven_right_hand_
  SafeWrite8(0x471B84, 0x90);                // nop
@@ -1143,8 +1101,13 @@ void BugsInit() {
  MakeCall(0x471C17, &inven_item_wearing, false);// inven_worn_
  SafeWrite8(0x471C1C, 0x90);                // nop
 
+// Исправление вывода в окно монитора сообщения при попадании в случайную скриптовую цель если она не является персонажем
  MakeCall(0x425365, &combat_display_hook, true);
+// Исправление вызова damage_p_proc при промахах если цель не_персонаж
  MakeCall(0x424CD2, &apply_damage_hook, false);
+
+// Исправление краша при попытке открыть сумку/рюкзак в окне обмена/торговли
+ MakeCall(0x473191, &inven_action_cursor_hook, false);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);
