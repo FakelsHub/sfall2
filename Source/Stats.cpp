@@ -121,8 +121,8 @@ void _stdcall SetNPCStatMax(int stat, int value) {
 
 void StatsReset() {
  for (int stat = STAT_st; stat < STAT_max_stat; stat++) {
-  StatPC[stat].min = StatNPC[stat].min = *(DWORD*)(stat_data + stat*24);
-  StatPC[stat].max = StatNPC[stat].max = *(DWORD*)(stat_data + 4 + stat*24);
+  StatPC[stat].min = StatNPC[stat].min = *(DWORD*)(_stat_data + 12 + stat*24);
+  StatPC[stat].max = StatNPC[stat].max = *(DWORD*)(_stat_data + 16 + stat*24);
  }
  StandardApAcBonus = 4;
  ExtraApAcBonus = 4;
@@ -182,8 +182,10 @@ static void __declspec(naked) stat_recalc_derived_hook() {
   sub  esp, 4
   mov  edx, esp
   push eax
+  push edx
   mov  eax, [eax+0x64]                      // eax = pid
   call proto_ptr_
+  pop  edx
   push [edx]
   call StatRecalcDerived
   add  esp, 4

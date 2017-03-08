@@ -488,7 +488,7 @@ extern const DWORD xvfprintf_;
 #define _squares                    0x66BE08
 #define _stack                      0x59E86C
 #define _stack_offset               0x59E844
-#define stat_data                   0x51D548
+#define _stat_data                  0x51D53C
 #define _stat_flag                  0x66452A
 #define _Tag_                       0x5708B0
 #define _tag_skill                  0x668070

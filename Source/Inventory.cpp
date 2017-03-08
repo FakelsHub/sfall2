@@ -101,30 +101,17 @@ static void __declspec(naked) critter_curr_size() {
   mov  eax, edi
   call inven_right_hand_
   mov  edx, eax
-  test eax, eax
-  jz   noRightItem
-  test byte ptr [eax+0x27], 2               // iobj.flags4 & Right_Hand_?
-  jnz  noRightItem
   call item_size_
   add  esi, eax
-noRightItem:
   mov  eax, edi
   call inven_left_hand_
-  test eax, eax
-  jz   noLeftItem
   cmp  edx, eax
-  je   noLeftItem
-  test byte ptr [eax+0x27], 1               // iobj.flags4 & Left_Hand_?
-  jnz  noLeftItem
+  je   skip
   call item_size_
   add  esi, eax
-noLeftItem:
+skip:
   xchg edi, eax
   call inven_worn_
-  test eax, eax
-  jz   end
-  test byte ptr [eax+0x27], 4               // iobj.flags4 & Worn_?
-  jnz  end
   call item_size_
   add  esi, eax
 end:
@@ -209,6 +196,128 @@ end:
  }
 }
 
+static char InvenFmt[20]="%d/%d  %d/%d";
+static void __declspec(naked) display_stats_hook() {
+ __asm {
+  mov  ecx, ds:[_curr_stack]
+  mov  eax, ds:[_stack][ecx*4]
+  push eax
+  jecxz itsCritter
+  call item_c_max_size_
+  pop  edx
+  xchg edx, eax                             // eax=source, edx=макс. размер сумки
+  push eax
+  call item_c_curr_size_
+  sub  edx, eax                             // edx=свободный размер сумки
+  pop  eax
+  push edx
+  call obj_top_environment_
+  push eax
+  mov  edx, STAT_carry_amt
+  call stat_level_                          // Макс. груз
+  pop  edx
+  xchg edx, eax                             // edx=Макс. груз, eax=source
+  call item_total_weight_
+  sub  edx, eax
+  mov  eax, HiddenArmor
+  call item_weight_
+  sub  edx, eax                             // edx=свободный вес
+  mov  edi, edx
+  jmp  print
+itsCritter:
+  pop  edi
+  call critter_max_size
+  inc  eax                                  // Включён CritterInvSizeLimitMode?
+  jnz  SizeLimitMode                        // Да
+  mov  eax, edi                             // source
+  mov  edx, STAT_carry_amt
+  call stat_level_                          // Макс. груз
+  push eax
+  xchg edi, eax                             // eax=source, edi=Макс. груз
+  call item_total_weight_
+  xchg edx, eax                             // edx=вес вещей
+  mov  eax, HiddenArmor
+  call item_weight_
+  add  edx, eax
+  sub  edi, edx
+print:
+  push edx
+  mov  edx, [esp+0x9C]
+  push edx
+  push 0x509EF4                             // "%s %d/%d"
+  lea  eax, [esp+0x10]
+  push eax
+  call sprintf_
+  add  esp, 5*4
+  movzx ebx, byte ptr ds:[_GreenColor]
+  cmp  edi, 0                               // Перегрузка по весу?
+  jge  noOverloaded                         // Нет
+  mov  bl, ds:[_RedColor]
+noOverloaded:
+  mov  edx, 0x472626
+  jmp  edx
+SizeLimitMode:
+  dec  eax
+  push eax                                  // макс.размер
+  xchg ecx, eax                             // ecx = макс.размер
+  mov  eax, edi                             // source
+  call critter_curr_size
+  xchg edx, eax                             // edx = размер вещей
+  mov  eax, HiddenArmor
+  call item_size_
+  add  eax, edx
+  push eax                                  // общий размер
+  sub  ecx, eax                             // ecx = свободный размер
+  mov  edx, STAT_carry_amt
+  mov  eax, edi                             // source
+  call stat_level_
+  push eax                                  // Макс.груз
+  xchg ebx, eax                             // ebx = Макс.груз
+  mov  eax, edi                             // source
+  call item_total_weight_
+  xchg edx, eax                             // edx = вес вещей
+  mov  eax, HiddenArmor
+  call item_weight_
+  add  eax, edx
+  push eax                                  // общий вес
+  sub  ebx, eax                             // ebx = свободный вес
+  mov  eax, offset InvenFmt
+  push eax
+  mov  eax, offset MsgBuf
+  push eax
+  call sprintf_
+  add  esp, 6*4
+  movzx eax, byte ptr ds:[_GreenColor]
+  cmp  ebx, 0                               // Перегрузка по весу?
+  jl   Red                                  // Да
+  cmp  ecx, 0                               // Перегрузка по размеру?
+  jge  noRed                                // Нет
+Red:
+  mov  al, ds:[_RedColor]
+noRed:
+  push eax                                  // ColorIndex
+  mov  edi, offset MsgBuf
+  push edi
+  xor  edx, edx
+nextChar:
+  xor  eax, eax
+  mov  al, [edi]
+  call dword ptr ds:[_text_char_width]
+  inc  eax
+  add  edx, eax
+  inc  edi
+  cmp  word ptr [edi-1], '  '
+  jne  nextChar
+  mov  ebx, 150                             // TxtWidth
+  mov  ecx, 499                             // ToWidth
+  lea  eax, [esi+ebp+75]                    // ToSurface
+  sub  eax, edx
+  pop  edx                                  // DisplayText
+  mov  edi, 0x472677
+  jmp  edi
+ }
+}
+
 static void __declspec(naked) critterIsOverloaded_hook() {
  __asm {
   call item_total_weight_
@@ -221,7 +330,7 @@ static void __declspec(naked) critterIsOverloaded_hook() {
   dec  eax
   xchg edx, eax                             // edx = макс.размер
   mov  eax, ebx                             // source
-  call critter_curr_size
+  call item_c_curr_size_
 end:
   retn
  }
@@ -250,37 +359,6 @@ skip:
   pop  edx
   cmp  eax, edx                             // общий размер <= макс.размера?
   jle  end                                  // Да
-  mov  edi, 0x4771C2                        // С вещами на выход
-end:
-  jmp  edi
- }
-}
-
-static void __declspec(naked) item_add_mult_hook1() {
- __asm {
-  cmp  eax, edi                             // максимальный вес < общего веса?
-  jl   skip                                 // Да
-  mov  edi, 0x4772A6
-  mov  eax, ecx
-  call obj_top_environment_
-  mov  edx, eax
-  call critter_max_size
-  inc  eax
-  jz   end
-  dec  eax
-  push eax                                  // макс.размер
-  push edx                                  // source
-  mov  eax, esi                             // item
-  call item_size_
-  xchg edx, eax
-  imul edx, ebx                             // edx = размер вещи * количество
-  pop  eax                                  // source
-  call critter_curr_size
-  add  eax, edx
-  pop  edx
-  cmp  eax, edx                             // общий размер <= макс.размера?
-  jle  end                                  // Да
-skip:
   mov  edi, 0x4771C2                        // С вещами на выход
 end:
   jmp  edi
@@ -351,82 +429,11 @@ end:
  }
 }
 
-static char InvenFmt[20]="%d/%d  %d/%d";
-static void __declspec(naked) display_stats_hook() {
- __asm {
-  mov  eax, ds:[_curr_stack]
-  test eax, eax                             // Это вложенная сумка?
-  jnz  end                                  // Да
-  mov  eax, ds:[_stack][eax*4]
-  mov  edi, eax
-  call critter_max_size
-  inc  eax
-  jz   end
-  dec  eax
-  push eax                                  // макс.размер
-  mov  eax, edi                             // source
-  call critter_curr_size
-  xchg edx, eax                             // edx = размер вещей
-  mov  eax, HiddenArmor
-  call item_size_
-  add  eax, edx
-  push eax                                  // общий размер
-  mov  edx, STAT_carry_amt
-  mov  eax, edi                             // source
-  call stat_level_
-  push eax                                  // Макс.груз
-  mov  eax, edi                             // source
-  call item_total_weight_
-  xchg edx, eax                             // edx = вес вещей
-  mov  eax, HiddenArmor
-  call item_weight_
-  add  eax, edx
-  push eax                                  // общий вес
-  mov  eax, offset InvenFmt
-  push eax
-  mov  eax, offset MsgBuf
-  push eax
-  call sprintf_
-  add  esp, 6*4
-  movzx ebx, byte ptr ds:[_GreenColor]
-  mov  eax, edi                             // source
-  call critterIsOverloaded_
-  test eax, eax
-  jz   noRed
-  mov  bl, ds:[_RedColor]
-noRed:
-  pop  edi                                  // Уничтожаем адрес возврата
-  push ebx                                  // ColorIndex
-  mov  edi, offset MsgBuf
-  push edi
-  xor  edx, edx
-nextChar:
-  xor  eax, eax
-  mov  al, [edi]
-  call dword ptr ds:[_text_char_width]
-  inc  eax
-  add  edx, eax
-  inc  edi
-  cmp  word ptr [edi-1], '  '
-  jne  nextChar
-  mov  ebx, 150                             // TxtWidth
-  mov  ecx, 499                             // ToWidth
-  lea  eax, [esi+ebp+75]                    // ToSurface
-  sub  eax, edx
-  pop  edx                                  // DisplayText
-  mov  edi, 0x472677
-  jmp  edi
-end:
-  mov  edi, 20
-  retn
- }
-}
-
 static void __declspec(naked) gdControlUpdateInfo_hook() {
  __asm {
   push eax                                  // _dialog_target
   call stat_level_
-  xchg ecx, eax                             // ecx = Carry Weight|Макс. груз
+  xchg ecx, eax                             // ecx = Макс. груз
   pop  eax
   push eax
   call critter_max_size
@@ -436,7 +443,7 @@ static void __declspec(naked) gdControlUpdateInfo_hook() {
   jz   end
   dec  edi
   push edi                                  // макс.размер
-  call critter_curr_size
+  call item_c_curr_size_
   push eax                                  // общий размер
   push ecx                                  // Макс. груз
   push ebx                                  // Общий вес
@@ -913,8 +920,9 @@ static void __declspec(naked) printFreeMaxWeightSize() {
   jne  noWeight                             // Нет
   mov  eax, ebx
   mov  edx, STAT_carry_amt
-  call stat_level_                          // eax = макс. вес груза
+  call stat_level_
   xchg ebx, eax                             // ebx = макс. вес груза, eax = source
+  sub  ebx, esi                             // ebx = макс. вес груза - extraWeight
   push eax
   call critter_max_size
   xchg edx, eax                             // edx = макс. размер груза
@@ -932,8 +940,7 @@ inContainer:
   sub  edx, eax                             // edx = свободный размер
   pop  eax
   push edx
-  call item_total_weight_                   // eax = общий вес груза
-  sub  ebx, esi
+  call item_total_weight_
   sub  ebx, eax                             // eax = свободный вес
   push ebx
   push 0x503180                             // '%d/%d'
@@ -942,10 +949,10 @@ inContainer:
   call sprintf_
   add  esp, 4*4
   movzx eax, byte ptr ds:[_GreenColor]
-  cmp  ebx, 0
-  jl   Red
-  cmp  dword ptr [esp-4], 0
-  jge  noRed
+  cmp  ebx, 0                               // Перегрузка по весу?
+  jl   Red                                  // Да
+  cmp  edx, 0                               // Перегрузка по размеру?
+  jge  noRed                                // Нет
 Red:
   mov  al, ds:[_RedColor]
 noRed:
@@ -958,7 +965,7 @@ nextChar:
   inc  eax
   add  edx, eax
   inc  esi
-  cmp  byte ptr [esi], '/'
+  cmp  byte ptr [esi-1], '/'
   jne  nextChar
   sub  edi, edx
   pop  edx                                  // DisplayText
@@ -979,8 +986,9 @@ itsItem:
   jne  noOwner                              // Нет
   push eax
   mov  edx, STAT_carry_amt
-  call stat_level_                          // eax = макс. вес груза у персонажа
+  call stat_level_
   xchg ebx, eax                             // ebx = макс. вес груза у персонажа, eax = source
+  sub  ebx, esi                             // ebx = макс. вес груза - extraWeight
   push eax
   call item_c_max_size_
   xchg edx, eax                             // edx = макс. размер груза сумки
@@ -991,9 +999,7 @@ noOwner:
   call item_c_max_size_                     // eax = макс. размер груза
   xchg ebx, eax                             // ebx = макс. размер груза, eax = source
   call item_c_curr_size_
-  xor  esi, esi
 printFree:
-  sub  ebx, esi
   sub  ebx, eax                             // ebx = свободный вес/размер
   push ebx
   push 0x503190                             // '%d'
@@ -1002,8 +1008,8 @@ printFree:
   call sprintf_
   add  esp, 3*4
   movzx eax, byte ptr ds:[_GreenColor]
-  cmp  ebx, 0
-  jge  skipColor
+  cmp  ebx, 0                               // Перегрузка по весу?
+  jge  skipColor                            // Нет
   mov  al, ds:[_RedColor]
 skipColor:
   push eax
@@ -1032,22 +1038,11 @@ static void __declspec(naked) display_inventory_hook() {
   mov  eax, [esp+0x4]
   call art_ptr_unlock_
   pushad
-  mov  ecx, ds:[_curr_stack]
-  mov  ebx, ds:[_stack][ecx*4]
-  jecxz skip
-  mov  eax, ds:[_i_lhand]
-  call item_weight_
-  xchg ecx, eax
-  mov  eax, ds:[_i_rhand]
-  call item_weight_
-  add  ecx, eax
-  mov  eax, ds:[_i_worn]
-  call item_weight_
-  add  ecx, eax
-skip:
-  mov  esi, ecx
+  mov  eax, ds:[_curr_stack]
+  mov  ebx, ds:[_stack][eax*4]
   mov  ecx, 537
   mov  edi, 325*537+180+32                  // Xpos=180, Ypos=325, max text width/2=32
+  xor  esi, esi
   xor  ebp, ebp
   call printFreeMaxWeightSize
   popad
@@ -1066,8 +1061,8 @@ static void __declspec(naked) display_target_inventory_hook() {
   mov  eax, [esp]
   call art_ptr_unlock_
   pushad
-  mov  ebx, ds:[_target_curr_stack]
-  mov  ebx, ds:[_target_stack][ebx*4]
+  mov  eax, ds:[_target_curr_stack]
+  mov  ebx, ds:[_target_stack][eax*4]
   mov  ecx, 537
   mov  edi, 325*537+301+32                  // Xpos=301, Ypos=325, max text width/2=32
   mov  esi, WeightOnBody                    // Учитываем вес одетой на цели брони и оружия
@@ -1104,20 +1099,8 @@ static void __declspec(naked) display_table_inventories_hook1() {
   pop  eax
   call critter_curr_size                    // eax = размер вещей цели в окне бартера
   xchg ebp, eax
-  mov  ecx, ds:[_curr_stack]
-  mov  ebx, ds:[_stack][ecx*4]
-  jecxz skip
-  mov  eax, ds:[_i_lhand]
-  call item_weight_
-  xchg ecx, eax
-  mov  eax, ds:[_i_rhand]
-  call item_weight_
-  add  ecx, eax
-  mov  eax, ds:[_i_worn]
-  call item_weight_
-  add  ecx, eax
-skip:
-  add  esi, ecx
+  mov  eax, ds:[_curr_stack]
+  mov  ebx, ds:[_stack][eax*4]
   mov  ecx, 480
   mov  edi, 10*480+169+32                   // Xpos=169, Ypos=10, max text width/2=32
   call printFreeMaxWeightSize
@@ -1155,8 +1138,8 @@ static void __declspec(naked) display_table_inventories_hook3() {
   call critter_curr_size
   add  eax, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
   xchg ebp, eax
-  mov  ebx, ds:[_target_curr_stack]
-  mov  ebx, ds:[_target_stack][ebx*4]
+  mov  eax, ds:[_target_curr_stack]
+  mov  ebx, ds:[_target_stack][eax*4]
   mov  ecx, 480
   mov  edi, 10*480+254+32                   // Xpos=254, Ypos=10, max text width/2=32
   call printFreeMaxWeightSize
@@ -1378,7 +1361,7 @@ noButton:
 }
 
 static char OverloadedDrop[48];
-static void __declspec(naked) drop_all_() {
+static void __declspec(naked) drop_all() {
  __asm {
   cmp  esi, 'a'
   jne  skip
@@ -1395,52 +1378,80 @@ dropKey:
   pushad
   cmp  dword ptr ds:[_gIsSteal], 0
   jne  end
+  mov  esi, ebp
   mov  ecx, [esp+0x134+0x20]
-  mov  eax, [ebp+0x20]
+  mov  eax, ecx
+  call critter_body_type_
+  test eax, eax                             // Это Body_Type_Biped?
+  jnz  end                                  // Нет
+  mov  eax, [esi+0x20]
   and  eax, 0xF000000
   sar  eax, 0x18
   test eax, eax                             // Это ObjType_Item?
   jz   itsItem                              // Да
   cmp  eax, ObjType_Critter
   jne  end                                  // Нет
-  mov  eax, ebp
+  mov  eax, esi
   call critter_body_type_
   test eax, eax                             // Это Body_Type_Biped?
   jnz  end                                  // Нет
+itsCritter:
   mov  edx, STAT_carry_amt
-  mov  eax, ebp
+  mov  eax, esi
   call stat_level_
   xchg edx, eax                             // edx = макс. вес груза цели
   sub  edx, WeightOnBody                    // Учитываем вес одетой на цели брони и оружия
-  mov  eax, ebp
+  mov  eax, esi
   call item_total_weight_                   // eax = общий вес груза цели
   sub  edx, eax
   mov  eax, ecx
   call item_total_weight_
+  xchg edi, eax                             // edi = общий вес груза игрока
+  mov  eax, ds:[_i_rhand]
+  call item_weight_
+  sub  edi, eax
+  mov  eax, ds:[_i_lhand]
+  call item_weight_
+  sub  edi, eax
+  mov  eax, ds:[_i_worn]
+  call item_weight_
+  sub  edi, eax
+  xchg edi, eax                             // eax = общий вес груза игрока
   cmp  eax, edx
   jg   compareSizeWeight
-  mov  eax, ebp
+  mov  eax, esi
   call critter_max_size
   inc  eax
   jz   cont
   dec  eax
   xchg edx, eax
   sub  edx, SizeOnBody                      // Учитываем размер одетой на цели брони и оружия
-  mov  eax, ebp                             // source
+  mov  eax, esi                             // source
   call critter_curr_size
   sub  edx, eax
   mov  eax, ecx
-  call critter_curr_size
+  call item_c_curr_size_
   jmp  compareSizeWeight
 itsItem:
-  mov  eax, ebp
+  mov  eax, esi
   call item_get_type_
-  cmp  eax, item_type_container
+  cmp  eax, item_type_container             // Это сумка/рюкзак?
   jne  end                                  // Нет
-  mov  eax, ebp
+  mov  eax, esi
+  call obj_top_environment_
+  test eax, eax                             // Есть владелец?
+  jz   noOwner                              // Нет
+  xchg esi, eax                             // esi = владелец сумки
+  mov  eax, [esi+0x20]
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  cmp  eax, ObjType_Critter                 // Это персонаж?
+  je   itsCritter                           // Нет
+noOwner:
+  mov  eax, esi
   call item_c_max_size_
   xchg edx, eax
-  mov  eax, ebp
+  mov  eax, esi
   call item_c_curr_size_
   sub  edx, eax
   mov  eax, ecx
@@ -1496,26 +1507,6 @@ end:
 
 static void __declspec(naked) loot_container_hook1() {
  __asm {
-  cmp  ds:[_curr_stack], 0
-  je   end
-  push eax
-  mov  eax, ds:[_i_lhand]
-  call item_weight_
-  sub  edx, eax
-  mov  eax, ds:[_i_rhand]
-  call item_weight_
-  sub  edx, eax
-  mov  eax, ds:[_i_worn]
-  call item_weight_
-  sub  edx, eax
-  pop  eax
-end:
-  jmp  item_total_weight_
- }
-}
-
-static void __declspec(naked) loot_container_hook2() {
- __asm {
   xor  eax, eax
   mov  ds:[_stack_offset], eax
   mov  ds:[_target_stack_offset], eax
@@ -1527,7 +1518,7 @@ static void __declspec(naked) loot_container_hook2() {
  }
 }
 
-static void __declspec(naked) loot_container_hook3() {
+static void __declspec(naked) loot_container_hook2() {
  __asm {
   cmp  esi, 0x150                           // source_down
   je   scroll
@@ -1654,73 +1645,6 @@ static void __declspec(naked) handle_inventory_hook1() {
  }
 }
 
-static void __declspec(naked) display_stats_hook1() {
- __asm {
-  mov  ecx, ds:[_curr_stack]
-  mov  eax, ds:[_stack][ecx*4]
-  push eax
-  jecxz itsCritter
-  call item_c_max_size_
-  pop  edx
-  xchg edx, eax                             // eax=source, edx=макс. размер сумки
-  push eax
-  call item_c_curr_size_
-  sub  edx, eax                             // edx=свободный размер сумки
-  pop  eax
-  push edx
-  call obj_top_environment_
-  push eax
-  mov  edx, STAT_carry_amt
-  call stat_level_                          // Макс. груз
-  pop  edx
-  xchg edx, eax                             // edx=Макс. груз, eax=source
-  call item_total_weight_
-  sub  edx, eax                             // edx=свободный вес
-  mov  eax, ds:[_i_lhand]
-  call item_weight_
-  sub  edx, eax
-  mov  eax, ds:[_i_rhand]
-  call item_weight_
-  sub  edx, eax
-  mov  eax, ds:[_i_worn]
-  call item_weight_
-  sub  edx, eax
-  mov  eax, HiddenArmor
-  call item_weight_
-  sub  edx, eax
-  mov  edi, edx
-  jmp  skip
-itsCritter:
-  mov  edx, STAT_carry_amt
-  call stat_level_                          // Макс. груз
-  pop  edi
-  push eax
-  xchg edi, eax                             // eax=source, edi=Макс. груз
-  call item_total_weight_
-  xchg edx, eax                             // edx=вес вещей
-  mov  eax, HiddenArmor
-  call item_weight_
-  add  edx, eax
-  sub  edi, edx
-skip:
-  push edx
-  mov  edx, [esp+0x9C]
-  push edx
-  push 0x509EF4                             // "%s %d/%d"
-  lea  eax, [esp+0x10]
-  push eax
-  call sprintf_
-  add  esp, 5*4
-  movzx ebx, byte ptr ds:[_GreenColor]
-  cmp  edi, 0
-  jge  noRed
-  mov  bl, ds:[_RedColor]
-noRed:
-  mov  edx, 0x472626
-  jmp  edx
- }
-}
-
 void InventoryInit() {
  // Теперь STAT_unused при включённом InvSizeLimitMode является STAT_size для заданных персонажей
  MakeCall(0x4AF0CB, &stat_level_hook, true);
@@ -1729,6 +1653,9 @@ void InventoryInit() {
  // Чтобы можно было менять STAT_unused
  MakeCall(0x4AF54E, &stat_set_base_hook, false);
 
+ // Показывать не только вес вещей/общий вес игрока, но и вес в открытой вложенной сумке
+ MakeCall(0x4725C8, &display_stats_hook, true);
+
  InvSizeLimitMode = GetPrivateProfileInt("Misc", "CritterInvSizeLimitMode", 0, ini);
  if (InvSizeLimitMode >= 1 && InvSizeLimitMode <= 7) {
   if (InvSizeLimitMode >= 4) {
@@ -1736,13 +1663,12 @@ void InventoryInit() {
    SafeWrite8(0x477EB3, 0xEB);
   }
   if (InvSizeLimitMode) {
-   InvSizeLimit = GetPrivateProfileInt("Misc", "CritterInvSizeLimit", 100, ini);
+   InvSizeLimit = GetPrivateProfileInt("Misc", "CritterInvSizeLimit", 50, ini);
 
    HookCall(0x42E67E, &critterIsOverloaded_hook);
 
    //Check item_add_mult_ (picking stuff from the floor, etc.)
    HookCall(0x4771BD, &item_add_mult_hook);
-   MakeCall(0x47726D, &item_add_mult_hook1, true);
 
    //Check capacity of player and barteree when bartering
    HookCall(0x474C73, &barter_attempt_transaction_peon);
@@ -1750,9 +1676,6 @@ void InventoryInit() {
 
    // Кнопка "Take all"
    HookCall(0x47410B, &loot_container_hook);
-
-   //Display total weight on the inventory screen
-   MakeCall(0x4725A2, &display_stats_hook, false);
 
    // Показывать в окне настроек сопартийца в поле "Несёт" размеры
    HookCall(0x449136, &gdControlUpdateInfo_hook);
@@ -1851,22 +1774,18 @@ void InventoryInit() {
 
 // Кнопка "Положить всё"
  MakeCall(0x46FA7A, &make_drop_button, false);
- MakeCall(0x473EFC, &drop_all_, true);
- HookCall(0x474102, &loot_container_hook1);
- HookCall(0x47418D, &loot_container_hook2);
+ MakeCall(0x473EFC, &drop_all, true);
+ HookCall(0x47418D, &loot_container_hook1);
  GetPrivateProfileString("sfall", "OverloadedDrop", "Sorry, there is no space left.", OverloadedDrop, 48, translationIni);
 
  UseScrollWheel = GetPrivateProfileIntA("Input", "UseScrollWheel", 1, ini) != 0;
  if (UseScrollWheel) {
-  MakeCall(0x473E66, &loot_container_hook3, false);
+  MakeCall(0x473E66, &loot_container_hook2, false);
   MakeCall(0x4759F1, &barter_inventory_hook1, false);
  };
 
 // Обновление данных игрока (в частности веса вещей) при закрытии вложенной сумки
  HookCall(0x46EB1E, &handle_inventory_hook1);
-
-// Показывать не только вес вещей/общий вес игрока, но и вес в открытой вложенной сумке
- MakeCall(0x4725C8, &display_stats_hook1, true);
 
 }
 

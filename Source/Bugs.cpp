@@ -444,6 +444,8 @@ static void __declspec(naked) exit_inventory_hook() {
   mov  ds:[_i_lhand], eax
   mov  WeightOnBody, eax
   mov  SizeOnBody, eax
+  mov  ds:[_curr_stack], eax
+  mov  ds:[_target_stack], eax
   retn
  }
 }
@@ -880,67 +882,63 @@ end:
 
 static void __declspec(naked) item_add_mult_hook1() {
  __asm {
-  cmp  eax, ds:[_stack]
-  je   itsPlayer
-  cmp  eax, ds:[_target_stack]
-  jne  end
-  add  edx, WeightOnBody
+  cmp  eax, ds:[_stack]                     // Сумка принадлежит игроку?
+  je   itsPlayer                            // Да
+  cmp  eax, ds:[_target_stack]              // Сумка принадлежит цели?
+  jne  end                                  // Нет
+  add  edx, WeightOnBody                    // Учитываем одетые вещи
   jmp  end
 itsPlayer:
-  push ebp
-  push ecx
-  push ebx
   mov  eax, HiddenArmor
   call item_weight_
   add  edx, eax
-  mov  ebp, ds:[_i_lhand]
-  mov  ecx, ds:[_i_rhand]
-  mov  ebx, ds:[_i_worn]
-  cmp  ds:[_curr_stack], 0
-  je   subItems
-  cmp  ebp, esi
-  je   skipLeft
-  xchg ebp, eax
+  cmp  ds:[_curr_stack], 0                  // Перетаскивают вещь в руке или броню в сумку в главном рюкзаке?
+  jne  end                                  // Нет
+  cmp  esi, ds:[_i_rhand]
+  je   found
+  cmp  esi, ds:[_i_lhand]
+  je   found
+  cmp  esi, ds:[_i_worn]
+  jne  end
+found:
+  mov  eax, esi                             // Нашли вещь
   call item_weight_
-  add  edx, eax
-skipLeft:
-  cmp  ecx, esi
-  je   skipRight
-  xchg ecx, eax
-  call item_weight_
-  add  edx, eax
-skipRight:
-  cmp  ebx, esi
-  je   noArmor
-  xchg ebx, eax
-  call item_weight_
-  add  edx, eax
-  jmp  noArmor
-subItems:
-  cmp  ebp, esi
-  jne  noLeft
-  xchg ebp, eax
-  call item_weight_
-  sub  edx, eax
-noLeft:
-  cmp  ecx, esi
-  jne  noRight
-  xchg ecx, eax
-  call item_weight_
-  sub  edx, eax
-noRight:
-  cmp  ebx, esi
-  jne  noArmor
-  xchg ebx, eax
-  call item_weight_
-  sub  edx, eax
-noArmor:
-  pop  ebx
-  pop  ecx
-  pop  ebp
+  sub  edx, eax                             // Корректируем вес
 end:
   mov  eax, edi
   jmp item_total_weight_
+ }
+}
+
+static void __declspec(naked) inven_item_wearing() {
+ __asm {
+  mov  esi, ds:[_inven_dude]
+  xchg ebx, eax                             // ebx = source
+  mov  eax, [esi+0x20]
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  test eax, eax                             // Это ObjType_Item?
+  jnz  skip                                 // Нет
+  mov  eax, esi
+  call item_get_type_
+  cmp  eax, item_type_container             // Сумка/Рюкзак?
+  jne  skip                                 // Нет
+  mov  eax, esi
+  call obj_top_environment_
+  test eax, eax                             // Есть владелец?
+  jz   skip                                 // Нет
+  mov  ecx, [eax+0x20]
+  and  ecx, 0xF000000
+  sar  ecx, 0x18
+  cmp  ecx, ObjType_Critter                 // Это персонаж?
+  jne  skip                                 // Нет
+  cmp  eax, ebx                             // владелец сумки == source?
+  je   end                                  // Да
+skip:
+  xchg ebx, eax
+  cmp  eax, esi
+end:
+  retn
  }
 }
 
@@ -1113,6 +1111,14 @@ void BugsInit() {
 
 // Учитываем броню/оружие на игроке при проверке веса при помещении предмета во вложенную сумку
  HookCall(0x477252, &item_add_mult_hook1);
+
+// Исправление неучёта одетых вещей на игроке при открытой вложенной сумке
+ MakeCall(0x471B7F, &inven_item_wearing, false);// inven_right_hand_
+ SafeWrite8(0x471B84, 0x90);                // nop
+ MakeCall(0x471BCB, &inven_item_wearing, false);// inven_left_hand_
+ SafeWrite8(0x471BD0, 0x90);                // nop
+ MakeCall(0x471C17, &inven_item_wearing, false);// inven_worn_
+ SafeWrite8(0x471C1C, 0x90);                // nop
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook);
