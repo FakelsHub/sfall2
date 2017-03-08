@@ -1427,7 +1427,7 @@ static void __declspec(naked) modified_ini() {
  __asm {
   push edx
   push eax
-  xor  edx, edx
+  mov  edx, 666
   call interpretPushLong_
   pop  eax
   mov  edx, VAR_TYPE_INT

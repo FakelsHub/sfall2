@@ -317,6 +317,8 @@ int     arg1 - event type: 1 - pressed, 0 - released
 int     arg2 - key DX scancode
 int     arg3 - key VK code (very similar to ASCII codes)
 
+int     ret1 - overrides key (0 or new key DX scancode)
+
 -------------------------------------------
 
 hs_mouseclick.int
