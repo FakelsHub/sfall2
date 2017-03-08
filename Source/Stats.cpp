@@ -24,12 +24,9 @@
 #include "FalloutEngine.h"
 #include "Stats.h"
 
-static const DWORD AgeMin[] = {
- 0x51D860, 0x4373C9, 0x4373F3, 0x43754C,
-};
-
-static const DWORD AgeMax[] = {
- 0x43731B, 0x437352, 0x437536,
+static const DWORD AgeData[7][2] = {
+ {0x51D860, 8}, {0x4373C9, 8}, {0x4373F3, 8}, {0x43754C, 8},
+ {0x43731B, 60}, {0x437352, 60}, {0x437536, 60}
 };
 
 struct Stat {
@@ -196,11 +193,8 @@ static void __declspec(naked) stat_recalc_derived_hook() {
 
 void StatsInit() {
 
-// Минимальный возраст игрока
- for (int i = 0; i < sizeof(AgeMin)/4; i++) SafeWrite8(AgeMin[i], 8);
-
-// Максимальный возраст игрока
- for (int i = 0; i < sizeof(AgeMax)/4; i++) SafeWrite8(AgeMax[i], 60);
+// Минимальный и максимальный возраст игрока
+ for (int i = 0; i < 7; i++) SafeWrite8(AgeData[i][0], (BYTE)AgeData[i][1]);
 
  int tmp = GetPrivateProfileIntA("Misc", "CarryWeightLimit", -1, ini);
  if (tmp > 0) SafeWrite32(0x51D66C, tmp);

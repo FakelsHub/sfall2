@@ -1926,7 +1926,7 @@ static void DllMain2() {
   HookCall(0x4798B1, &item_m_turn_off_hook);
  }
 
- if (GetPrivateProfileIntA("Misc", "InstanWeaponEquip", 0, ini)) {
+ if (GetPrivateProfileIntA("Misc", "InstantWeaponEquip", 0, ini)) {
 // Пропускать анимацию убирания оружия
   for (int i = 0; i < sizeof(PutAwayWeapon)/4; i++) SafeWrite8(PutAwayWeapon[i], 0xEB);// jmps
   BlockCall(0x472AD5);                      //

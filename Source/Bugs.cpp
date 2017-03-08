@@ -109,9 +109,12 @@ skip:
 
 static void __declspec(naked) item_d_check_addict_hook() {
  __asm {
-  mov  edx, 2                               // type = зависимость
-  cmp  eax, -1                              // Есть drug_pid?
-  je   skip                                 // Нет
+  xor  edx, edx
+  inc  edx
+  inc  edx                                  // type = зависимость
+  inc  eax                                  // Есть drug_pid?
+  jz   skip                                 // Нет
+  dec  eax
   xchg ebx, eax                             // ebx = drug_pid
   mov  eax, esi                             // eax = source
   call queue_find_first_
@@ -121,7 +124,9 @@ loopQueue:
   cmp  ebx, [eax+0x4]                       // drug_pid == queue_addict.drug_pid?
   je   end                                  // Есть конкретная зависимость
   mov  eax, esi                             // eax = source
-  mov  edx, 2                               // type = зависимость
+  xor  edx, edx
+  inc  edx
+  inc  edx                                  // type = зависимость
   call queue_find_next_
   jmp  loopQueue
 skip:
@@ -157,7 +162,9 @@ static void __declspec(naked) item_d_take_drug_hook() {
   call perform_withdrawal_end_
 skip:
   mov  ds:[_wd_obj], esi
-  mov  eax, 2                               // type = зависимость
+  xor  eax, eax
+  inc  eax
+  inc  eax                                  // type = зависимость
   mov  edx, offset remove_jet_addict
   call queue_clear_type_
   push 0x479FD1
@@ -293,7 +300,6 @@ skip:
 
 static void __declspec(naked) invenWieldFunc_hook() {
  __asm {
-  pushad
   mov  edx, esi
   xor  ebx, ebx
   inc  ebx
@@ -302,8 +308,7 @@ static void __declspec(naked) invenWieldFunc_hook() {
   and  cl, 0x3
   xchg edx, eax                             // eax = source, edx = item
   call item_remove_mult_
-  pop  ebx
-  xchg ebp, eax
+  xchg ebx, eax
 nextWeapon:
   mov  eax, esi
   test cl, 0x2                              // Правая рука?
@@ -319,13 +324,14 @@ removeFlag:
   jmp  nextWeapon
 noWeapon:
   or   [edi+0x27], cl                       // Устанавливаем флаг оружия в руке
-  inc  ebp
+  inc  ebx
+  pop  ebx
   jz   skip
-  xchg esi, eax
+  mov  eax, esi
   mov  edx, edi
   call item_add_force_
 skip:
-  popad
+  mov  eax, edi
   jmp  item_get_type_
  }
 }
@@ -563,8 +569,9 @@ end:
 
 static void __declspec(naked) op_wield_obj_critter_hook() {
  __asm {
+  xor  edx, edx                             // Старой брони нет, поскольку она была снята в invenWieldFunc_hook (HookScripts.cpp) с последующим вызовом adjust_ac_
   call adjust_ac_
-  xor  ecx, ecx                             // todo: проверить так ли уж это нужно
+  xor  eax, eax                             // не анимировать
   jmp  intface_update_ac_
  }
 }
@@ -1019,9 +1026,7 @@ void BugsInit() {
  HookCall(0x4A59C1, &scr_save_hook);
 
 // Исправление "заправки" не_автомобиля и использования топливных элементов даже когда бак полный
- if (GetPrivateProfileIntA("Misc", "CarChargingFix", 1, ini)) {
-  MakeCall(0x49C36D, &protinst_default_use_item_hook, true);
- }
+ if (GetPrivateProfileIntA("Misc", "CarChargingFix", 1, ini)) MakeCall(0x49C36D, &protinst_default_use_item_hook, true);
  MakeCall(0x49BE70, &obj_use_power_on_car_hook, false);
 
 // Исправление проверки наркотической зависимости

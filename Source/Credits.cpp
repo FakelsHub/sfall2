@@ -67,6 +67,7 @@ static const char* ExtraLines[] = {
  "Sduibek",
  "burn",
  "Foxx",
+ "Pyran",
  "Anyone who has used sfall in their own mods",
  "The bug reporters and feature requesters",
  ""

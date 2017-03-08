@@ -41,7 +41,7 @@ static DWORD CurrentAppearance[2] = {0, 0};
 
 static DWORD critterListCount = 0, critterArraySize = 0;// Critter art list size
 
-static DWORD write32[27][2] = {
+static const DWORD write32[27][2] = {
 // {0x43647C, 592+3},                         // skill slider thingy (xpos)
 // {0x4364FA, 614+3},                         // skill slider thingy (plus button xpos)
 // {0x436567, 614+3},                         // skill slider thingy (minus button xpos)
@@ -79,7 +79,7 @@ static DWORD write32[27][2] = {
  {0x4363DF, 0x000077BB}                     // mov  ebx, 573+3-380-77 (0x77)
 };
 
-static DWORD write16[10][2] = {
+static const DWORD write16[10][2] = {
  {0x419521, 0x003B},                        // jmp  0x419560
  {0x433368, 0xA192},                        // xchg edx, eax; mov  eax, ds:[_win_buf]
  {0x433378, 0x0000},
@@ -92,8 +92,8 @@ static DWORD write16[10][2] = {
  {0x4363E3, 0x9200}                         // xchg edx, eax
 };
 
-/*static DWORD write8[2][2] = {
- {0x4365C8, 100}                           // Чтобы обрабатывались 98 и 99 _info_line в DrawInfoWin_
+/*static const DWORD write8[2][2] = {
+ {0x4365C8, 100},                           // Чтобы обрабатывались 98 и 99 _info_line в DrawInfoWin_
  {0x43ACD5, 160}                            // Максимальная ширина описания в DrawCard_
 };*/
 
@@ -154,20 +154,20 @@ static void __declspec(naked) xaddpath() {
   xchg ecx, eax
   jmp  end
 skip:
-  mov  [ecx], eax                           // sPath.path
+  mov  [ecx], eax                           // database.path
   xchg esi, eax
   call dbase_open_
   test eax, eax                             // Открыли dat-файл?
   jz   notDat                               // Нет
-  mov  [ecx+0x4], eax                       // sPath.pDat
+  mov  [ecx+0x4], eax                       // database.dat
   xor  eax, eax
   inc  eax
-  mov  [ecx+0x8], eax                       // sPath.isDat
+  mov  [ecx+0x8], eax                       // database.is_dat
   inc  eax
 notDat:
   mov  edx, ds:[_paths]
   mov  ds:[_paths], ecx
-  mov  [ecx+0xC], edx                       // sPath.next
+  mov  [ecx+0xC], edx                       // database.next
   dec  eax
 end:
 // eax: 0 = фейл, но память освобождать не надо; 1 = всё хорошо; -1 = не смогли открыть dat-файл, нужно освободить память
@@ -188,15 +188,15 @@ static void __declspec(naked) LoadHeroDat() {
   push ecx
   push ebx
   sub  esp, 260+260                         // [0]filename, [260]filename_dat
-  xchg ecx, eax
+  xchg ecx, eax                             // ecx = Race
+  call art_flush_
   lea  esi, [esp+0]                         // filename
   lea  edi, [esp+260]                       // filename_dat
-  call art_flush_
 // unload previous Dats
   mov  eax, ds:[_master_db_handle]
   test eax, eax
   jz   noHero
-  mov  eax, [eax]                           // sPath.path
+  mov  eax, [eax]                           // database.path
   call xremovepath_
   dec  eax
   mov  ds:[_master_db_handle], eax
@@ -204,7 +204,7 @@ noHero:
   mov  eax, ds:[_critter_db_handle]
   test eax, eax
   jz   noRace
-  mov  eax, [eax]                           // sPath.path
+  mov  eax, [eax]                           // database.path
   call xremovepath_
   dec  eax
   mov  ds:[_critter_db_handle], eax
@@ -1105,9 +1105,9 @@ createButtons:
 skip:
   cmp  byte ptr styleExist, 0
   je   skipButtons
-  add  ecx, 187
   mov  edi, 577                             // RightButtUp
   mov  esi, 575                             // LeftButtUp
+  add  ecx, 187
   call CreateButtons                        // style selection buttons
 skipButtons:
   xor  eax, eax
@@ -1218,7 +1218,7 @@ static void __declspec(naked) xfopen_hook() {
   test eax, eax
   jz   isReading
 skip:
-  mov  ecx, [eax+0xC]                       // sPath.next = _paths
+  mov  ecx, [eax+0xC]                       // database.next = _paths
 isReading:
   push 0x4DEEEB
   retn
@@ -2416,12 +2416,6 @@ void EnableHeroAppearanceMod() {
 // Reset Appearance when selecting "Create Character" from the New Char screen
   HookCall(0x4A740A, &select_character_hook);
 
-// Load Appearance data from GCD file
-  HookCall(0x42DF5F, &pc_load_data_hook);
-
-// Save Appearance data to GCD file
-  HookCall(0x42E163, &pc_save_data_hook);
-
 // Adjust PC SFX Name
   HookCall(0x45114C, &gsound_load_sound_hook);
 
@@ -2436,6 +2430,12 @@ void EnableHeroAppearanceMod() {
 
   dlogr(" Done", DL_INIT);
  }
+
+// Load Appearance data from GCD file
+ HookCall(0x42DF5F, &pc_load_data_hook);
+
+// Save Appearance data to GCD file
+ HookCall(0x42E163, &pc_save_data_hook);
 
  HookCall(0x43ACFC, &DrawCard_hook);
 

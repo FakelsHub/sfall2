@@ -38,13 +38,12 @@ static void _declspec(naked) LoadGameHook() {
   call RunNumbers();
 fail:
   popad;
-  mov ecx, 0x1e0
-  push 0x480AFE
+  mov  ecx, 480
   retn
  }
 }
 
 NumbersInit() {
  HookCall(0x480A81, &NewGameHook);
- MakeCall(0x480AF9, &LoadGameHook, true);
+ MakeCall(0x480AF9, &LoadGameHook, false);
 }

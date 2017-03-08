@@ -90,12 +90,9 @@ static char PerkBoxTitle[64];
 
 static DWORD PerkFreqOverride;
 
-static const DWORD GainPerksC9[] = {
- 0x4AF122, 0x4AF184, 0x4AF1C0, 0x4AF217,
-};
-
-static const DWORD GainPerks90[] = {
- 0x4AF19F, 0x4AF232, 0x4AF24D,
+static const DWORD GainPerks[7][2] = {
+ {0x4AF122, 0xC9}, {0x4AF184, 0xC9}, {0x4AF1C0, 0xC9}, {0x4AF217, 0xC9}, // mov  ecx, ecx
+ {0x4AF19F, 0x90}, {0x4AF232, 0x90}, {0x4AF24D, 0x90}                    // nop
 };
 
 void _stdcall SetPerkFreq(int i) {
@@ -1067,13 +1064,7 @@ void _stdcall SetPerkDesc(int id, char* value) {
 
 void PerksInit() {
 
- for (int i = 0; i < sizeof(GainPerksC9)/4; i++) {
-  SafeWrite8(GainPerksC9[i], 0xC9);         // mov  ecx, ecx
- }
-
- for (int i = 0; i < sizeof(GainPerks90)/4; i++) {
-  SafeWrite8(GainPerks90[i], 0x90);         // nop
- }
+ for (int i = 0; i < 7; i++) SafeWrite8(GainPerks[i][0], (BYTE)GainPerks[i][1]);
 
  HookCall(0x442729, &PerkInitWrapper);
  if(GetPrivateProfileString("Misc", "PerksFile", "", &perksFile[2], 257, ini)) {
