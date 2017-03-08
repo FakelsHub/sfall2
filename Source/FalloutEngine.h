@@ -82,6 +82,8 @@ extern const DWORD debug_register_env_;
 extern const DWORD dialog_out_;
 extern const DWORD display_inventory_;
 extern const DWORD display_print_;
+extern const DWORD display_scroll_down_;
+extern const DWORD display_scroll_up_;
 extern const DWORD display_stats_;
 extern const DWORD display_table_inventories_;
 extern const DWORD display_target_inventory_;
@@ -215,7 +217,6 @@ extern const DWORD obj_find_first_at_tile_;
 extern const DWORD obj_find_next_at_;
 extern const DWORD obj_find_next_at_tile_;
 extern const DWORD obj_fix_combat_cid_for_dude_;
-extern const DWORD obj_is_a_portal_;
 extern const DWORD obj_new_sid_inst_;
 extern const DWORD obj_outline_object_;
 extern const DWORD obj_pid_new_;
@@ -398,6 +399,7 @@ extern const DWORD xvfprintf_;
 #define _game_user_wants_to_quit    0x5186CC
 #define _gdBarterMod                0x51873C
 #define _gIsSteal                   0x51D430
+#define _gmouse_current_cursor      0x518C0C
 #define _gmovie_played_list         0x596C78
 #define _GreenColor                 0x6A3CB0
 #define _gsound_initialized         0x518E30
@@ -436,6 +438,7 @@ extern const DWORD xvfprintf_;
 #define _main_window                0x5194F0
 #define _map_elevation              0x519578
 #define _map_global_vars            0x51956C
+#define _max                        0x56FB50
 #define _mouse_hotx                 0x6AC7D0
 #define _mouse_hoty                 0x6AC7CC
 #define _mouse_is_hidden            0x6AC790

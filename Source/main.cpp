@@ -331,7 +331,7 @@ static void __declspec(naked) apply_damage_hook() {
  __asm {
   xor  edx, edx
   inc  edx                                  // COMBAT_SUBTYPE_WEAPON_USED
-  test byte ptr ds:[esi+0x15], dl           // ctd.flags2Source & DAM_HIT_?
+  test [esi+0x15], dl                       // ctd.flags2Source & DAM_HIT_?
   jz   end                                  // Нет
   inc  edx                                  // COMBAT_SUBTYPE_HIT_SUCCEEDED
 end:

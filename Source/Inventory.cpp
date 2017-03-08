@@ -1782,6 +1782,7 @@ void InventoryInit() {
  if (UseScrollWheel) {
   MakeCall(0x473E66, &loot_container_hook2, false);
   MakeCall(0x4759F1, &barter_inventory_hook1, false);
+  *((DWORD*)_max) = 100;
  };
 
 // Обновление данных игрока (в частности веса вещей) при закрытии вложенной сумки

@@ -22,6 +22,7 @@
 #include <dinput.h>
 #include <math.h>
 #include "DebugEditor.h"
+#include "FalloutEngine.h"
 #include "graphics.h"
 #include "HookScripts.h"
 #include "Inventory.h"
@@ -177,10 +178,18 @@ public:
    int count = 1;
    if (MouseState.lZ > 0) {
     if (WheelMod) count = MouseState.lZ/WheelMod;
-    while (count--) TapKey(DIK_UP);
+    if (*(DWORD*)_gmouse_current_cursor == 2 || *(DWORD*)_gmouse_current_cursor == 3) {
+     __asm {
+      call display_scroll_up_
+     }
+    } else while (count--) TapKey(DIK_UP);
    } else if (MouseState.lZ < 0) {
     if (WheelMod) count = (-MouseState.lZ)/WheelMod;
-    while (count--) TapKey(DIK_DOWN);
+    if (*(DWORD*)_gmouse_current_cursor == 2 || *(DWORD*)_gmouse_current_cursor == 3) {
+     __asm {
+      call display_scroll_down_
+     }
+    } else while (count--) TapKey(DIK_DOWN);
    }
   }
 

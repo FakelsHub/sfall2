@@ -947,15 +947,21 @@ static void __declspec(naked) combat_display_hook() {
   mov  ebx, 0x42536B
   je   end                                  // Это ObjType_Critter
   cmp  dword ptr [ecx+0x78], -1             // У цели есть скрипт?
-  je   skip                                 // Нет
-  xchg ecx, eax                             // eax = target
-  call obj_is_a_portal_
-  test eax, eax                             // Это дверь?
-  jnz  end                                  // Да
-skip:
+  jne  end                                  // Да
   mov  ebx, 0x425413
 end:
   jmp  ebx
+ }
+}
+
+static void __declspec(naked) apply_damage_hook() {
+ __asm {
+  xchg edx, eax
+  test [esi+0x15], dl                       // ctd.flags2Source & DAM_HIT_?
+  jz   end                                  // Нет
+  inc  ebx
+end:
+  retn
  }
 }
 
@@ -1138,6 +1144,7 @@ void BugsInit() {
  SafeWrite8(0x471C1C, 0x90);                // nop
 
  MakeCall(0x425365, &combat_display_hook, true);
+ MakeCall(0x424CD2, &apply_damage_hook, false);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);
