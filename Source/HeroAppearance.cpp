@@ -484,7 +484,7 @@ notRace:
   call win_width_
   mov  ebp, eax                             // ebp = to_width
   sub  ecx, 8
-  sub  ebx, 8
+  sub  ebx, 11
   imul eax, ecx                             // eax = to_width * y
   add  eax, ebx                             // eax = to_width * y + x
   add  esi, eax
@@ -532,7 +532,7 @@ notRace:
   call art_frame_length_
   push eax                                  // height
   mov  ebx, [esp+0+(1*4)]                   // x
-  add  ebx, 139
+  add  ebx, 136
   mov  eax, [esp+4+(1*4)]                   // y
   add  eax, 42
   imul eax, ebp                             // eax = to_width * y
@@ -594,7 +594,6 @@ skipFRM:
   mov  eax, [esp+4+(4*4)]                   // y
   add  eax, 5
   imul eax, ebp                             // eax = to_width * y
-  add  eax, 3
   add  eax, [esp+0+(4*4)]                   // x
   mov  edx, esi                             // DisplayText
   mov  ecx, ebp                             // ToWidth
@@ -605,19 +604,15 @@ skipFRM:
   xchg esi, eax
   mov  eax, [esp+8+(3*4)]                   // GNWID
   mov  ebx, [esp+4+(3*4)]                   // y
-  add  ebx, 5
-  add  ebx, esi                             // y_start
-  mov  edx, [esp+0+(3*4)]                   // x
-  add  edx, 3                               // x_start
+  lea  ebx, [ebx+esi+5]                     // y_start
+  mov  edx, [esp+0+(3*4)]                   // x_start
   lea  ecx, [edx+265]                       // x_end
   push ebx
   call win_line_
   mov  eax, [esp+8+(2*4)]                   // GNWID
   mov  ebx, [esp+4+(2*4)]                   // y
-  add  ebx, 6
-  add  ebx, esi                             // y_start
-  mov  edx, [esp+0+(2*4)]                   // x
-  add  edx, 3                               // x_start
+  lea  ebx, [ebx+esi+6]                     // y_start
+  mov  edx, [esp+0+(2*4)]                   // x_start
   lea  ecx, [edx+265]                       // x_end
   push ebx
   call win_line_
@@ -644,7 +639,6 @@ noLimit:
 loopText:
   mov  eax, [esp+4+(1*4)]                   // y
   imul eax, ebp                             // eax = to_width * y
-  add  eax, 3
   add  eax, [esp+0+(1*4)]                   // eax = to_width * y + x
   lea  ebx, [edi+eax]                       // ToSurface
   xor  edx, edx
@@ -1491,6 +1485,8 @@ static void __declspec(naked) DrawInfoWin_hook() {
  __asm {
   cmp  ecx, 81
   je   end
+  pop  eax                                  // ”ничтожаем адрес возврата
+  push 0x436C3C
   sub  ecx, 98                              // Check If Race or Style selected to redraw info note
   jecxz skip
   dec  ecx
@@ -1499,12 +1495,10 @@ static void __declspec(naked) DrawInfoWin_hook() {
 skip:
   mov  edx, ecx
   mov  eax, ds:[_edit_win]
-  mov  ebx, 345
+  mov  ebx, 348
   mov  ecx, 267
   mov  esi, ds:[_bckgnd]
   call DrawCard
-  pop  eax                                  // ”ничтожаем адрес возврата
-  push 0x436C3C
 end:
   retn
  }
@@ -2032,7 +2026,7 @@ loopButton:
   mov  eax, [esp+4]                         // GNWID
   jnz  skipRedraw
   lea  edx, [ebp-98]                        // Check If Race or Style selected to redraw info note
-  mov  ebx, 96                              // x
+  mov  ebx, 99                              // x
   mov  ecx, 24                              // y
   mov  esi, [esp+0]
   push eax

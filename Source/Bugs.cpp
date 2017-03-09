@@ -1180,6 +1180,10 @@ void BugsInit() {
 // 
  MakeCall(0x4C5A41, &wmTeleportToArea_hook, true);
 
+// Исправление бага заcтывания убитых персонажей при использовании kill_critter_type
+ SafeWrite16(0x457E22, 0xDB31);
+ SafeWrite32(0x457C99, 0x30BE0075);
+
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);
 
