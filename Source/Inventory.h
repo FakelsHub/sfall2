@@ -21,6 +21,7 @@
 extern bool UseScrollWheel;
 
 void _stdcall SetInvenApCost(int a);
+int _stdcall ChangeArmorFid(DWORD* item, DWORD* npc);
 void InventoryInit();
 void InventoryReset();
 void item_add_check();

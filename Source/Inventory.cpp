@@ -711,7 +711,7 @@ end:
 }
 
 static int pobj;
-static int _stdcall ChangeArmorFid(DWORD* item, DWORD* npc) {
+int _stdcall ChangeArmorFid(DWORD* item, DWORD* npc) {
  int itm_pid = 0, npc_pid = PID_Player;
  if (item) itm_pid = item[0x64/4]&0xffffff;
  if (npc) npc_pid = npc[0x64/4];
@@ -743,8 +743,8 @@ static int _stdcall ChangeArmorFid(DWORD* item, DWORD* npc) {
      break;
    }
    __asm {
-    mov  ebx, npc
-    mov  eax, ebx
+    mov  eax, npc
+    mov  ebx, eax
     call inven_right_hand_
     push eax                                // Сохраним указатель на оружие, если оно конечно есть
     test eax, eax
@@ -792,7 +792,7 @@ canUse:
     test edx, edx                           // Оружие было в руках?
     jz   end                                // Нет
     xor  ebx, ebx
-    inc  ebx                                // правая рука (INVEN_TYPE_RIGHT_HAND)
+    inc  ebx                                // правая рука
     mov  eax, ecx                           // *npc
     call inven_wield_                       // Одеваем оружие
     mov  edx, [ecx+0x20]                    // fid
@@ -1053,13 +1053,23 @@ static void __declspec(naked) display_target_inventory_hook() {
  }
 }
 
+static DWORD isFakeTable;                   // 0 = не изменять source, 1 = не изменять target
 static void __declspec(naked) display_table_inventories_hook() {
  __asm {
-  call win_get_buf_
-  mov  edi, ds:[_btable]
-  mov  [esp+0x8C+4], edi
-  mov  edi, ds:[_ptable]
-  mov  [esp+0x94+4], edi
+  xor  eax, eax
+  test edx, edx                             // Нет source?
+  jz   skip                                 // Да
+  inc  eax
+  test ebx, ebx                             // Нет target?
+  jz   skip                                 // Да
+  inc  eax
+skip:
+  mov  isFakeTable, eax
+  mov  eax, ds:[_btable]
+  mov  [esp+0x8C+4], eax                    // target_
+  mov  eax, ds:[_ptable]
+  mov  [esp+0x94+4], eax                    // source_
+  mov  eax, ds:[_i_wid]
   retn
  }
 }
@@ -1127,6 +1137,28 @@ static void __declspec(naked) display_table_inventories_hook3() {
 end:
 #endif
   push 0x475612
+  retn
+ }
+}
+
+static void __declspec(naked) display_table_inventories_hook4() {
+ __asm {
+  and  eax, 0xFF
+  cmp  dword ptr isFakeTable, 0
+  jne  end
+  xor  eax, eax
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) display_table_inventories_hook5() {
+ __asm {
+  and  eax, 0xFF
+  cmp  dword ptr isFakeTable, 1
+  jne  end
+  xor  eax, eax
+end:
   retn
  }
 }
@@ -1913,7 +1945,7 @@ void InventoryInit() {
   MakeCall(0x47002D, &display_inventory_hook, true);
   MakeCall(0x4703E9, &display_target_inventory_hook, true);
 
-  HookCall(0x475363, &display_table_inventories_hook);
+  MakeCall(0x475359, &display_table_inventories_hook, false);
 
   SafeWrite16(0x4753D5, 0xD231);
   MakeCall(0x47541F, &display_table_inventories_hook1, true);
@@ -1922,6 +1954,9 @@ void InventoryInit() {
   SafeWrite16(0x4755BF, 0xFF31);
   MakeCall(0x47560A, &display_table_inventories_hook3, true);
   HookCall(0x4757D2, &display_table_inventories_hook2);
+
+  MakeCall(0x475459, &display_table_inventories_hook4, false);
+  MakeCall(0x475689, &display_table_inventories_hook5, false);
 
   HookCall(0x475D93, &barter_inventory_hook);
  }

@@ -129,6 +129,7 @@ const DWORD interpretPopShort_ = 0x4674F0;
 const DWORD interpretPushLong_ = 0x4674DC;
 const DWORD interpretPushShort_ = 0x46748C;
 const DWORD intface_redraw_ = 0x45EB98;
+const DWORD intface_redraw_items_ = 0x45FD88;
 const DWORD intface_toggle_item_state_ = 0x45F4E0;
 const DWORD intface_toggle_items_ = 0x45F404;
 const DWORD intface_update_ac_ = 0x45EDA8;

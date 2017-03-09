@@ -128,6 +128,7 @@ extern const DWORD interpretPopShort_;
 extern const DWORD interpretPushLong_;
 extern const DWORD interpretPushShort_;
 extern const DWORD intface_redraw_;
+extern const DWORD intface_redraw_items_;
 extern const DWORD intface_toggle_item_state_;
 extern const DWORD intface_toggle_items_;
 extern const DWORD intface_update_ac_;

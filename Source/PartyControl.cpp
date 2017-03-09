@@ -21,6 +21,7 @@
 #include <vector>
 #include "Define.h"
 #include "FalloutEngine.h"
+#include "Inventory.h"
 #include "PartyControl.h"
 
 DWORD IsControllingNPC = 0;
@@ -43,7 +44,7 @@ static DWORD real_dude;
 static DWORD real_hand;
 static DWORD real_trait;
 static DWORD real_trait2;
-static DWORD real_itemButtonItems[(6*4)*2];
+static DWORD real_itemButtonItems[6*2];
 static DWORD real_perkLevelDataList[PERK_count];
 static DWORD real_drug_gvar[6];
 static DWORD real_jet_gvar;
@@ -192,7 +193,7 @@ noSneak:
   call trait_get_
   mov  esi, _itemButtonItems
   mov  edi, offset real_itemButtonItems
-  mov  ecx, (6*4)*2
+  mov  ecx, 6*2
   rep  movsd
   mov  esi, ds:[_perkLevelDataList]
   push esi
@@ -304,13 +305,14 @@ skip:
   mov  eax, ebx
   call inven_right_hand_
   test eax, eax                             // Есть вещь в правой руке?
-  jz   setActiveHand                        // Нет
+  jz   checkAnim                            // Нет
   push eax
   call item_get_type_
   cmp  eax, item_type_weapon
   pop  eax
   jne  setActiveHand                        // Нет
   call item_w_anim_code_
+checkAnim:
   cmp  eax, edx                             // Анимация одинаковая?
   jne  setActiveHand                        // Нет
   inc  ecx                                  // Правая рука
@@ -363,6 +365,12 @@ void __declspec(naked) RestoreDudeState() {
   mov  ds:[_map_elevation], eax
   mov  eax, real_sneak_working
   mov  ds:[_sneak_working], eax
+  mov  eax, ds:[_itemCurrentItem]
+  imul eax, eax, 24
+  mov  edx, ds:[_itemButtonItems+0x10][eax] // mode
+  dec  edx
+  mov  eax, ds:[_perkLevelDataList]
+  mov  [eax+27*4], edx                      // PERK_mental_block
   mov  eax, real_hand
   mov  ds:[_itemCurrentItem], eax
   mov  edx, real_trait2
@@ -370,7 +378,7 @@ void __declspec(naked) RestoreDudeState() {
   call trait_set_
   mov  esi, offset real_itemButtonItems
   mov  edi, _itemButtonItems
-  mov  ecx, (6*4)*2
+  mov  ecx, 6*2
   rep  movsd
   mov  esi, offset real_drug_gvar
   mov  edi, ds:[_game_global_vars]
@@ -493,6 +501,13 @@ npcControl:
   xchg ebx, eax                             // ebx = npc
   call SaveDudeState
   call intface_redraw_
+  mov  eax, ds:[_itemCurrentItem]
+  imul edx, eax, 24
+  mov  eax, ds:[_perkLevelDataList]
+  mov  eax, [eax+27*4]                      // PERK_mental_block
+  inc  eax
+  mov  ds:[_itemButtonItems+0x10][edx], eax // mode
+  call intface_redraw_items_
   mov  eax, [ebx+0x4]                       // tile_num
   mov  edx, 3
   call tile_scroll_to_
@@ -675,6 +690,7 @@ static void __declspec(naked) damage_object_hook() {
   jne  skip
   mov  ecx, edx
   call RestoreDudeState
+  call intface_redraw_
 skip:
   push eax
   call scr_set_objs_
@@ -686,6 +702,14 @@ skip:
   mov  IsControllingNPC, ebx
   mov  ebx, ecx
   call SaveDudeState
+  call intface_redraw_
+  mov  eax, ds:[_itemCurrentItem]
+  imul edx, eax, 24
+  mov  eax, ds:[_perkLevelDataList]
+  mov  eax, [eax+27*4]                      // PERK_mental_block
+  inc  eax
+  mov  ds:[_itemButtonItems+0x10][edx], eax // mode
+  call intface_redraw_items_
 end:
   pop  ecx
   pop  eax                                  // Уничтожаем адрес возврата
@@ -704,6 +728,49 @@ static void __declspec(naked) op_give_exp_points_hook() {
 skip:
   xchg esi, eax
   jmp  stat_pc_add_experience_
+ }
+}
+
+static void __declspec(naked) adjust_fid_hook() {
+ __asm {
+  mov  edx, ds:[_i_worn]
+  xor  eax, eax
+  cmp  IsControllingNPC, eax
+  je   end
+  mov  eax, HiddenArmor
+  test eax, eax
+  jz   skip
+  xchg edx, eax
+skip:
+  push edx
+  push ecx
+  push dword ptr ds:[_inven_dude]           // указатель на нпс
+  push edx                                  // указатель на объект (броню)
+  call ChangeArmorFid
+  pop  ecx
+  pop  edx
+  test eax, eax
+  jz   end
+  xor  edx, edx
+  and  eax, 0xFFF
+  cmp  eax, esi
+  je   end
+  xchg esi, eax
+end:
+  push 0x471739
+  retn
+ }
+}
+
+static void __declspec(naked) partyMemberCopyLevelInfo_hook() {
+ __asm {
+  call inven_left_hand_
+  test eax, eax
+  jz   end
+  and  byte ptr [eax+0x27], 0xFC            // Сбрасываем флаг оружия в руке
+end:
+  xor  eax, eax
+  retn
  }
 }
 
@@ -740,5 +807,7 @@ void PartyControlInit() {
   HookCall(0x41279A, &action_use_skill_on_hook);
   HookCall(0x4250D7, &damage_object_hook);
   HookCall(0x454218, &op_give_exp_points_hook);
+  MakeCall(0x471733, &adjust_fid_hook, true);
+  HookCall(0x495F00, &partyMemberCopyLevelInfo_hook);
  } else dlog(" Disabled.", DL_INIT);
 }
