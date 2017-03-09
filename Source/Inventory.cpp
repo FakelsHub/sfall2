@@ -858,7 +858,7 @@ static void __declspec(naked) ControlArmor_hook() {
   xchg ecx, eax                             // _dialog_target
   jmp  ai_search_inven_armor_
 haveArmor:
-  mov  ebx, 0x4000000                       // Worn
+  xor  ebx, ebx                             // Worn
   xchg edx, eax                             // edx = указатель на снимаемую броню
   xchg ecx, eax                             // eax = _dialog_target
   jmp  correctFidForRemovedItem_
@@ -1625,7 +1625,7 @@ static void __declspec(naked) itsLootBarterTarget() {
   xor  edx, edx
   test eax, eax
   jz   end
-  test InLoop, 0x30000                      // INTFACELOOT + BARTER
+  test dword ptr InLoop, INTFACELOOT+BARTER
   jz   end
   cmp  eax, ds:[_target_stack]
   jne  end

@@ -305,6 +305,7 @@ extern const DWORD stat_set_bonus_;
 extern const DWORD strcmp_;
 extern const DWORD strdup_;
 extern const DWORD strncpy_;
+extern const DWORD strupr_;
 extern const DWORD talk_to_translucent_trans_buf_to_buf_;
 extern const DWORD text_font_;
 extern const DWORD text_object_create_;
@@ -505,6 +506,7 @@ extern const DWORD xvfprintf_;
 #define _RedColor                   0x6AB4D0
 #define _retvals                    0x43EA7C
 #define _scr_size                   0x6AC9F0
+#define _sfx_file_name              0x596FB5
 #define _skill_data                 0x51D118
 #define _slot_cursor                0x5193B8
 #define _sneak_working              0x56D77C

@@ -571,6 +571,7 @@ static void _declspec(naked) handle_inventory_hook() {
   jz   end
   cmp  IsControllingNPC, ebx
   je   end
+  and  byte ptr [eax+0x27], 0xFB            // Сбрасываем флаг одетой брони
   push eax
   push edx
   inc  ebx
@@ -579,23 +580,16 @@ static void _declspec(naked) handle_inventory_hook() {
   pop  edx                                  // edx = source
   pop  ebx                                  // ebx = armor
   inc  eax                                  // Удалили?
-  jnz  nextArmor                            // Да
+  jnz  skip                                 // Да
 // Не смогли удалить, поэтому снимем броню с учётом уменьшения КБ
   push edx
   push eax
   xchg ebx, eax                             // ebx = newarmor, eax = oldarmor
   xchg edx, eax                             // edx = oldarmor, eax = source
-  call adjust_ac_
+  call correctFidForRemovedItem_
   pop  ebx
   pop  edx
-nextArmor:
-  mov  eax, edx
-  call inven_worn_
-  test eax, eax
-  jz   noArmor
-  and  byte ptr [eax+0x27], 0xFB            // Сбрасываем флаг одетой брони
-  jmp  nextArmor
-noArmor:
+skip:
   xchg ebx, eax                             // eax = armor
   mov  HiddenArmor, eax
 end:

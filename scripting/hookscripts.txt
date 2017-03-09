@@ -238,6 +238,9 @@ int     arg3 - the default value of the goods
 critter arg4 - the barter critter (has all of the goods being traded in its inventory)
 int     arg5 - the amount of actual caps in the barter stack (as opposed to goods)
 int     arg6 - the value of all goods being traded before skill modifications
+critter arg7 - указатель на "стол" с предложенными игроком товарами
+int     arg8 - общая стоимость предложенных игроком товаров (отдельно можно узнать количество денег с помощью item_caps_total(arg7))
+int     arg9 - 1 если была нажата кнопка "предложения обмена" не сопартийцу, иначе 0.
 
 int     ret1 - the modified value of all of the goods
 

@@ -235,21 +235,6 @@ static void __declspec(naked) queue_clear_type_hook() {
  }
 }
 
-static void __declspec(naked) partyMemberCopyLevelInfo_hook() {
- __asm {
-nextArmor:
-  mov  eax, esi
-  call inven_worn_
-  test eax, eax
-  jz   noArmor
-  and  byte ptr [eax+0x27], 0xFB            // Сбрасываем флаг одетой брони
-  jmp  nextArmor
-noArmor:
-  mov  eax, esi
-  jmp  stat_level_
- }
-}
-
 static void __declspec(naked) partyMemberIncLevels_hook() {
  __asm {
   push eax
@@ -1057,10 +1042,6 @@ void BugsInit() {
 
 // Исправление краша при использовании стимпаков на жертве с последующим выходом с карты
  HookCall(0x4A27E7, &queue_clear_type_hook);
-
-// Мерзкий баг! Если в инвентаре сопартийца есть броня такая же как на нём одета, то при
-// получении уровня он теряет КБ равный значению получаемому от этой брони
- HookCall(0x495F3B, &partyMemberCopyLevelInfo_hook);
 
 // Исправление неправильных статов при получении уровня сопартийцем когда он под наркотиками
  HookCall(0x495D5C, &partyMemberIncLevels_hook);

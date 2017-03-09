@@ -44,7 +44,6 @@ skip:
  }
 }
 
-#ifdef TRACE
 static void __declspec(naked) gsnd_build_weapon_sfx_name_hook() {
  __asm {
   xor  edx, edx
@@ -52,15 +51,45 @@ static void __declspec(naked) gsnd_build_weapon_sfx_name_hook() {
   inc  edx
   inc  eax
   call roll_random_
-  pop  esi
+  mov  esi, eax
   push eax
   mov  al, cl
   push eax
+  push ebx
+  mov  al, [esp+0x1C]
+  push eax
+  mov  al, [esp+0x1C]
+  push eax
+  push 0x503DE0                             // 'W%c%c%1d%cXX%1d'
+  mov  edx, _sfx_file_name
+  push edx
+  call sprintf_
+  add  esp, 7*4
+  xchg edx, eax
+  call strupr_
+  push 0x503908                             // '.ACM'
+  push eax                                  // _sfx_file_name
+  push 0x5035BC                             // 'sound\sfx\'
+  push 0x503C98                             // '%s%s%s'
+  mov  edx, _str
+  push edx
+  call sprintf_
+  mov  eax, esp
+  xchg edx, eax
+  call db_dir_entry_
+  add  esp, 5*4
+  inc  eax
+  jnz  skip
+  inc  eax
+  xchg esi, eax
+skip:
   push esi
+  mov  al, cl
+  push eax
+  push 0x451863
   retn
  }
 }
-#endif
 
 void SoundInit() {
  int tmp = GetPrivateProfileIntA("Sound", "NumSoundBuffers", 0, ini);
@@ -76,8 +105,6 @@ void SoundInit() {
   SafeWrite8(0x42B772, 0xEB);
  }
 
-#ifdef TRACE
- MakeCall(0x45185E, &gsnd_build_weapon_sfx_name_hook, false);
-#endif
+ MakeCall(0x45185E, &gsnd_build_weapon_sfx_name_hook, true);
 
 }

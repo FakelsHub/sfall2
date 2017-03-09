@@ -306,6 +306,7 @@ const DWORD stat_set_bonus_ = 0x4AF63C;
 const DWORD strcmp_ = 0x4F0BB0;
 const DWORD strdup_ = 0x4E629C;
 const DWORD strncpy_ = 0x4F014F;
+const DWORD strupr_ = 0x4F0DA1;
 const DWORD talk_to_translucent_trans_buf_to_buf_ = 0x44AC68;
 const DWORD text_font_ = 0x4D58DC;
 const DWORD text_object_create_ = 0x4B036C;

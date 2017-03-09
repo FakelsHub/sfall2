@@ -585,7 +585,7 @@ static void __declspec(naked) item_remove_mult_hook() {
 
 static void __declspec(naked) barter_compute_value_hook() {
  __asm {
-  hookbegin(6)
+  hookbegin(9)
   push offset return
   push ebx
   push ecx
@@ -607,6 +607,16 @@ return:
   pop  eax
   call item_total_cost_
   mov  args[20], eax
+  mov  eax, ds:[_ptable]
+  mov  args[24], eax
+  call item_total_cost_
+  mov  args[28], eax
+  xor  eax, eax
+  cmp  edi, args[0]
+  jne  skip
+  inc  eax
+skip:
+  mov  args[32], eax
   pop  eax
   pushad
   push HOOK_BARTERPRICE
@@ -1274,7 +1284,7 @@ static void _declspec(naked) invenWieldFunc_hook() {
   test eax, eax                             // item_type_armor?
   mov  eax, esi
   jnz  notArmor                             // Нет
-  mov  ebx, 0x4000000                       // Worn
+  xor  ebx, ebx                             // Worn
   call inven_worn_
   jmp  UnwieldOld
 notArmor:
@@ -1427,8 +1437,12 @@ return:
 
 static void __declspec(naked) partyMemberCopyLevelInfo_hook() {
  __asm {
-  mov  ebx, 0x4000000                       // Worn
+  jecxz skip
+  and  byte ptr [edx+0x27], 0xFB            // Сбрасываем флаг одетой брони (если в инвентаре сопартийца есть броня такая же как на нём
+                                            // одета, то при получении уровня он теряет КБ равный значению получаемому от этой брони
   jmp  correctFidForRemovedItem_
+skip:
+  jmp  adjust_ac_
  }
 }
 
