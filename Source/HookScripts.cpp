@@ -1425,6 +1425,13 @@ return:
  }
 }
 
+static void __declspec(naked) partyMemberCopyLevelInfo_hook() {
+ __asm {
+  mov  ebx, 0x4000000                       // Worn
+  jmp  correctFidForRemovedItem_
+ }
+}
+
 DWORD _stdcall GetHSArgCount() {
  return ArgCount;
 }
@@ -1595,6 +1602,7 @@ void HookScriptInit() {
  MakeCall(0x472768, &invenWieldFunc_hook, true);
  MakeCall(0x472A64, &invenUnwieldFunc_hook, true);
  MakeCall(0x45409C, &correctFidForRemovedItem_hook, true);
+ HookCall(0x495F21, &partyMemberCopyLevelInfo_hook);
 
  dlogr("Completed hook script init", DL_HOOK|DL_INIT);
 

@@ -44,6 +44,24 @@ skip:
  }
 }
 
+#ifdef TRACE
+static void __declspec(naked) gsnd_build_weapon_sfx_name_hook() {
+ __asm {
+  xor  edx, edx
+  inc  edx
+  inc  edx
+  inc  eax
+  call roll_random_
+  pop  esi
+  push eax
+  mov  al, cl
+  push eax
+  push esi
+  retn
+ }
+}
+#endif
+
 void SoundInit() {
  int tmp = GetPrivateProfileIntA("Sound", "NumSoundBuffers", 0, ini);
  if (tmp > 0 && tmp <= 127) SafeWrite8(0x451129, (BYTE)tmp);
@@ -57,5 +75,9 @@ void SoundInit() {
  if (GetPrivateProfileIntA("Sound", "Test_ForceFloats", 0, ini)) {
   SafeWrite8(0x42B772, 0xEB);
  }
+
+#ifdef TRACE
+ MakeCall(0x45185E, &gsnd_build_weapon_sfx_name_hook, false);
+#endif
 
 }
