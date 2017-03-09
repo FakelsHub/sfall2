@@ -45,6 +45,7 @@ extern const DWORD buf_to_buf_;
 extern const DWORD check_death_;
 extern const DWORD Check4Keys_;
 extern const DWORD combat_ai_;
+extern const DWORD combat_anim_finished_;
 extern const DWORD combat_attack_;
 extern const DWORD combat_should_end_;
 extern const DWORD combat_turn_;
@@ -352,6 +353,8 @@ extern const DWORD xvfprintf_;
 
 #define _aiInfoList                 0x510948
 #define _ambient_light              0x51923C
+#define _anim_set                   0x54CC14
+#define _anim_in_bk                 0x510728
 #define _art                        0x510738
 #define _art_intrface               0x5107F8
 #define _art_name                   0x56C9E4

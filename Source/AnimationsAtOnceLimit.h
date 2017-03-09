@@ -18,7 +18,5 @@
 
 #pragma once
 
-extern int AnimationsLimit;
-
 void AnimationsAtOnceInit();
 void AnimationsAtOnceExit();

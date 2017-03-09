@@ -47,6 +47,8 @@ static DWORD real_perkLevelDataList[PERK_count];
 static DWORD real_drug_gvar[6];
 static DWORD real_jet_gvar;
 static DWORD real_tag_skill[4];
+static DWORD party_PERK_bonus_awareness;
+static DWORD party_PERK_gecko_skinning;
 
 static void __declspec(naked) isRealParty() {
  __asm {
@@ -203,6 +205,9 @@ noSneak:
   rep  movsd
   pop  ecx
   pop  edi
+  push dword ptr [edi]                      // PERK_bonus_awareness
+  push dword ptr [edi+73*4]                 // PERK_gecko_skinning
+  push edi
   mov  eax, ebx
   call isRealParty
   test eax, eax
@@ -218,6 +223,13 @@ skipPerks:
   mov  ds:[_free_perk], al
   mov  ds:[_curr_pc_stat], eax
   mov  ds:[_sneak_working], eax
+  pop  edi
+  pop  eax
+  xchg [edi+73*4], eax                      // PERK_gecko_skinning
+  mov  party_PERK_gecko_skinning, eax
+  pop  eax
+  xchg [edi], eax                           // PERK_bonus_awareness
+  mov  party_PERK_bonus_awareness, eax
   mov  eax, [ebx+0x64]
   mov  ds:[_inven_pid], eax
   mov  ds:[_obj_dude], ebx
@@ -385,9 +397,13 @@ static void __declspec(naked) RestoreDudeState() {
   mov  ds:[_stack], ecx
   mov  esi, [ecx+0x64]
   mov  ds:[_inven_pid], esi
+  mov  esi, ds:[_perkLevelDataList]
+  mov  ecx, party_PERK_bonus_awareness
+  mov  [esi], ecx                           // PERK_bonus_awareness
+  mov  ecx, party_PERK_gecko_skinning
+  mov  [esi+73*4], ecx                      // PERK_gecko_skinning
   mov  ecx, PERK_count
   push ecx
-  mov  esi, ds:[_perkLevelDataList]
   push esi
   call isRealParty
   test eax, eax

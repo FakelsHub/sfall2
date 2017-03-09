@@ -1724,12 +1724,7 @@ static void DllMain2() {
  dlogr("Patching out ereg call.", DL_INIT);
  BlockCall(0x4425E6);
 
- AnimationsLimit = GetPrivateProfileIntA("Misc", "AnimationsAtOnceLimit", 32, ini);
- if (AnimationsLimit > 32) {
-  dlog("Applying AnimationsAtOnceLimit patch.", DL_INIT);
-  AnimationsAtOnceInit();
-  dlogr(" Done", DL_INIT);
- }
+ AnimationsAtOnceInit();
 
  if (GetPrivateProfileIntA("Misc", "RemoveCriticalTimelimits", 0, ini)) {
   dlog("Removing critical time limits.", DL_INIT);

@@ -918,6 +918,7 @@ end:
  }
 }
 
+#ifndef TRACE
 static void __declspec(naked) apply_damage_hook() {
  __asm {
   xchg edx, eax
@@ -928,6 +929,7 @@ end:
   retn
  }
 }
+#endif
 
 static void __declspec(naked) inven_action_cursor_hook() {
  __asm {
@@ -1167,8 +1169,11 @@ void BugsInit() {
 
 // Исправление вывода в окно монитора сообщения при попадании в случайную скриптовую цель если она не является персонажем
  MakeCall(0x425365, &combat_display_hook, true);
+
+#ifndef TRACE
 // Исправление вызова damage_p_proc при промахах если цель не_персонаж
  MakeCall(0x424CD2, &apply_damage_hook, false);
+#endif
 
 // Исправление краша при попытке открыть сумку/рюкзак в окне обмена/торговли
  MakeCall(0x473191, &inven_action_cursor_hook, false);
