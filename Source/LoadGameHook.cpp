@@ -53,15 +53,22 @@ static void _stdcall ResetState(DWORD onLoad) {
  ClearGlobals();
  ForceGraphicsRefresh(0);
  WipeSounds();
- if(GraphicsMode>3) graphics_OnGameLoad();
+ if (GraphicsMode > 3) graphics_OnGameLoad();
  Knockback_OnGameLoad();
  Skills_OnGameLoad();
- InLoop=0;
+ InLoop = 0;
  PerksReset();
  InventoryReset();
  RegAnimCombatCheck(1);
  AfterAttackCleanup();
- PartyControlReset();
+ __asm {
+  xor  eax, eax
+  cmp  IsControllingNPC, eax
+  je   end
+  mov  DelayedExperience, eax
+  call RestoreDudeState
+end:
+ }
 }
 
 void GetSavePath(char* buf, char* ftype) {

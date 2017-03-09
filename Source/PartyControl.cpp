@@ -25,6 +25,7 @@
 
 DWORD IsControllingNPC = 0;
 DWORD HiddenArmor = 0;
+DWORD DelayedExperience = 0;
 
 static DWORD Mode;
 static std::vector<WORD> Chars;
@@ -133,13 +134,9 @@ static bool _stdcall IsInPidList(DWORD* npc) {
 }
 
 // save "real" dude state
-static void __declspec(naked) SaveDudeState() {
+void __declspec(naked) SaveDudeState() {
  __asm {
-  push edi
-  push esi
-  push edx
-  push ecx
-  push ebx
+  pushad
   mov  esi, _pc_name
   mov  edi, offset real_pc_name
   mov  ecx, 32/4
@@ -341,17 +338,13 @@ noRightHand:
   jnz  noLeftHand
   and  byte ptr [eax+0x27], 0xFE            // —брасываем флаг вещи в левой руке
 noLeftHand:
-  pop  ebx
-  pop  ecx
-  pop  edx
-  pop  esi
-  pop  edi
+  popad
   retn
  }
 }
 
 // restore dude state
-static void __declspec(naked) RestoreDudeState() {
+void __declspec(naked) RestoreDudeState() {
  __asm {
   pushad
   mov  eax, offset real_pc_name
@@ -431,10 +424,16 @@ skip:
   pop  edx
   mov  eax, real_sneak_queue_time
   test eax, eax
-  jz   end
+  jz   noSneak
   mov  ecx, 10
   xor  ebx, ebx
   call queue_add_
+noSneak:
+  mov  eax, DelayedExperience
+  test eax, eax
+  jz   end
+  call stat_pc_add_experience_
+  mov  DelayedExperience, eax
 end:
   popad
   retn
@@ -468,7 +467,7 @@ static void _declspec(naked) CombatWrapper_v2() {
   cmp  ds:[_combatNumTurns], edx
   je   skipControl                          // Ёто первый ход
   mov  eax, [eax+0x4]                       // tile_num
-  add  edx, 2
+  add  edx, 3
   call tile_scroll_to_
   jmp  skipControl
 skip:
@@ -495,7 +494,7 @@ npcControl:
   call SaveDudeState
   call intface_redraw_
   mov  eax, [ebx+0x4]                       // tile_num
-  mov  edx, 2
+  mov  edx, 3
   call tile_scroll_to_
   xchg ebx, eax                             // eax = npc
   xor  edx, edx
@@ -503,7 +502,7 @@ npcControl:
   call combat_turn_
   pop  ecx
   xchg ecx, eax
-  cmp  IsControllingNPC, eax                // if game was loaded during turn, PartyControlReset()
+  cmp  IsControllingNPC, eax                // if game was loaded during turn, RestoreDudeState()
   je   skipRestore                          // was called and already restored state
   call RestoreDudeState
   call intface_redraw_
@@ -672,6 +671,48 @@ end:
  }
 }
 
+static void __declspec(naked) damage_object_hook() {
+ __asm {
+  push ecx
+  xor  ecx, ecx
+  cmp  IsControllingNPC, ecx
+  je   skip
+  cmp  edx, ds:[_obj_dude]
+  jne  skip
+  mov  ecx, edx
+  call RestoreDudeState
+skip:
+  push eax
+  call scr_set_objs_
+  pop  eax
+  mov  edx, destroy_p_proc
+  call exec_script_proc_
+  jecxz end
+  inc  ebx
+  mov  IsControllingNPC, ebx
+  mov  ebx, ecx
+  call SaveDudeState
+end:
+  pop  ecx
+  pop  eax                                  // ”ничтожаем адрес возврата
+  push 0x4250E9
+  retn
+ }
+}
+
+static void __declspec(naked) op_give_exp_points_hook() {
+ __asm {
+  xor  eax, eax
+  cmp  IsControllingNPC, eax
+  je   skip
+  add  DelayedExperience, esi
+  retn
+skip:
+  xchg esi, eax
+  jmp  stat_pc_add_experience_
+ }
+}
+
 void PartyControlInit() {
  Mode = GetPrivateProfileIntA("Misc", "ControlCombat", 0, ini);
  if (Mode == 1 || Mode == 2) {
@@ -703,14 +744,7 @@ void PartyControlInit() {
   MakeCall(0x422879, &combat_input_hook, false);
   MakeCall(0x4124E0, &action_skill_use_hook, false);
   HookCall(0x41279A, &action_use_skill_on_hook);
+  HookCall(0x4250D7, &damage_object_hook);
+  HookCall(0x454218, &op_give_exp_points_hook);
  } else dlog(" Disabled.", DL_INIT);
-}
-
-void __stdcall PartyControlReset() {
- __asm {
-  cmp  dword ptr IsControllingNPC, 0
-  je   end
-  call RestoreDudeState
-end:
- }
 }

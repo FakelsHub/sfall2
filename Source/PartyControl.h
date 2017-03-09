@@ -19,9 +19,11 @@
 
 extern DWORD IsControllingNPC;
 extern DWORD HiddenArmor;
+extern DWORD DelayedExperience;
 
 void PartyControl_CanUseWeapon();
+void SaveDudeState();
+void RestoreDudeState();
 void PartyControl_PrintWarning();
 
 void PartyControlInit();
-void __stdcall PartyControlReset();

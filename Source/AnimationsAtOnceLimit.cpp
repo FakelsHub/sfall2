@@ -161,6 +161,16 @@ end:
   retn
  }
 }
+
+static void __declspec(naked) op_anim_hook() {
+ __asm {
+  test ds:[_combat_state], al               // В бою?
+  jz   skip                                 // Нет
+  inc  eax                                  // RB_RESERVED
+skip:
+  jmp  register_begin_
+ }
+}
 #endif
 
 void AnimationsAtOnceInit() {
@@ -316,6 +326,7 @@ void AnimationsAtOnceInit() {
 
 #ifdef TRACE
  MakeCall(0x415DE2, &anim_set_end_hook, true);
+ HookCall(0x459A0B, &op_anim_hook);
 #endif
 
 }

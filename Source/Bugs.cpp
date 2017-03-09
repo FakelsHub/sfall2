@@ -771,24 +771,38 @@ end:
  }
 }
 
-static void __declspec(naked) action_explode_hook() {
+static void __declspec(naked) explode_critter_kill() {
  __asm {
+  push edx
+  push ecx
+  push ebx
+  push eax
+  mov  edx, [eax+0x54]                      // pobj.who_hit_me
+  xor  ecx, ecx
+  cmp  IsControllingNPC, ecx
+  je   skip
+  cmp  edx, ds:[_obj_dude]
+  jne  skip
+  mov  ecx, edx
+  call RestoreDudeState
+skip:
+  mov  eax, [eax+0x78]                      // pobj.sid
+  push eax
+  call scr_set_objs_
+  pop  eax                                  // pobj.sid
   mov  edx, destroy_p_proc
-  mov  eax, [esi+0x78]                      // pobj.sid
   call exec_script_proc_
-  xor  edx, edx
-  dec  edx
-  retn
- }
-}
-
-static void __declspec(naked) action_explode_hook1() {
- __asm {
-  push esi
-  mov  esi, [esi+0x40]                      // ctd.target#
-  call action_explode_hook
-  pop  esi
-  retn
+  jecxz end
+  inc  ebx
+  mov  IsControllingNPC, ebx
+  mov  ebx, ecx
+  call SaveDudeState
+end:
+  pop  eax
+  pop  ebx
+  pop  ecx
+  pop  edx
+  jmp  critter_kill_
  }
 }
 
@@ -1122,8 +1136,8 @@ void BugsInit() {
 // Fix explosives bugs
  MakeCall(0x422F05, &combat_ctd_init_hook, true);
  MakeCall(0x489413, &obj_save_hook, true);
- MakeCall(0x4130C3, &action_explode_hook, false);
- MakeCall(0x4130E5, &action_explode_hook1, false);
+ HookCall(0x4130CC, &explode_critter_kill);
+ HookCall(0x4130EF, &explode_critter_kill);
 
  dlog("Applying MultiHex Pathing Fix.", DL_INIT);
  MakeCall(0x42901F, &ai_danger_source_hook, false);
@@ -1188,6 +1202,9 @@ void BugsInit() {
 // Исправление бага заcтывания убитых персонажей при использовании kill_critter_type
  SafeWrite16(0x457E22, 0xDB31);
  SafeWrite32(0x457C99, 0x30BE0075);
+
+// Исправление проверки позиции по оси y вместо x при задании координат на мировой карте
+ SafeWrite8(0x4C4743, 0xC6);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);
