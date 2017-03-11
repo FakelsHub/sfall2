@@ -438,12 +438,12 @@ static void __declspec(naked) intface_item_reload_hook() {
   push eax
   call register_clear_
   xor  eax, eax
-  inc  eax
+  inc  eax                                  // RB_UNRESERVED
   call register_begin_
-  xor  edx, edx
+  xor  edx, edx                             // ANIM_stand
   xor  ebx, ebx
-  dec  ebx
-  pop  eax                                  // _obj_dude
+  dec  ebx                                  // no delay
+  pop  eax                                  // source = _obj_dude
   call register_object_animate_
   call register_end_
   popad
@@ -1516,7 +1516,7 @@ static void DllMain2() {
  }
 
  dlogr("Patching out ereg call.", DL_INIT);
- HookCall(0x4425E6, (void*)debug_register_env_);
+ MakeCall(0x4425E6, (void*)debug_register_env_, false);
 
  tmp = GetPrivateProfileIntA("Debugging", "DebugMode", 0, ini);
  if (tmp && *((DWORD*)0x444A60) == 0xFFFE76FC && *((DWORD*)0x444A64) == 0x0F01FE83) {

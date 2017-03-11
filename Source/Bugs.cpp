@@ -1197,7 +1197,7 @@ void BugsInit() {
  BlockCall(0x422E02);
  MakeCall(0x422E1B, &combat_hook, false);
 
-// 
+// Частичное исправление неправильного позиционирования после выхода из маленького города
  MakeCall(0x4C5A41, &wmTeleportToArea_hook, true);
 
 // Исправление бага заcтывания убитых персонажей при использовании kill_critter_type

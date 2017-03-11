@@ -39,6 +39,8 @@ static bool styleExist = false;
 // holds Appearance values to restore after global reset in NewGame2 fuction in LoadGameHooks.cpp
 static DWORD CurrentAppearance[2] = {0, 0};
 
+static DWORD HeroPaths[4] = {0, 0, 0, 0};
+
 static DWORD critterListCount = 0, critterArraySize = 0;// Critter art list size
 
 static const DWORD write32[27][2] = {
@@ -133,7 +135,6 @@ static void __declspec(naked) xaddpath() {
 // eax = *filename
  __asm {
   push esi
-  push edx
   push ecx
   push ebx
   xchg esi, eax
@@ -144,36 +145,40 @@ static void __declspec(naked) xaddpath() {
   jz   end
   xor  edx, edx                             // val
   call memset_
-  xchg ecx, eax
+  xchg edx, eax
   mov  eax, esi
   call strdup_
   test eax, eax
   jnz  skip
-  xchg ecx, eax
+  xchg edx, eax
   call nfree_
-  xchg ecx, eax
+  xchg edx, eax
   jmp  end
 skip:
-  mov  [ecx], eax                           // database.path
+  mov  ecx, ds:[_paths]
+  mov  [edx], eax                           // database.path
   xchg esi, eax
   call dbase_open_
   test eax, eax                             // Открыли dat-файл?
   jz   notDat                               // Нет
-  mov  [ecx+0x4], eax                       // database.dat
+  mov  [edx+0x4], eax                       // database.dat
   xor  eax, eax
   inc  eax
-  mov  [ecx+0x8], eax                       // database.is_dat
+  mov  [edx+0x8], eax                       // database.is_dat
   inc  eax
 notDat:
-  mov  edx, ds:[_paths]
-  mov  ds:[_paths], ecx
-  mov  [ecx+0xC], edx                       // database.next
+  mov  ebx, ecx
+  mov  ecx, [ecx+0xC]                       // database.next
+  test ecx, ecx
+  jnz  notDat
+  mov  [ebx+0xC], edx                       // database.next
+  mov  [edx+0xC], ecx                       // database.next
   dec  eax
 end:
 // eax: 0 = фейл, но память освобождать не надо; 1 = всё хорошо; -1 = не смогли открыть dat-файл, нужно освободить память
+// edx = database
   pop  ebx
   pop  ecx
-  pop  edx
   pop  esi
   retn
  }
@@ -182,102 +187,104 @@ end:
 static void __declspec(naked) LoadHeroDat() {
 // eax = Race, ebx = Style
  __asm {
+  push ebp
   push edi
   push esi
   push edx
   push ecx
   push ebx
   sub  esp, 260+260                         // [0]filename, [260]filename_dat
-  xchg ecx, eax                             // ecx = Race
-  call art_flush_
   lea  esi, [esp+0]                         // filename
   lea  edi, [esp+260]                       // filename_dat
+  push eax
+  call art_flush_
 // unload previous Dats
-  mov  eax, ds:[_master_db_handle]
+  mov  edx, offset HeroPaths
+  push edx
+  mov  ecx, 4
+loopPaths:
+  mov  eax, [edx]
   test eax, eax
-  jz   noHero
+  jz   nextPath
   mov  eax, [eax]                           // database.path
   call xremovepath_
-  dec  eax
-  mov  ds:[_master_db_handle], eax
-noHero:
-  mov  eax, ds:[_critter_db_handle]
-  test eax, eax
-  jz   noRace
-  mov  eax, [eax]                           // database.path
-  call xremovepath_
-  dec  eax
-  mov  ds:[_critter_db_handle], eax
-noRace:
+  xor  eax, eax
+  mov  [edx], eax
+nextPath:
+  add  edx, 4
+  loop loopPaths
+  pop  ebp
+  pop  ecx                                  // ecx = Race
   call makeDataPath
   xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
-  mov  eax, edi
-  call access_
-  test eax, eax                             // Есть dat-файл?
-  jnz  noDatFile                            // Нет
-  mov  eax, edi
-  call xaddpath
-  dec  eax                                  // Открыли dat-файл?
-  jz   goodDat                              // Да
-  inc  eax                                  // Ничего не добавили?
-  jz   noDatFile                            // Да
-  mov  eax, edi
-  call xremovepath_
-noDatFile:
-  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
-  mov  eax, esi
+  mov  eax, esi                             // filename
   call access_
   test eax, eax                             // Есть каталог?
-  jnz  shortFail                            // Нет
-  mov  eax, esi
+  jnz  checkRaceDatFile                     // Нет
+  mov  eax, esi                             // filename
   call xaddpath
   inc  eax                                  // Удачно добавили путь?
-shortFail:
-  jnz  fail
-goodDat:
-  mov  eax, ds:[_paths]
-  mov  ds:[_master_db_handle], eax          // set path for selected appearance
+  jnz  checkRaceDatFile                     // Нет
+  mov  [ebp+0], edx
+checkRaceDatFile:
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, edi                             // filename_dat
+  call access_
+  xor  edx, edx
+  test eax, eax                             // Есть dat-файл?
+  jnz  checkRace                            // Нет
+  mov  eax, edi                             // filename_dat
+  call xaddpath
+  dec  eax                                  // Открыли dat-файл?
+  jz   checkRace                            // Да
+  xor  edx, edx
+  inc  eax                                  // Ничего не добавили?
+  jz   checkRace                            // Да
+  mov  eax, edi                             // filename_dat
+  call xremovepath_
+checkRace:
+  mov  [ebp+4], edx
+  test edx, edx                             // Есть dat-файл?
+  jnz  goodRace                             // Да
+  cmp  [ebp+0], edx                         // Есть каталог?
+  jne  goodRace                             // Да
+  xchg edx, eax
+  dec  eax
+  jmp  end
+goodRace:
   test ebx, ebx
   jz   skip
   xor  ebx, ebx                             // Style
   call makeDataPath
   xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
-  mov  eax, edi
-  call access_
-  test eax, eax                             // Есть dat-файл?
-  jnz  noStyleDatFile                       // Нет
-  mov  eax, edi
-  call xaddpath
-  dec  eax                                  // Открыли dat-файл?
-  jz   goodStyleDat                         // Да
-  inc  eax                                  // Ничего не добавили?
-  jz   noStyleDatFile                       // Да
-  mov  eax, edi
-  call xremovepath_
-noStyleDatFile:
-  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
-  mov  eax, esi
+  mov  eax, esi                             // filename
   call access_
   test eax, eax                             // Есть каталог?
-  jnz  end                                  // Нет
-  mov  eax, esi
+  jnz  checkStyleDatFile                    // Нет
+  mov  eax, esi                             // filename
   call xaddpath
   inc  eax                                  // Удачно добавили путь?
-  jnz  skip
-goodStyleDat:
-  mov  eax, ds:[_paths]                     // _critter_db_handle -> _master_db_handle -> _paths
-  mov  ds:[_critter_db_handle], eax         // eax = _critter_db_handle
-  mov  edx, [eax+0xC]                       // edx = _master_db_handle
-  mov  ecx, [edx+0xC]                       // ecx = _paths
-  mov  [eax+0xC], ecx                       // _critter_db_handle -> _paths
-  mov  [edx+0xC], eax                       // _master_db_handle -> _critter_db_handle
-  mov  ds:[_paths], edx                     // _master_db_handle -> _critter_db_handle -> _paths
+  jnz  checkStyleDatFile                    // Нет
+  mov  [ebp+8], edx
+checkStyleDatFile:
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, edi                             // filename_dat
+  call access_
+  test eax, eax                             // Есть dat-файл?
+  jnz  skip                                 // Нет
+  mov  eax, edi                             // filename_dat
+  call xaddpath
+  dec  eax                                  // Открыли dat-файл?
+  jz   checkStyle                           // Да
+  xor  edx, edx
+  inc  eax                                  // Ничего не добавили?
+  jz   checkStyle                           // Да
+  mov  eax, edi                             // filename_dat
+  call xremovepath_
+checkStyle:
+  mov  [ebp+12], edx
 skip:
   xor  eax, eax
-  jmp  end
-fail:
-  xor  eax, eax
-  dec  eax
 end:
   add  esp, 260+260
   pop  ebx
@@ -285,6 +292,7 @@ end:
   pop  edx
   pop  esi
   pop  edi
+  pop  ebp
   retn
  }
 }
@@ -1195,26 +1203,6 @@ loopArt:
   add  [esi], eax
   add  esi, 4
   loop loopArt
-  retn
- }
-}
-
-// insert main path structure in front when not loading
-static void __declspec(naked) xfopen_hook() {
- __asm {
-  mov  ecx, ds:[_paths]
-  cmp  byte ptr [esi], 'r'
-  je   isReading
-  mov  eax, ds:[_critter_db_handle]
-  test eax, eax
-  jnz  skip
-  mov  eax, ds:[_master_db_handle]
-  test eax, eax
-  jz   isReading
-skip:
-  mov  ecx, [eax+0xC]                       // database.next = _paths
-isReading:
-  push 0x4DEEEB
   retn
  }
 }
@@ -2372,9 +2360,6 @@ void EnableHeroAppearanceMod() {
 
 // Shift base hero critter art offset up into hero section
   HookCall(0x418CA2, &art_init_hook1);
-
-// Insert main path structure in front when not loading
-  MakeCall(0x4DEEE5, &xfopen_hook, true);
 
 // Check if new hero art exists otherwise use regular art
   MakeCall(0x419560, &art_get_name_hook, false);

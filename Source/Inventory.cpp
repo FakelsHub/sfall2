@@ -712,7 +712,7 @@ end:
 
 static int pobj;
 int _stdcall ChangeArmorFid(DWORD* item, DWORD* npc) {
- int itm_pid = 0, npc_pid = PID_Player;
+ int itm_pid = 0, npc_pid = PID_PLAYER;
  if (item) itm_pid = item[0x64/4]&0xffffff;
  if (npc) npc_pid = npc[0x64/4];
  pobj = 0;
@@ -1177,7 +1177,7 @@ static void __declspec(naked) barter_inventory_hook() {
 static void __declspec(naked) gdProcess_hook() {
  __asm {
   mov  eax, ds:[_dialog_target]
-  cmp  dword ptr [eax+0x64], PID_Marcus
+  cmp  dword ptr [eax+0x64], PID_MARCUS
   je   noArmor
   mov  edx, eax
   call ai_search_inven_armor_

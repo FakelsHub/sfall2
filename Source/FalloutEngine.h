@@ -22,6 +22,7 @@
 extern const DWORD access_;
 extern const DWORD action_get_an_object_;
 extern const DWORD action_loot_container_;
+extern const DWORD action_push_critter_;
 extern const DWORD action_use_an_item_on_object_;
 extern const DWORD add_bar_box_;
 extern const DWORD AddHotLines_;
@@ -49,6 +50,7 @@ extern const DWORD combat_anim_finished_;
 extern const DWORD combat_attack_;
 extern const DWORD combat_should_end_;
 extern const DWORD combat_turn_;
+extern const DWORD combat_turn_run_;
 extern const DWORD container_exit_;
 extern const DWORD correctFidForRemovedItem_;
 extern const DWORD credits_;
@@ -74,6 +76,7 @@ extern const DWORD db_fwriteIntCount_;
 extern const DWORD db_read_to_buf_;
 extern const DWORD dbase_open_;
 extern const DWORD debug_log_;
+extern const DWORD debug_printf_;
 extern const DWORD debug_register_env_;
 extern const DWORD dialog_out_;
 extern const DWORD display_print_;
@@ -161,6 +164,7 @@ extern const DWORD item_m_turn_off_;
 extern const DWORD item_move_all_;
 extern const DWORD item_move_force_;
 extern const DWORD item_mp_cost_;
+extern const DWORD item_name_;
 extern const DWORD item_remove_mult_;
 extern const DWORD item_size_;
 extern const DWORD item_total_cost_;
@@ -386,7 +390,6 @@ extern const DWORD xvfprintf_;
 #define _combat_turn_running        0x51093C
 #define _combatNumTurns             0x510940
 #define _crit_succ_eff              0x510978
-#define _critter_db_handle          0x58E94C
 #define _crnt_func                  0x664508
 #define _curr_font_num              0x51E3B0
 #define _curr_pc_stat               0x6681AC
@@ -463,7 +466,6 @@ extern const DWORD xvfprintf_;
 #define _main_window                0x5194F0
 #define _map_elevation              0x519578
 #define _map_global_vars            0x51956C
-#define _master_db_handle           0x58E948
 #define _max                        0x56FB50
 #define _Meet_Frank_Horrigan        0x672E04
 #define _mesg                       0x5700E8

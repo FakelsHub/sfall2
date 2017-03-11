@@ -16,11 +16,11 @@
 #define PID_LEATHER_ARMOR            1
 #define PID_LEATHER_ARMOR_MK_II      379
 #define PID_LEATHER_JACKET           74
-#define PID_Marcus                   16777377
+#define PID_MARCUS                   16777377
 #define PID_METAL_ARMOR              2
 #define PID_METAL_ARMOR_MK_II        380
 #define PID_MOTION_SENSOR            59
-#define PID_Player                   16777216
+#define PID_PLAYER                   16777216
 #define PID_POWERED_ARMOR            3
 #define PID_PURPLE_ROBE              113
 #define PID_SUPER_STIMPAK            144

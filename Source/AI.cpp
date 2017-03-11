@@ -89,12 +89,78 @@ end:
  }
 }
 
+static const char* PushFmt = "\n%s (->%s) move %s from %d to %d";
+static void __declspec(naked) ai_move_steps_closer_hook() {
+ __asm {
+  jz   fail                                 // Нет объекта
+  mov  eax, [edx+0x64]
+  shr  eax, 0x18
+  dec  eax                                  // ObjType_Critter?
+  jnz  fail                                 // Нет
+  push edx
+  mov  eax, esi                             // eax=source, edx=target
+  call obj_dist_
+  pop  edx
+  dec  eax                                  // Расстояние = 1
+  jnz  end                                  // Нет
+  call register_end_
+  mov  ebx, [edx+0x4]                       // target.tile_num
+  push edx
+  mov  eax, esi                             // eax=source, edx=target
+  call action_push_critter_
+  pop  edx
+  inc  eax                                  // Сдвинули?
+  jz   skip                                 // Нет
+  call combat_turn_run_
+  push dword ptr [edx+0x4]                  // target.tile_num
+  push ebx
+  xchg edx, eax
+  call item_name_
+  push eax
+  mov  eax, edi
+  call item_name_
+  push eax
+  mov  eax, esi
+  call item_name_
+  push eax
+  push PushFmt
+  call debug_printf_
+  add  esp, 6*4
+  pop  eax                                  // Уничтожаем адрес возврата
+  push 0x42A089
+skip:
+  push eax
+  xor  eax, eax
+  inc  eax
+  inc  eax
+  call register_begin_
+  pop  ecx
+  jecxz end
+fail:
+  xor  eax, eax
+  retn
+end:
+  mov  eax, 0x1000000
+  retn
+ }
+}
+
 void AIInit() {
  HookCall(0x426A95, combat_attack_hook);
  HookCall(0x42A796, combat_attack_hook);
  MakeCall(0x45F6AF, &intface_use_item_hook, false);
  HookCall(0x4432A6, &game_handle_input_hook);
  GetPrivateProfileString("sfall", "BlockedCombat", "You cannot enter combat at this time.", CombatBlockedMessage, 128, translationIni);
+
+/* HookCall(0x42B1AF, (void*)item_name_);
+ SafeWriteStr(0x50108C, "\n%s minHp = %d; curHp = %d\n");
+ SafeWriteStr(0x501174, "%s: FLEEING: Out of Range -> min_to_hit !\n");
+ SafeWriteStr(0x5012D4, "%s is using %s packet with a %d chance to taunt\n");
+ SafeWriteStr(0x501268, ">>>NOTE: %s had extra AP''s to use!<<<\n");
+
+ SafeWrite8(0x413747, 0x0);
+ MakeCall(0x42A0C9, &ai_move_steps_closer_hook, false);*/
+
 }
 
 void _stdcall AICombatStart() {
