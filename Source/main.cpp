@@ -404,6 +404,73 @@ static void _stdcall SetKarma(int value) {
  }
 }
 
+static void __declspec(naked) removeDatabase() {
+ __asm {
+  cmp  eax, -1
+  je   end
+  mov  ebx, ds:[_paths]
+  mov  ecx, ebx
+nextPath:
+  mov  edx, [esp+0x104+4+4]                 // path_patches
+  mov  eax, [ebx+0x0]                       // database.path
+  call stricmp_
+  test eax, eax                             // Нашли путь?
+  jz   skip                                 // Да
+  mov  ecx, ebx
+  mov  ebx, [ebx+0xC]                       // database.next
+  jmp  nextPath
+skip:
+  mov  eax, [ebx+0xC]                       // database.next
+  mov  [ecx+0xC], eax                       // database.next
+  xchg ebx, eax
+  cmp  eax, ecx
+  jne  end
+  mov  ds:[_paths], ebx
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) game_init_databases_hook() {
+ __asm {
+  call removeDatabase
+  mov  ds:[_master_db_handle], eax
+  retn
+ }
+}
+
+static void __declspec(naked) game_init_databases_hook1() {
+ __asm {
+  cmp  eax, -1
+  je   end
+  mov  eax, ds:[_master_db_handle]
+  mov  eax, [eax+0x0]                       // eax = master_patches.path
+  call xremovepath_
+  dec  eax                                  // Удалили путь (critter_patches == master_patches)?
+  jz   end                                  // Да
+  inc  eax
+  call removeDatabase
+end:
+  mov  ds:[_critter_db_handle], eax
+  retn
+ }
+}
+
+static void __declspec(naked) game_init_databases_hook2() {
+// eax = _master_db_handle
+ __asm {
+  mov  ecx, ds:[_critter_db_handle]
+  mov  edx, ds:[_paths]
+  jecxz skip
+  mov  [ecx+0xC], edx                       // critter_patches.next->_paths
+  mov  edx, ecx
+skip:
+  mov  [eax+0xC], edx                       // master_patches.next
+  mov  ds:[_paths], eax
+  retn
+ }
+}
+
 static void __declspec(naked) op_set_global_var_hook() {
  __asm {
   test eax, eax
@@ -862,7 +929,7 @@ end:
 FILETIME ftCurr, ftPrev;
 static void _stdcall _GetFileTime(char* filename) {
  char fname[65];
- sprintf_s(fname, "%s%s", "data\\", filename);
+ sprintf_s(fname, "%s\\%s", *(char**)_patches, filename);
  HANDLE hFile = CreateFile(fname, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
  if (hFile != INVALID_HANDLE_VALUE) {
   GetFileTime(hFile, NULL, NULL, &ftCurr);
@@ -1561,14 +1628,14 @@ static void DllMain2() {
 
  CritInit();
 
- tmp = GetPrivateProfileInt("Misc", "NumberPatchLoop", -1, ini);
- if (tmp > -1) {
-  dlog("Applying load multiple patches patch. ", DL_INIT);
-  SafeWrite8(0x444366, 0xEB);               // Disable check
-  SafeWrite32(0x444357, tmp);               // New loop count
-  SafeWrite8(0x444354, 0x90);               // Change step from 2 to 1
-  dlogr(" Done", DL_INIT);
- }
+ dlog("Applying load multiple patches patch. ", DL_INIT);
+ SafeWrite8(0x444338, 0x90);                // Change step from 2 to 1
+ SafeWrite32(0x444363, 0xEB909090);         // Disable check
+ MakeCall(0x444259, &game_init_databases_hook, false);
+ MakeCall(0x4442F1, &game_init_databases_hook1, false);
+ HookCall(0x44436D, &game_init_databases_hook2);
+ SafeWrite8(0x4DFAEC, 0x1D);                // Исправление ошибки
+ dlogr(" Done", DL_INIT);
 
  if (GetPrivateProfileInt("Misc", "DisplayKarmaChanges", 0, ini)) {
   dlog("Applying display karma changes patch. ", DL_INIT);

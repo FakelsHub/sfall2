@@ -129,6 +129,7 @@ extern const DWORD inc_stat_;
 extern const DWORD insert_withdrawal_;
 extern const DWORD interpret_;
 extern const DWORD interpretAddString_;
+extern const DWORD interpretDecStringRef_;
 extern const DWORD interpretFindProcedure_;
 extern const DWORD interpretFreeProgram_;
 extern const DWORD interpretGetString_;
@@ -247,7 +248,6 @@ extern const DWORD pc_flag_off_;
 extern const DWORD pc_flag_on_;
 extern const DWORD pc_flag_toggle_;
 extern const DWORD perform_withdrawal_end_;
-extern const DWORD perk_add_;
 extern const DWORD perk_add_effect_;
 extern const DWORD perk_description_;
 extern const DWORD perk_init_;
@@ -318,6 +318,7 @@ extern const DWORD stat_pc_set_;
 extern const DWORD stat_set_bonus_;
 extern const DWORD strcmp_;
 extern const DWORD strdup_;
+extern const DWORD stricmp_;
 extern const DWORD strncpy_;
 extern const DWORD strupr_;
 extern const DWORD talk_to_translucent_trans_buf_to_buf_;
@@ -399,6 +400,7 @@ extern const DWORD xvfprintf_;
 #define _combat_turn_running        0x51093C
 #define _combatNumTurns             0x510940
 #define _crit_succ_eff              0x510978
+#define _critter_db_handle          0x58E94C
 #define _crnt_func                  0x664508
 #define _curr_crit_num              0x56D61C
 #define _curr_crit_list             0x56D620
@@ -479,6 +481,7 @@ extern const DWORD xvfprintf_;
 #define _main_window                0x5194F0
 #define _map_elevation              0x519578
 #define _map_global_vars            0x51956C
+#define _master_db_handle           0x58E948
 #define _max                        0x56FB50
 #define _Meet_Frank_Horrigan        0x672E04
 #define _mesg                       0x5700E8

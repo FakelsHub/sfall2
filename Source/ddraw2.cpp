@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include "math.h"
 #include "ddraw.h"
+#include "FalloutEngine.h"
 #include "Graphics.h"
 #include "heads.h"
 #include "input.h"
@@ -169,12 +170,9 @@ void _stdcall SetShaderMode(DWORD d, DWORD mode) {
 }
 
 int _stdcall LoadShader(const char* path) {
- if(GraphicsMode < 4) return -1;
- if(strstr(path, "..")) return -1;
- if(strstr(path, ":")) return -1;
+ if ((GraphicsMode < 4) || (!strstr(path, "..")) || (!strstr(path, ":"))) return -1;
  char buf[MAX_PATH];
- strcpy_s(buf, "data\\shaders\\");
- strcat_s(buf, path);
+ sprintf(buf, "%s\\shaders\\%s", *(char**)_patches, path);
  for(DWORD d=0;d<shaders.size();d++) {
   if(!shaders[d].Effect) {
    if(FAILED(D3DXCreateEffectFromFile(d3d9Device, buf, 0, 0, 0, 0, &shaders[d].Effect, 0))) return -1;
@@ -193,7 +191,7 @@ int _stdcall LoadShader(const char* path) {
 
   sprintf_s(buf, "texname%d", i);
   if(FAILED(shader.Effect->GetString(buf, &name))) break;
-  sprintf_s(buf, "data\\art\\stex\\%s", name);
+  sprintf_s(buf, "%s\\art\\stex\\%s", *(char**)_patches, name);
   if(FAILED(D3DXCreateTextureFromFileA(d3d9Device,buf,&tex))) continue;
   sprintf_s(buf, "tex%d", i);
   shader.Effect->SetTexture(buf, tex);

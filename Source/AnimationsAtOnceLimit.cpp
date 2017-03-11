@@ -324,7 +324,7 @@ void AnimationsAtOnceInit() {
  }
 
  MakeCall(0x415DE2, &anim_set_end_hook, true);
- HookCall(0x459A0B, &op_anim_hook);
+// HookCall(0x459A0B, &op_anim_hook);
 
 }
 

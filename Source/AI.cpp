@@ -279,11 +279,32 @@ end:
  }
 }
 
+static void __declspec(naked) isGoodTarget() {
+// eax = target, ebp = *target4+4
+ __asm {
+  test byte ptr [eax+0x44], 0x80            // target & DAM_DEAD?
+  jnz  skip                                 // Да, target трупик
+  cmp  [ebp-16], eax                        // *target1 == target?
+  je   skip                                 // Да
+  cmp  [ebp-12], eax                        // *target2 == target?
+  je   skip                                 // Да
+  cmp  [ebp-8], eax                         // *target3 == target?
+  je   skip                                 // Да
+  cmp  [ebp-4], eax                         // *target4 == target?
+  jne  end                                  // Нет
+skip:
+  xor  eax, eax
+end:
+  retn
+ }
+}
+
 static void __declspec(naked) ai_find_attackers() {
 // eax,esi = source, edx = *target2
  __asm {
   push ebp
   push edi
+  push esi
   mov  ebx, 4
   sub  edx, ebx
   mov  edi, edx                             // edi = *target1
@@ -318,16 +339,9 @@ loopCritters:
   jecxz nextCritter                         // У target нет обидчика
   cmp  ebx, [ecx+0x50]                      // source.team_num = target.who_hit_me.team_num?
   jne  nextCritter                          // Кто-то левый обидел target
-  test byte ptr [eax+0x44], 0x80            // target & DAM_DEAD?
-  jnz  nextCritter                          // Да, target трупик
-  cmp  [ebp-16], eax                        // *target1 == target?
-  je   nextCritter                          // Да
-  cmp  [ebp-12], eax                        // *target2 == target?
-  je   nextCritter                          // Да
-  cmp  [ebp-8], eax                         // *target3 == target?
-  je   nextCritter                          // Да
-  cmp  [ebp-4], eax                         // *target4 == target?
-  je   nextCritter                          // Да
+  call isGoodTarget
+  test eax, eax
+  jz   nextCritter
   mov  [edi], eax
   add  edi, 4
   cmp  edi, ebp                             // Использованы все слоты для целей?
@@ -336,8 +350,37 @@ nextCritter:
   inc  edx
   cmp  edx, ds:[_curr_crit_num]             // Все персонажи из списка?
   jl   loopCritters                         // Нет
+  xor  edx, edx
+loopTeam:
+  mov  eax, ds:[_curr_crit_list]
+  mov  eax, [eax+edx*4]                     // eax = target
+  call isGoodTarget
+  test eax, eax                             // Цель можно использовать?
+  jz   nextTeam                             // Нет
+  lea  esi, [ebp-16]                        // esi = *target1
+  mov  ebx, [eax+0x50]                      // ebx = target.team_num
+loopTargets:
+  mov  ecx, [esi]                           // ecx = target#
+  jecxz nextTarget                          // Слот не занят
+  cmp  ebx, [ecx+0x50]                      // target.team_num == target#.team_num?
+  je   foundTarget                          // Да, нашли новую цель
+nextTarget:
+  add  esi, 4
+  cmp  esi, ebp                             // Проверены все слоты целей?
+  jne  loopTargets                          // Нет
+  jmp  nextTeam
+foundTarget:
+  mov  [edi], eax
+  add  edi, 4
+  cmp  edi, ebp                             // Использованы все слоты для целей?
+  je   end                                  // Да
+nextTeam:
+  inc  edx
+  cmp  edx, ds:[_curr_crit_num]             // Все персонажи из списка?
+  jl   loopTeam                             // Нет
 end:
   xor  eax, eax
+  pop  esi
   pop  edi
   pop  ebp
   retn
@@ -352,7 +395,7 @@ void AIInit() {
  GetPrivateProfileString("sfall", "BlockedCombat", "You cannot enter combat at this time.", CombatBlockedMessage, 128, translationIni);
 
  AI_Called_Freq_Div = GetPrivateProfileIntA("Misc", "AI_Called_Freq_Div", 0, ini);
- if (AI_Called_Freq_Div > 0) MakeCall(0x42A6BA, &ai_called_shot_hook, false);
+ if (AI_Called_Freq_Div > 1) MakeCall(0x42A6BA, &ai_called_shot_hook, false);
 
  if (GetPrivateProfileIntA("Misc", "SmarterAI", 0, ini)) {
 //  SafeWrite8(0x428F6E, 0xEB);

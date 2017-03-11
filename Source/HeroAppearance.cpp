@@ -138,12 +138,12 @@ static void __declspec(naked) xaddpath() {
   push ecx
   push ebx
   xchg esi, eax
+  xor  edx, edx                             // val
   mov  eax, 16                              // size
   mov  ebx, eax                             // size
   call nmalloc_
-  test eax, eax
-  jz   end
-  xor  edx, edx                             // val
+  test eax, eax                             // Выделили память для database?
+  jz   end                                  // Нет
   call memset_
   xchg edx, eax
   mov  eax, esi
@@ -152,10 +152,9 @@ static void __declspec(naked) xaddpath() {
   jnz  skip
   xchg edx, eax
   call nfree_
-  xchg edx, eax
+  mov  eax, edx
   jmp  end
 skip:
-  mov  ecx, ds:[_paths]
   mov  [edx], eax                           // database.path
   xchg esi, eax
   call dbase_open_
@@ -167,16 +166,18 @@ skip:
   mov  [edx+0x8], eax                       // database.is_dat
   inc  eax
 notDat:
+  mov  ebx, ds:[_master_db_handle]          // master_patches
+  mov  ecx, ds:[_critter_db_handle]         // critter_patches
+  jecxz onePath
   mov  ebx, ecx
-  mov  ecx, [ecx+0xC]                       // database.next
-  test ecx, ecx
-  jnz  notDat
+onePath:
+  mov  ecx, [ebx+0xC]                       // database.next
   mov  [ebx+0xC], edx                       // database.next
   mov  [edx+0xC], ecx                       // database.next
   dec  eax
 end:
 // eax: 0 = фейл, но память освобождать не надо; 1 = всё хорошо; -1 = не смогли открыть dat-файл, нужно освободить память
-// edx = database
+// edx = database или 0
   pop  ebx
   pop  ecx
   pop  esi
@@ -193,6 +194,8 @@ static void __declspec(naked) LoadHeroDat() {
   push edx
   push ecx
   push ebx
+  push dword ptr ds:[_master_db_handle]
+  push dword ptr ds:[_critter_db_handle]
   sub  esp, 260+260                         // [0]filename, [260]filename_dat
   lea  esi, [esp+0]                         // filename
   lea  edi, [esp+260]                       // filename_dat
@@ -213,80 +216,82 @@ loopPaths:
 nextPath:
   add  edx, 4
   loop loopPaths
-  pop  ebp
+  pop  ebp                                  // ebp = HeroPaths
   pop  ecx                                  // ecx = Race
   call makeDataPath
   xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
-  mov  eax, esi                             // filename
-  call access_
-  test eax, eax                             // Есть каталог?
-  jnz  checkRaceDatFile                     // Нет
-  mov  eax, esi                             // filename
-  call xaddpath
-  inc  eax                                  // Удачно добавили путь?
-  jnz  checkRaceDatFile                     // Нет
-  mov  [ebp+0], edx
-checkRaceDatFile:
-  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
   mov  eax, edi                             // filename_dat
   call access_
-  xor  edx, edx
   test eax, eax                             // Есть dat-файл?
-  jnz  checkRace                            // Нет
+  jnz  checkRacePath                        // Нет
   mov  eax, edi                             // filename_dat
   call xaddpath
   dec  eax                                  // Открыли dat-файл?
-  jz   checkRace                            // Да
-  xor  edx, edx
+  jz   addRaceDatFile                       // Да
   inc  eax                                  // Ничего не добавили?
-  jz   checkRace                            // Да
+  jz   checkRacePath                        // Да
   mov  eax, edi                             // filename_dat
   call xremovepath_
-checkRace:
+  xor  edx, edx
+addRaceDatFile:
+  mov  [ebp+0], edx
+checkRacePath:
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, esi                             // filename
+  call access_
+  xor  edx, edx
+  test eax, eax                             // Есть каталог?
+  jnz  checkRace                            // Нет
+  mov  eax, esi                             // filename
+  call xaddpath
   mov  [ebp+4], edx
-  test edx, edx                             // Есть dat-файл?
+checkRace:
+  mov  eax, [ebp+0]
+  test edx, edx                             // Есть каталог?
   jnz  goodRace                             // Да
-  cmp  [ebp+0], edx                         // Есть каталог?
-  jne  goodRace                             // Да
-  xchg edx, eax
+  test eax, eax                             // Есть dat-файл?
+  jnz  goodRace                             // Да
   dec  eax
   jmp  end
 goodRace:
   test ebx, ebx
   jz   skip
+  push eax
   xor  ebx, ebx                             // Style
   call makeDataPath
-  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
-  mov  eax, esi                             // filename
-  call access_
-  test eax, eax                             // Есть каталог?
-  jnz  checkStyleDatFile                    // Нет
-  mov  eax, esi                             // filename
-  call xaddpath
-  inc  eax                                  // Удачно добавили путь?
-  jnz  checkStyleDatFile                    // Нет
-  mov  [ebp+8], edx
-checkStyleDatFile:
+  mov  ds:[_master_db_handle], edx          // master_patches
+  pop  dword ptr ds:[_critter_db_handle]    // critter_patches
   xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
   mov  eax, edi                             // filename_dat
   call access_
   test eax, eax                             // Есть dat-файл?
-  jnz  skip                                 // Нет
+  jnz  checkStylePath                       // Нет
   mov  eax, edi                             // filename_dat
   call xaddpath
   dec  eax                                  // Открыли dat-файл?
-  jz   checkStyle                           // Да
-  xor  edx, edx
+  jz   addStyleDatFile                      // Да
   inc  eax                                  // Ничего не добавили?
-  jz   checkStyle                           // Да
+  jz   checkStylePath                       // Да
   mov  eax, edi                             // filename_dat
   call xremovepath_
-checkStyle:
+  xor  edx, edx
+addStyleDatFile:
+  mov  [ebp+8], edx
+checkStylePath:
+  xor  edx, edx                             // mode = Существование файла (3 = Доступность для чтения)
+  mov  eax, esi                             // filename
+  call access_
+  test eax, eax                             // Есть каталог?
+  jnz  skip                                 // Нет
+  mov  eax, esi                             // filename
+  call xaddpath
   mov  [ebp+12], edx
 skip:
   xor  eax, eax
 end:
   add  esp, 260+260
+  pop  dword ptr ds:[_critter_db_handle]
+  pop  dword ptr ds:[_master_db_handle]
   pop  ebx
   pop  ecx
   pop  edx

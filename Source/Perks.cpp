@@ -558,28 +558,14 @@ static void _stdcall AddFakePerk(DWORD perkID) {
 
  }
 }
-static void __declspec(naked) AddPerkHook() {
+
+static void __declspec(naked) perk_add_hook() {
  __asm {
-  cmp  edx, PERK_count
-  jl   skip
   pushad
   push edx
   call AddFakePerk
   popad
   xor  eax, eax
-  retn
-skip:
-  push edx
-  call perk_add_
-  pop  edx
-  test eax, eax
-  jnz  end
-  cmp  edx, PERK_gain_strength
-  jl   end
-  cmp  edx, PERK_gain_luck
-  jg   end
-  inc  dword ptr ds:[edx*4 + (_pc_proto + 0x24 - PERK_gain_strength*4)] // base_stat_srength
-end:
   retn
  }
 }
@@ -709,7 +695,8 @@ static void PerkSetup() {
  HookCall(0x43C8D1, GetPerkSDescHook);
  HookCall(0x43C8EF, GetPerkSNameHook);
  HookCall(0x43C90F, GetPerkSImageHook);
- HookCall(0x43C952, &AddPerkHook);
+ SafeWrite8(0x496A65, 0x16);
+ MakeCall(0x496A6B, &perk_add_hook, false);
  //PerkboxSwitchPerk
  HookCall(0x43C3F1, GetPerkSLevelHook);
  HookCall(0x43C41E, GetPerkSLevelHook);
@@ -1143,7 +1130,11 @@ void _stdcall SetPerkDesc(int id, char* value) {
 
 void PerksInit() {
 
- for (int i = STAT_st; i <= STAT_lu; i++) SafeWrite8(GainPerks[i][0], (BYTE)GainPerks[i][1]);
+ for (int STAT_ = STAT_st; STAT_ <= STAT_lu; STAT_++) {
+  SafeWrite32(_perk_data + 0x14 + (PERK_gain_strength + STAT_) * 0x4C, STAT_);
+  SafeWrite32(_perk_data + 0x18 + (PERK_gain_strength + STAT_) * 0x4C, 1);
+  SafeWrite8(GainPerks[STAT_][0], (BYTE)GainPerks[STAT_][1]);
+ }
 
  HookCall(0x442729, &PerkInitWrapper);
 
