@@ -175,6 +175,7 @@ void AnimationsAtOnceInit() {
 
  AnimationsLimit = GetPrivateProfileIntA("Misc", "AnimationsAtOnceLimit", 32, ini);
  if (AnimationsLimit > 32) {
+  if (AnimationsLimit > 127) AnimationsLimit = 127;
   dlog("Applying AnimationsAtOnceLimit patch.", DL_INIT);
 
   int i;

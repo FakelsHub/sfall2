@@ -993,6 +993,28 @@ end:
  }
 }
 
+static void __declspec(naked) exec_script_proc_hook() {
+ __asm {
+  mov  eax, [esi+0x58]
+  test eax, eax
+  ja   end
+  inc  eax
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) exec_script_proc_hook1() {
+ __asm {
+  mov  esi, [edi+0x58]
+  test esi, esi
+  ja   end
+  inc  esi
+end:
+  retn
+ }
+}
+
 static void __declspec(naked) combat_display_hook1() {
  __asm {
   mov  ecx, [eax+0x20]                      // pobj.fid
@@ -1186,8 +1208,8 @@ void BugsInit() {
  SafeWrite8(0x4C4743, 0xC6);
 
 // Исправление использования фиксированной позиции для вызова скриптовой процедуры start при отсутствии стандартного обработчика
- SafeWrite32(0x4A4926, 0xEB58468B);
- SafeWrite32(0x4A4979, 0xEB58778B);
+ MakeCall(0x4A4926, &exec_script_proc_hook, false);
+ MakeCall(0x4A4979, &exec_script_proc_hook1, false);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);

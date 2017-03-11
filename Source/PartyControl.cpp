@@ -427,7 +427,7 @@ void __declspec(naked) RestoreDudeState() {
   mov  edx, ds:[_itemButtonItems+0x10][eax] // mode
   dec  edx
   mov  eax, ds:[_perkLevelDataList]
-  mov  [eax+27*4], edx                      // PERK_mental_block*/
+  mov  [eax+36*4], edx                      // PERK_friendly_foe*/
 
   mov  eax, real_hand
   mov  ds:[_itemCurrentItem], eax
@@ -563,7 +563,7 @@ npcControl:
 /*  mov  eax, ds:[_itemCurrentItem]
   imul edx, eax, 24
   mov  eax, ds:[_perkLevelDataList]
-  mov  eax, [eax+27*4]                      // PERK_mental_block
+  mov  eax, [eax+36*4]                      // PERK_friendly_foe
   inc  eax
   mov  ds:[_itemButtonItems+0x10][edx], eax // mode
   call intface_redraw_items_*/
@@ -769,7 +769,7 @@ skip:
 /*  mov  eax, ds:[_itemCurrentItem]
   imul edx, eax, 24
   mov  eax, ds:[_perkLevelDataList]
-  mov  eax, [eax+27*4]                      // PERK_mental_block
+  mov  eax, [eax+36*4]                      // PERK_friendly_foe
   inc  eax
   mov  ds:[_itemButtonItems+0x10][edx], eax // mode
   call intface_redraw_items_*/

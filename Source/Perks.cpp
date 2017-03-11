@@ -29,7 +29,7 @@ static char Name[64*PERK_count];
 static char Desc[1024*PERK_count];
 static char tName[64*TRAIT_count];
 static char tDesc[1024*TRAIT_count];
-static char perksFile[260];
+static char perksFile[260] = ".\\";
 static BYTE disableTraits[TRAIT_count];
 static DWORD* pc_trait=(DWORD*)_pc_trait;
 
@@ -893,13 +893,17 @@ static int _stdcall trait_adjust_stat_override(DWORD statID) {
 
 static void __declspec(naked) TraitAdjustStatHook() {
  __asm {
-  push edx
-  push ecx
+  xor  ebx, ebx
+check:
+  cmp  eax, STAT_max_derived
+  jbe  skip
+  retn
+skip:
   push eax
   call trait_adjust_stat_override
-  pop  ecx
-  pop  edx
-  retn
+  mov  ebx, STAT_real_max_stat
+  xchg ebx, eax
+  jmp  check
  }
 }
 
@@ -936,7 +940,7 @@ static void __declspec(naked) BlockedTrait() {
 }
 
 static void TraitSetup() {
- MakeCall(0x4B3C7C, &TraitAdjustStatHook, true);
+ MakeCall(0x4B3C84, &TraitAdjustStatHook, false);
  MakeCall(0x4B40FC, &TraitAdjustSkillHook, true);
 
  memset(tName, 0, sizeof(tName));
@@ -1026,14 +1030,14 @@ static void TraitSetup() {
   }
  }
 
- for(int i=0;i<TRAIT_count;i++) {
-  if(Traits[i].Name!=&tName[64*i]) {
+ for (int i = 0; i < TRAIT_count; i++) {
+  if (Traits[i].Name != &tName[64*i]) {
    strcpy_s(&tName[64*i], 64, Traits[i].Name);
-   Traits[i].Name=&tName[64*i];
+   Traits[i].Name = &tName[64*i];
   }
-  if(Traits[i].Desc&&Traits[i].Desc!=&tDesc[1024*i]) {
+  if (Traits[i].Desc && Traits[i].Desc != &tDesc[1024*i]) {
    strcpy_s(&tDesc[1024*i], 1024, Traits[i].Desc);
-   Traits[i].Desc=&tDesc[1024*i];
+   Traits[i].Desc = &tDesc[1024*i];
   }
  }
 }
@@ -1101,7 +1105,7 @@ static void __declspec(naked) StatButton_hook() {
   test ebx, ebx
   jge  end
   sub  ds:[_character_points], esi
-  xor  esi, esi
+  dec  esi
   mov  [esp+0xC+0x4], esi
 end:
   retn
@@ -1139,19 +1143,15 @@ void _stdcall SetPerkDesc(int id, char* value) {
 
 void PerksInit() {
 
- for (int i = 0; i < 7; i++) SafeWrite8(GainPerks[i][0], (BYTE)GainPerks[i][1]);
+ for (int i = STAT_st; i <= STAT_lu; i++) SafeWrite8(GainPerks[i][0], (BYTE)GainPerks[i][1]);
 
  HookCall(0x442729, &PerkInitWrapper);
 
- if (GetPrivateProfileString("Misc", "PerksFile", "", &perksFile[2], 257, ini)) {
-  perksFile[0] = '.';
-  perksFile[1] = '\\';
-  HookCall(0x44272E, &game_init_hook);
- } else perksFile[0] = 0;
+ if (GetPrivateProfileString("Misc", "PerksFile", "", &perksFile[2], 257, ini)) HookCall(0x44272E, &game_init_hook);
+ else perksFile[0] = 0;
 
  MakeCall(0x43DF6F, &is_supper_bonus_hook, false);
  MakeCall(0x434BFF, &PrintBasicStat_hook, false);
-
  HookCall(0x437AB4, &StatButton_hook);
  HookCall(0x437B26, &StatButton_hook1);
 }

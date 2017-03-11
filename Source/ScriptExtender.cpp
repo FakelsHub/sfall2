@@ -31,7 +31,6 @@
 #include "input.h"
 #include "LoadGameHook.h"
 #include "Logging.h"
-#include "numbers.h"
 #include "ScriptExtender.h"
 #include "version.h"
 
