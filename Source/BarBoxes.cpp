@@ -21,20 +21,14 @@
 #include "BarBoxes.h"
 #include "FalloutEngine.h"
 
-struct sBox {
- DWORD msg;
- DWORD colour;
- void* mem;
-};
-
-static sBox boxes[10];
-static DWORD boxesEnabled[5];
+sBBox bboxes[10];
+static DWORD bboxesEnabled[5];
 
 static void __declspec(naked) refresh_box_bar_win_hook() {
  __asm {
   xor  ebx, ebx
 loopBoxes:
-  mov  eax, boxesEnabled[ebx*4]
+  mov  eax, bboxesEnabled[ebx*4]
   test eax, eax
   jz   skip
   lea  eax, [ebx+5]
@@ -54,46 +48,46 @@ end:
 }
 
 void BarBoxesInit() {
- SafeWrite32(0x461266, (DWORD)boxes + 8);
- SafeWrite32(0x4612AC, (DWORD)boxes + 8);
- SafeWrite32(0x4612FE, (DWORD)boxes + 4);
- SafeWrite32(0x46133C, (DWORD)boxes + 0);
- SafeWrite32(0x461374, (DWORD)boxes + 8);
- SafeWrite32(0x4613E8, (DWORD)boxes + 8);
+ SafeWrite32(0x461266, (DWORD)bboxes + 8);
+ SafeWrite32(0x4612AC, (DWORD)bboxes + 8);
+ SafeWrite32(0x4612FE, (DWORD)bboxes + 4);
+ SafeWrite32(0x46133C, (DWORD)bboxes + 0);
+ SafeWrite32(0x461374, (DWORD)bboxes + 8);
+ SafeWrite32(0x4613E8, (DWORD)bboxes + 8);
 
- SafeWrite32(0x461479, (DWORD)boxes + 8);
- SafeWrite32(0x46148C, (DWORD)boxes + 8);
- SafeWrite32(0x4616BB, (DWORD)boxes + 8);
+ SafeWrite32(0x461479, (DWORD)bboxes + 8);
+ SafeWrite32(0x46148C, (DWORD)bboxes + 8);
+ SafeWrite32(0x4616BB, (DWORD)bboxes + 8);
 
- memset(boxes, 0, 12*10);
- memset(boxesEnabled, 0, 5*4);
- memcpy(boxes, (void*)0x518FE8, 12*5);
+ memset(bboxes, 0, 10*12);
+ memset(bboxesEnabled, 0, 5*4);
+ memcpy(bboxes, (void*)_bbox, 5*12);
  
- for (int i = 5; i < 10; i++) boxes[i].msg = 0x69 + i - 5;
+ for (int i = 5; i < 10; i++) bboxes[i].msgnumber = 105 + i - 5;
 
  SafeWrite8(0x46127C, 10);
  SafeWrite8(0x46140B, 10);
- SafeWrite8(0x461495, 0x78);
+ SafeWrite8(0x461495, 10*12);
 
  MakeCall(0x4615A3, &refresh_box_bar_win_hook, false);
  char buf[6];
  GetPrivateProfileString("Misc", "BoxBarColours", "", buf, 6, ini);
  if (strlen(buf) == 5) {
-  for (int i = 0; i < 5; i++) if (buf[i] == '1') boxes[i+5].colour = 1;
+  for (int i = 0; i < 5; i++) if (buf[i] == '1') bboxes[i+5].colour = 1;
  }
 }
 
 int _stdcall GetBox(int i) { 
  if (i < 5 || i > 9) return 0;
- return boxesEnabled[i-5];
+ return bboxesEnabled[i-5];
 }
 
 void _stdcall AddBox(int i) { 
  if (i < 5 || i > 9) return;
- boxesEnabled[i-5] = 1;
+ bboxesEnabled[i-5] = 1;
 }
 
 void _stdcall RemoveBox(int i) { 
  if (i < 5 || i > 9) return;
- boxesEnabled[i-5] = 0;
+ bboxesEnabled[i-5] = 0;
 }

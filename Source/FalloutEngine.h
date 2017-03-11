@@ -49,7 +49,6 @@ extern const DWORD combat_anim_finished_;
 extern const DWORD combat_attack_;
 extern const DWORD combat_should_end_;
 extern const DWORD combat_turn_;
-extern const DWORD config_set_value_;
 extern const DWORD container_exit_;
 extern const DWORD correctFidForRemovedItem_;
 extern const DWORD credits_;
@@ -74,6 +73,7 @@ extern const DWORD db_fwriteByteCount_;
 extern const DWORD db_fwriteIntCount_;
 extern const DWORD db_read_to_buf_;
 extern const DWORD dbase_open_;
+extern const DWORD debug_log_;
 extern const DWORD debug_register_env_;
 extern const DWORD dialog_out_;
 extern const DWORD display_print_;
@@ -144,6 +144,7 @@ extern const DWORD inven_set_mouse_;
 extern const DWORD inven_unwield_;
 extern const DWORD inven_wield_;
 extern const DWORD inven_worn_;
+extern const DWORD is_pc_flag_;
 extern const DWORD is_within_perception_;
 extern const DWORD isPartyMember_;
 extern const DWORD item_add_force_;
@@ -283,6 +284,7 @@ extern const DWORD scr_find_obj_from_program_;
 extern const DWORD scr_new_;
 extern const DWORD scr_ptr_;
 extern const DWORD scr_remove_;
+extern const DWORD scr_set_ext_param_;
 extern const DWORD scr_set_objs_;
 extern const DWORD scr_write_ScriptNode_;
 extern const DWORD set_game_time_;
@@ -322,6 +324,7 @@ extern const DWORD trait_set_;
 extern const DWORD transSrcCopy_;
 extern const DWORD _word_wrap_;
 extern const DWORD win_add_;
+extern const DWORD win_debug_;
 extern const DWORD win_delete_;
 extern const DWORD win_disable_button_;
 extern const DWORD win_draw_;
@@ -365,8 +368,10 @@ extern const DWORD xvfprintf_;
 #define _art_skilldex               0x510878
 #define _art_vault_guy_num          0x5108A4
 #define _art_vault_person_nums      0x5108A8
+#define _bbox                       0x518FE8
 #define _bckgnd                     0x5707A4
 #define _black_palette              0x663FD0
+#define _BlueColor                  0x6A38EF
 #define _bottom_line                0x664524
 #define _btable                     0x59E944
 #define _btncnt                     0x43EA1C
@@ -389,6 +394,7 @@ extern const DWORD xvfprintf_;
 #define _custom_msg_file            0x58EA98
 #define _DARK_GREEN_Color           0x6A3A90
 #define _DARK_GREY_Color            0x6A59D8
+#define _debug_func                 0x51DF04
 #define _dialog_target              0x518848
 #define _dialog_target_is_party     0x51884C
 #define _drugInfoList               0x5191CC
@@ -415,6 +421,7 @@ extern const DWORD xvfprintf_;
 #define _glblmode                   0x5709D0
 #define _gmouse_current_cursor      0x518C0C
 #define _gmovie_played_list         0x596C78
+#define _GNW_win_init_flag          0x51E3E0
 #define _GreenColor                 0x6A3CB0
 #define _grph_id                    0x431C40
 #define _grph_key                   0x570350
@@ -544,18 +551,7 @@ extern const DWORD xvfprintf_;
 #define _world_xpos                 0x672E0C
 #define _world_ypos                 0x672E10
 #define _WorldMapCurrArea           0x672E08
-
-struct sMessage {
- DWORD number;
- DWORD flags;
- char* audio;
- char* message;
-};
-
-struct sFile {
- DWORD fileType;
- void* handle;
-};
+#define _YellowColor                0x6AB8BB
 
 // WRAPPERS:
 const char* _stdcall GetMessageStr(DWORD fileAddr, DWORD messageId);

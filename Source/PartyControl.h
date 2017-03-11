@@ -27,3 +27,4 @@ void RestoreDudeState();
 void PartyControl_PrintWarning();
 
 void PartyControlInit();
+void PartyControlExit();

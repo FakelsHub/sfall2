@@ -19,6 +19,7 @@
 #include "main.h"
 
 #include <vector>
+#include "BarBoxes.h"
 #include "Define.h"
 #include "FalloutEngine.h"
 #include "Inventory.h"
@@ -49,8 +50,12 @@ static DWORD real_perkLevelDataList[PERK_count];
 static DWORD real_drug_gvar[6];
 static DWORD real_jet_gvar;
 static DWORD real_tag_skill[4];
+static DWORD real_bbox_sneak;
 static DWORD party_PERK_bonus_awareness;
 static DWORD party_PERK_gecko_skinning;
+
+static BYTE *NameBox;
+extern sBBox bboxes[10];
 
 static void __declspec(naked) isRealParty() {
  __asm {
@@ -143,8 +148,57 @@ void __declspec(naked) SaveDudeState() {
   mov  ecx, 32/4
   rep  movsd
   mov  eax, ebx
+  push ebx
   call critter_name_
+  push eax
   call critter_pc_set_name_
+  mov  eax, [bboxes+12+8]
+  mov  real_bbox_sneak, eax
+  mov  eax, NameBox
+  mov  [bboxes+12+8], eax
+  mov  ebx, 2730
+  xor  edx, edx
+  call memset_                              // eax = destination, edx = value, ebx = num
+  xchg edi, eax                             // edi = Buffer
+  pop  edx                                  // edx = DisplayText
+  push dword ptr ds:[_curr_font_num]
+  mov  eax, 103
+  call text_font_
+  mov  esi, 21
+  call ds:[_text_height]
+  sub  esi, eax
+  shr  esi, 1
+  inc  esi                                  // esi = y
+  mov  ecx, 130                             // ecx = ToWidth
+  imul esi, ecx                             // esi = ToWidth * y
+  lea  esi, [esi+67]                        // esi = ToWidth * y + 67
+  lea  ebx, [ecx-4]
+  mov  eax, edx
+  call ds:[_text_width]
+  cmp  eax, ebx
+  jbe  goodWidth
+  xchg ebx, eax
+goodWidth:
+  mov  ebx, eax                             // ebx = TxtWidth
+  shr  eax, 1                               // TxtWidth/2
+  sub  esi, eax
+  movzx eax, byte ptr ds:[_BlueColor]
+  push eax                                  // ColorIndex
+  lea  eax, [edi+esi]                       // eax = Buffer
+  call ds:[_text_to_buf]
+  pop  eax
+  call text_font_
+  movzx eax, byte ptr ds:[_GreenColor]
+  push eax                                  // Color
+  push 19
+  mov  edx, 129
+  push edx
+  inc  edx
+  xor  ecx, ecx
+  mov  ebx, 3
+  xchg edi, eax                             // toSurface
+  call draw_box_
+  pop  ebx
   mov  eax, ds:[_last_level]
   mov  real_last_level, eax
   mov  eax, ds:[_Level_]
@@ -365,12 +419,16 @@ void __declspec(naked) RestoreDudeState() {
   mov  ds:[_map_elevation], eax
   mov  eax, real_sneak_working
   mov  ds:[_sneak_working], eax
-  mov  eax, ds:[_itemCurrentItem]
+  mov  eax, real_bbox_sneak
+  mov  [bboxes+12+8], eax
+
+/*  mov  eax, ds:[_itemCurrentItem]
   imul eax, eax, 24
   mov  edx, ds:[_itemButtonItems+0x10][eax] // mode
   dec  edx
   mov  eax, ds:[_perkLevelDataList]
-  mov  [eax+27*4], edx                      // PERK_mental_block
+  mov  [eax+27*4], edx                      // PERK_mental_block*/
+
   mov  eax, real_hand
   mov  ds:[_itemCurrentItem], eax
   mov  edx, real_trait2
@@ -501,13 +559,15 @@ npcControl:
   xchg ebx, eax                             // ebx = npc
   call SaveDudeState
   call intface_redraw_
-  mov  eax, ds:[_itemCurrentItem]
+
+/*  mov  eax, ds:[_itemCurrentItem]
   imul edx, eax, 24
   mov  eax, ds:[_perkLevelDataList]
   mov  eax, [eax+27*4]                      // PERK_mental_block
   inc  eax
   mov  ds:[_itemButtonItems+0x10][edx], eax // mode
-  call intface_redraw_items_
+  call intface_redraw_items_*/
+
   mov  eax, [ebx+0x4]                       // tile_num
   mov  edx, 3
   call tile_scroll_to_
@@ -690,7 +750,9 @@ static void __declspec(naked) damage_object_hook() {
   jne  skip
   mov  ecx, edx
   call RestoreDudeState
+  push eax
   call intface_redraw_
+  pop  eax
 skip:
   push eax
   call scr_set_objs_
@@ -703,13 +765,15 @@ skip:
   mov  ebx, ecx
   call SaveDudeState
   call intface_redraw_
-  mov  eax, ds:[_itemCurrentItem]
+
+/*  mov  eax, ds:[_itemCurrentItem]
   imul edx, eax, 24
   mov  eax, ds:[_perkLevelDataList]
   mov  eax, [eax+27*4]                      // PERK_mental_block
   inc  eax
   mov  ds:[_itemButtonItems+0x10][edx], eax // mode
-  call intface_redraw_items_
+  call intface_redraw_items_*/
+
 end:
   pop  ecx
   pop  eax                                  // ”ничтожаем адрес возврата
@@ -768,8 +832,19 @@ static void __declspec(naked) partyMemberCopyLevelInfo_hook() {
   test eax, eax
   jz   end
   and  byte ptr [eax+0x27], 0xFC            // —брасываем флаг оружи€ в руке
-end:
   xor  eax, eax
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) refresh_box_bar_win_hook() {
+ __asm {
+  cmp  IsControllingNPC, eax
+  jne  end
+  jmp  is_pc_flag_
+end:
+  inc  eax
   retn
  }
 }
@@ -777,6 +852,7 @@ end:
 void PartyControlInit() {
  Mode = GetPrivateProfileIntA("Misc", "ControlCombat", 0, ini);
  if (Mode == 1 || Mode == 2) {
+  NameBox = new BYTE[2730];
   char pidbuf[512];
   pidbuf[511]=0;
   if (GetPrivateProfileStringA("Misc", "ControlCombatPIDList", "", pidbuf, 511, ini)) {
@@ -809,5 +885,10 @@ void PartyControlInit() {
   HookCall(0x454218, &op_give_exp_points_hook);
   MakeCall(0x471733, &adjust_fid_hook, true);
   HookCall(0x495F00, &partyMemberCopyLevelInfo_hook);
+  HookCall(0x461528, &refresh_box_bar_win_hook);
  } else dlog(" Disabled.", DL_INIT);
+}
+
+void PartyControlExit() {
+ if (Mode == 1 || Mode == 2) delete[] NameBox;
 }

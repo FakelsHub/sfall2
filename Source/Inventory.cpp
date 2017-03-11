@@ -808,16 +808,15 @@ end:
 static void __declspec(naked) correctFidForRemovedItem_hook() {
  __asm {
   call adjust_ac_
-nextArmor:
   mov  eax, esi
   call inven_worn_
   test eax, eax
   jz   noArmor
   and  byte ptr [eax+0x27], 0xFB            // Сбрасываем флаг одетой брони
-  jmp  nextArmor
 noArmor:
   cmp  edi, -1                              // Это игрок?
   jnz  end                                  // Да
+  xor  eax, eax
   cmp  npcCount, eax
   je   end
   push esi                                  // указатель на нпс

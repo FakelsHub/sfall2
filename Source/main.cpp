@@ -211,10 +211,13 @@ end:
  }
 }
 
-static void __declspec(naked) DebugMode() {
+static void __declspec(naked) win_debug_hook() {
  __asm {
-  call config_set_value_
-  jmp  debug_register_env_
+  call debug_log_
+  xor  eax, eax
+  cmp  ds:[_GNW_win_init_flag], eax
+  push 0x4DC320
+  retn
  }
 }
 
@@ -1207,6 +1210,26 @@ static void __declspec(naked) gdAddOptionStr_hook() {
  }
 }
 
+static void __declspec(naked) combat_begin_hook() {
+ __asm {
+  push eax
+  call scr_set_ext_param_
+  pop  eax                                  // pobj.sid
+  mov  edx, combat_is_starting_p_proc
+  jmp  exec_script_proc_
+ }
+}
+
+static void __declspec(naked) combat_over_hook() {
+ __asm {
+  push eax
+  call scr_set_ext_param_
+  pop  eax                                  // pobj.sid
+  mov  edx, combat_is_over_p_proc
+  jmp  exec_script_proc_
+ }
+}
+
 static void DllMain2() {
  int tmp;
  //SafeWrite8(0x4B15E8, 0xc3);
@@ -1492,14 +1515,23 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
+ dlogr("Patching out ereg call.", DL_INIT);
+ HookCall(0x4425E6, (void*)debug_register_env_);
+
  tmp = GetPrivateProfileIntA("Debugging", "DebugMode", 0, ini);
  if (tmp && *((DWORD*)0x444A60) == 0xFFFE76FC && *((DWORD*)0x444A64) == 0x0F01FE83) {
   dlog("Applying DebugMode patch.", DL_INIT);
-  HookCall(0x444A5F, &DebugMode);
+  MotionSensorFlags = 0x50F90C;             // "log"
+  if (tmp&1) {
+   if (tmp&2) {
+    SafeWrite16(0x4C6E75, 0x66EB);          // jmps 0x4C6EDD
+    SafeWrite8(0x4C6EF2, 0xEB);
+    SafeWrite8(0x4C7034, 0x0);
+    MakeCall(0x4DC319, &win_debug_hook, true);
+   } else MotionSensorFlags = 0x50F928;     // "gnw"
+  }
   SafeWrite8(0x4C6D9B, 0xB8);               // mov  eax, offset ???
-  if (tmp == 1) tmp = 0x50F928;             // "gnw"
-  else tmp = 0x50F90C;                      // "log"
-  SafeWrite32(0x4C6D9C, tmp);
+  SafeWrite32(0x4C6D9C, MotionSensorFlags);
   dlogr(" Done", DL_INIT);
  }
 
@@ -1720,9 +1752,6 @@ static void DllMain2() {
 
  dlogr("Running BarBoxesInit().", DL_INIT);
  BarBoxesInit();
-
- dlogr("Patching out ereg call.", DL_INIT);
- BlockCall(0x4425E6);
 
  AnimationsAtOnceInit();
 
@@ -1949,12 +1978,17 @@ static void DllMain2() {
   MakeCall(0x4458F5, &gdAddOptionStr_hook, true);
  }
 
+// todo: перенести в ScriptExtender.cpp
+ HookCall(0x421B72, &combat_begin_hook);
+ HookCall(0x421FC1, &combat_over_hook);
+
  dlogr("Leave DllMain2", DL_MAIN);
 }
 
 static void _stdcall OnExit() {
  ConsoleExit();
  AnimationsAtOnceExit();
+ PartyControlExit();
 }
 
 static void __declspec(naked) OnExitFunc() {

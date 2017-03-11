@@ -281,9 +281,11 @@
 #define ROLL_SUCCESS          (2)
 #define ROLL_CRITICAL_SUCCESS (3)
 
-#define start            (1)
-#define map_enter_p_proc (15)
-#define destroy_p_proc   (18)
+#define start                     (1)
+#define map_enter_p_proc          (15)
+#define destroy_p_proc            (18)
+#define combat_is_starting_p_proc (26)
+#define combat_is_over_p_proc     (27)
 
 #define COMBAT_SUBTYPE_WEAPON_USED   (1)
 #define COMBAT_SUBTYPE_HIT_SUCCEEDED (2)

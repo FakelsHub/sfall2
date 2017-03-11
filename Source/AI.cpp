@@ -29,20 +29,20 @@ static stdext::hash_map<DWORD,DWORD> targets;
 static stdext::hash_map<DWORD,DWORD> sources;
 
 DWORD _stdcall AIGetLastAttacker(DWORD target) {
- iter itr=sources.find(target);
- if(itr==sources.end()) return 0;
+ iter itr = sources.find(target);
+ if (itr == sources.end()) return 0;
  else return itr->second;
 }
 
 DWORD _stdcall AIGetLastTarget(DWORD source) {
- iter itr=targets.find(source);
- if(itr==targets.end()) return 0;
+ iter itr = targets.find(source);
+ if (itr == targets.end()) return 0;
  else return itr->second;
 }
 
 static void _stdcall CombatAttackHook(DWORD source, DWORD target) {
- sources[target]=source;
- targets[source]=target;
+ sources[target] = source;
+ targets[source] = target;
 }
 
 static void __declspec(naked) combat_attack_hook() {

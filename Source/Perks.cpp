@@ -1048,6 +1048,19 @@ static __declspec(naked) void TraitInitWrapper() {
  }
 }
 
+static void __declspec(naked) is_supper_bonus_hook() {
+ __asm {
+  test eax, eax
+  jle  end
+  cmp  eax, 10
+  jg   end
+  pop  eax                                  // ”ничтожаем адрес возврата
+  push 0x43DF7F
+end:
+  retn
+ }
+}
+
 void _stdcall SetPerkValue(int id, int value, DWORD offset) {
  if(id<0||id>=PERK_count) return;
  *(DWORD*)((DWORD)(&Perks[id])+offset)=value;
@@ -1072,7 +1085,9 @@ void PerksInit() {
   perksFile[1]='\\';
   HookCall(0x44272E, &TraitInitWrapper);
  } else perksFile[0]=0;
+ MakeCall(0x43DF71, &is_supper_bonus_hook, false);
 }
+
 void PerksReset() {
  fakeTraits.clear();
  fakePerks.clear();

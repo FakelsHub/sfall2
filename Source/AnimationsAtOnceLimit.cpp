@@ -143,7 +143,6 @@ static const DWORD sad_28[] = {
  0x4173CE, 0x4174C1, 0x4175F1, 0x417730,
 };
 
-#ifdef TRACE
 static void __declspec(naked) anim_set_end_hook() {
  __asm {
   mov  edi, _anim_set
@@ -171,7 +170,6 @@ skip:
   jmp  register_begin_
  }
 }
-#endif
 
 void AnimationsAtOnceInit() {
 
@@ -324,10 +322,8 @@ void AnimationsAtOnceInit() {
   dlogr(" Done", DL_INIT);
  }
 
-#ifdef TRACE
  MakeCall(0x415DE2, &anim_set_end_hook, true);
  HookCall(0x459A0B, &op_anim_hook);
-#endif
 
 }
 
