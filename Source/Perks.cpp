@@ -33,15 +33,16 @@ static char perksFile[260];
 static BYTE disableTraits[TRAIT_count];
 static DWORD* pc_trait=(DWORD*)_pc_trait;
 
-#define check_trait(a) !disableTraits[a]&&(pc_trait[0]==a||pc_trait[1]==a)
+#define check_trait(a) !disableTraits[a] && (pc_trait[0] == a || pc_trait[1] == a)
 
-static DWORD addPerkMode=2;
+static DWORD addPerkMode = 2;
 
 struct TraitStruct {
  char* Name;
  char* Desc;
  DWORD Image;
 };
+
 struct PerkStruct {
  char* Name;
  char* Desc;
@@ -82,8 +83,8 @@ static DWORD RemoveTraitID;
 static DWORD RemovePerkID;
 static DWORD RemoveSelectableID;
 
-static DWORD TraitSkillBonuses[TRAIT_count*18];
-static DWORD TraitStatBonuses[TRAIT_count*(STAT_max_derived+1)];
+static int TraitStatBonuses[TRAIT_count][STAT_max_derived+1];
+static int TraitSkillBonuses[TRAIT_count][SKILL_count];
 
 static DWORD IgnoringDefaultPerks=0;
 static char PerkBoxTitle[64];
@@ -96,12 +97,13 @@ static const DWORD GainPerks[7][2] = {
 };
 
 void _stdcall SetPerkFreq(int i) {
- PerkFreqOverride=i;
+ PerkFreqOverride = i;
 }
 
 static DWORD _stdcall IsTraitDisabled(int id) {
  return disableTraits[id];
 }
+
 static void __declspec(naked) LevelUpHook() {
  __asm {
   push ecx;
@@ -731,7 +733,7 @@ static void PerkSetup() {
  SafeWrite32(0x00496BF5, (DWORD)Perks + 8);
  SafeWrite32(0x00496AD4, (DWORD)Perks + 12);
 
- if(strlen(perksFile)) {
+ if (strlen(perksFile)) {
   char num[4];
   for(int i=0;i<PERK_count;i++) {
    _itoa_s(i, num, 10);
@@ -821,93 +823,99 @@ static int _stdcall stat_get_base_direct(DWORD statID) {
  }
  return result;
 }
+
 static int _stdcall trait_adjust_stat_override(DWORD statID) {
- if(statID>STAT_max_derived) return 0;
- int result=0;
- if(pc_trait[0]!=-1) result+=TraitStatBonuses[statID*TRAIT_count+pc_trait[0]];
- if(pc_trait[1]!=-1) result+=TraitStatBonuses[statID*TRAIT_count+pc_trait[1]];
- switch(statID) {
-  case STAT_st:
-   if(check_trait(TRAIT_gifted)) result++;
-   if(check_trait(TRAIT_bruiser)) result+=2;
-   break;
-  case STAT_pe:
-   if(check_trait(TRAIT_gifted)) result++;
-   break;
-  case STAT_en:
-   if(check_trait(TRAIT_gifted)) result++;
-   break;
-  case STAT_ch:
-   if(check_trait(TRAIT_gifted)) result++;
-   break;
-  case STAT_iq:
-   if(check_trait(TRAIT_gifted)) result++;
-   break;
-  case STAT_ag:
-   if(check_trait(TRAIT_gifted)) result++;
-   if(check_trait(TRAIT_small_frame)) result++;
-   break;
-  case STAT_lu:
-   if(check_trait(TRAIT_gifted)) result++;
-   break;
-  case STAT_max_move_points:
-   if(check_trait(TRAIT_bruiser)) result-=2;
-   break;
-  case STAT_ac:
-   if(check_trait(TRAIT_kamikaze)) return -stat_get_base_direct(STAT_ac);
-   break;
-  case STAT_melee_dmg:
-   if(check_trait(TRAIT_heavy_handed)) result+=4;
-   break;
-  case STAT_carry_amt:
-   if(check_trait(TRAIT_small_frame)) {
-    int str=stat_get_base_direct(STAT_st);
-    result-=str*10;
-   }
-   break;
-  case STAT_sequence:
-   if(check_trait(TRAIT_kamikaze)) result+=5;
-   break;
-  case STAT_heal_rate:
-   if(check_trait(TRAIT_fast_metabolism)) result+=2;
-   break;
-  case STAT_crit_chance:
-   if(check_trait(TRAIT_finesse)) result+=10;
-   break;
-  case STAT_better_crit:
-   if(check_trait(TRAIT_heavy_handed)) result-=30;
-   break;
-  case STAT_rad_resist:
-   if(check_trait(TRAIT_fast_metabolism)) return -stat_get_base_direct(STAT_rad_resist);
-   break;
-  case STAT_poison_resist:
-   if(check_trait(TRAIT_fast_metabolism)) return -stat_get_base_direct(STAT_poison_resist);
-   break;
+ int result = 0;
+ if (statID >= STAT_st && statID <= STAT_max_derived) {
+  if (pc_trait[0] != -1) result+=TraitStatBonuses[pc_trait[0]][statID];
+  if (pc_trait[1] != -1) result+=TraitStatBonuses[pc_trait[1]][statID];
+  switch (statID) {
+   case STAT_st:
+    if(check_trait(TRAIT_gifted)) result++;
+    if(check_trait(TRAIT_bruiser)) result+=2;
+    break;
+   case STAT_pe:
+    if(check_trait(TRAIT_gifted)) result++;
+    break;
+   case STAT_en:
+    if(check_trait(TRAIT_gifted)) result++;
+    break;
+   case STAT_ch:
+    if(check_trait(TRAIT_gifted)) result++;
+    break;
+   case STAT_iq:
+    if(check_trait(TRAIT_gifted)) result++;
+    break;
+   case STAT_ag:
+    if(check_trait(TRAIT_gifted)) result++;
+    if(check_trait(TRAIT_small_frame)) result++;
+    break;
+   case STAT_lu:
+    if(check_trait(TRAIT_gifted)) result++;
+    break;
+   case STAT_max_move_points:
+    if(check_trait(TRAIT_bruiser)) result-=2;
+    break;
+   case STAT_ac:
+    if(check_trait(TRAIT_kamikaze)) return -stat_get_base_direct(STAT_ac);
+    break;
+   case STAT_melee_dmg:
+    if(check_trait(TRAIT_heavy_handed)) result+=4;
+    break;
+   case STAT_carry_amt:
+    if(check_trait(TRAIT_small_frame)) {
+     int str=stat_get_base_direct(STAT_st);
+     result-=str*10;
+    }
+    break;
+   case STAT_sequence:
+    if(check_trait(TRAIT_kamikaze)) result+=5;
+    break;
+   case STAT_heal_rate:
+    if(check_trait(TRAIT_fast_metabolism)) result+=2;
+    break;
+   case STAT_crit_chance:
+    if(check_trait(TRAIT_finesse)) result+=10;
+    break;
+   case STAT_better_crit:
+    if(check_trait(TRAIT_heavy_handed)) result-=30;
+    break;
+   case STAT_rad_resist:
+    if(check_trait(TRAIT_fast_metabolism)) return -stat_get_base_direct(STAT_rad_resist);
+    break;
+   case STAT_poison_resist:
+    if(check_trait(TRAIT_fast_metabolism)) return -stat_get_base_direct(STAT_poison_resist);
+    break;
+  }
  }
  return result;
 }
+
 static void __declspec(naked) TraitAdjustStatHook() {
  __asm {
-  push edx;
-  push ecx;
-  push eax;
-  call trait_adjust_stat_override;
-  pop ecx;
-  pop edx;
-  retn;
+  push edx
+  push ecx
+  push eax
+  call trait_adjust_stat_override
+  pop  ecx
+  pop  edx
+  retn
  }
 }
+
 static int _stdcall trait_adjust_skill_override(DWORD skillID) {
- int result=0;
- if(pc_trait[0]!=-1) result+=TraitSkillBonuses[skillID*TRAIT_count+pc_trait[0]];
- if(pc_trait[1]!=-1) result+=TraitSkillBonuses[skillID*TRAIT_count+pc_trait[1]];
- if(check_trait(TRAIT_gifted)) result-=10;
- if(check_trait(TRAIT_good_natured)) {
-  if(skillID<=SKILL_THROWING) result-=10;
-  else if(skillID==SKILL_FIRST_AID||skillID==SKILL_DOCTOR||skillID==SKILL_CONVERSANT||skillID==SKILL_BARTER) result+=15;
+ int result = 0;
+ if (pc_trait[0] != -1) result+=TraitSkillBonuses[pc_trait[0]][skillID];
+ if (pc_trait[1] != -1) result+=TraitSkillBonuses[pc_trait[1]][skillID];
+
+ if (check_trait(TRAIT_gifted)) result-=10;
+ if (check_trait(TRAIT_good_natured)) {
+  if (skillID <= SKILL_THROWING) result-=10;
+  else if (skillID == SKILL_FIRST_AID || skillID == SKILL_DOCTOR || skillID == SKILL_CONVERSANT || skillID == SKILL_BARTER) result+=15;
  }
  return result;
 }
+
 static void __declspec(naked) TraitAdjustSkillHook() {
  __asm {
   push edx;
@@ -919,12 +927,14 @@ static void __declspec(naked) TraitAdjustSkillHook() {
   retn;
  }
 }
+
 static void __declspec(naked) BlockedTrait() {
  __asm {
   xor eax, eax;
   retn;
  }
 }
+
 static void TraitSetup() {
  MakeCall(0x4B3C7C, &TraitAdjustStatHook, true);
  MakeCall(0x4B40FC, &TraitAdjustSkillHook, true);
@@ -941,76 +951,74 @@ static void TraitSetup() {
  SafeWrite32(0x4B3BA0, (DWORD)Traits + 4);
  SafeWrite32(0x4B3BC0, (DWORD)Traits + 8);
 
- if(strlen(perksFile)) {
+ if (strlen(perksFile)) {
   char num[5], buf[512];
-  num[0]='t';
-  char* num2=&num[1];
-  for(int i=0;i<TRAIT_count;i++) {
-   _itoa_s(i, num2, 4, 10);
-   if(GetPrivateProfileString(num, "Name", "", &tName[i*64], 63, perksFile)) Traits[i].Name=&tName[i*64];
-   if(GetPrivateProfileString(num, "Desc", "", &tDesc[i*1024], 1023, perksFile)) {
-    Traits[i].Desc=&tDesc[i*1024];
-   }
+  num[0] = 't';
+  char* num2 = &num[1];
+  for (int TRAIT_ = 0; TRAIT_ < TRAIT_count; TRAIT_++) {
+   _itoa_s(TRAIT_, num2, 4, 10);
+   if (GetPrivateProfileString(num, "Name", "", &tName[TRAIT_*64], 63, perksFile)) Traits[TRAIT_].Name = &tName[TRAIT_*64];
+   if (GetPrivateProfileString(num, "Desc", "", &tDesc[TRAIT_*1024], 1023, perksFile)) Traits[TRAIT_].Desc = &tDesc[TRAIT_*1024];
    int value;
-   value=GetPrivateProfileInt(num, "Image", -99999, perksFile);
-   if(value!=-99999) Traits[i].Image=value;
+   value = GetPrivateProfileInt(num, "Image", -99999, perksFile);
+   if (value != -99999) Traits[TRAIT_].Image = value;
 
-   if(GetPrivateProfileStringA(num, "StatMod", "", buf, 512, perksFile)>0) {
+   if (GetPrivateProfileStringA(num, "StatMod", "", buf, 512, perksFile) > 0) {
     char *stat, *mod;
-    stat=strtok(buf, "|");
-    mod=strtok(0, "|");
-    while(stat&&mod) {
-     int _stat=atoi(stat), _mod=atoi(mod);
-     if(_stat>=0&&_stat<=STAT_max_derived) TraitStatBonuses[_stat*TRAIT_count+i]=_mod;
-     stat=strtok(0, "|");
-     mod=strtok(0, "|");
+    stat = strtok(buf, "|");
+    mod = strtok(0, "|");
+    while (stat && mod) {
+     int STAT_ = atoi(stat);
+     if (STAT_ >= STAT_st && STAT_ <= STAT_max_derived) TraitStatBonuses[TRAIT_][STAT_] = atoi(mod);
+     stat = strtok(0, "|");
+     mod = strtok(0, "|");
     }
    }
 
-   if(GetPrivateProfileStringA(num, "SkillMod", "", buf, 512, perksFile)>0) {
-    char *stat, *mod;
-    stat=strtok(buf, "|");
-    mod=strtok(0, "|");
-    while(stat&&mod) {
-     int _stat=atoi(stat), _mod=atoi(mod);
-     if(_stat>=0&&_stat<18) TraitSkillBonuses[_stat*TRAIT_count+i]=_mod;
-     stat=strtok(0, "|");
-     mod=strtok(0, "|");
+   if (GetPrivateProfileStringA(num, "SkillMod", "", buf, 512, perksFile) > 0) {
+    char *skill, *mod;
+    skill = strtok(buf, "|");
+    mod = strtok(0, "|");
+    while (skill && mod) {
+     int SKILL_ = atoi(skill);
+     if (SKILL_ >= SKILL_SMALL_GUNS && SKILL_ < SKILL_count) TraitSkillBonuses[TRAIT_][SKILL_] = atoi(mod);
+     skill = strtok(0, "|");
+     mod = strtok(0, "|");
     }
    }
 
-   if(GetPrivateProfileInt(num, "NoHardcode", 0, perksFile)) {
-    disableTraits[i]=1;
-    switch(i) {
-     case 3:
+   if (GetPrivateProfileInt(num, "NoHardcode", 0, perksFile)) {
+    disableTraits[TRAIT_] = 1;
+    switch(TRAIT_) {
+     case TRAIT_one_hander:
       HookCall(0x4245E0, &BlockedTrait);
       break;
-     case 4:
+     case TRAIT_finesse:
       HookCall(0x4248F9, &BlockedTrait);
       break;
-     case 7:
+     case TRAIT_fast_shot:
       HookCall(0x478C8A, &BlockedTrait); //fast shot
       HookCall(0x478E70, &BlockedTrait);
       break;
-     case 8:
+     case TRAIT_bloody_mess:
       HookCall(0x410707, &BlockedTrait);
       break;
-     case 9:
+     case TRAIT_jinxed:
       HookCall(0x42389F, &BlockedTrait);
       break;
-     case 11:
+     case TRAIT_drug_addict:
       HookCall(0x47A0CD, &BlockedTrait);
       HookCall(0x47A51A, &BlockedTrait);
       break;
-     case 12:
+     case TRAIT_drug_resistant:
       HookCall(0x479BE1, &BlockedTrait);
       HookCall(0x47A0DD, &BlockedTrait);
       break;
-     case 14:
+     case TRAIT_skilled:
       HookCall(0x43C295, &BlockedTrait);
       HookCall(0x43C2F3, &BlockedTrait);
       break;
-     case 15:
+     case TRAIT_gifted:
       HookCall(0x43C2A4, &BlockedTrait);
       break;
     }
@@ -1029,33 +1037,87 @@ static void TraitSetup() {
   }
  }
 }
+
 static __declspec(naked) void PerkInitWrapper() {
  __asm {
   call perk_init_
-  pushad;
-  call PerkSetup;
-  popad;
-  retn;
+  pushad
+  call PerkSetup
+  popad
+  retn
  }
 }
-static __declspec(naked) void TraitInitWrapper() {
+
+static void __declspec(naked) game_init_hook() {
  __asm {
   call trait_init_
-  pushad;
-  call TraitSetup;
-  popad;
-  retn;
+  pushad
+  call TraitSetup
+  popad
+  retn
  }
 }
 
 static void __declspec(naked) is_supper_bonus_hook() {
  __asm {
+  add  eax, ecx
   test eax, eax
+  jle  skip
+  cmp  eax, 10
   jle  end
+skip:
+  pop  eax                                  // ”ничтожаем адрес возврата
+  xor  eax, eax
+  inc  eax
+  pop  edx
+  pop  ecx
+  pop  ebx
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) PrintBasicStat_hook() {
+ __asm {
+  test eax, eax
+  jle  skip
   cmp  eax, 10
   jg   end
+  pop  ebx                                  // ”ничтожаем адрес возврата
+  push 0x434C21
+  retn
+skip:
+  xor  eax, eax
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) StatButton_hook() {
+ __asm {
+  call inc_stat_
+  test eax, eax
+  jl   end
+  test ebx, ebx
+  jge  end
+  sub  ds:[_character_points], esi
+  xor  esi, esi
+  mov  [esp+0xC+0x4], esi
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) StatButton_hook1() {
+ __asm {
+  call stat_level_
+  cmp  eax, 1
+  jg   end
   pop  eax                                  // ”ничтожаем адрес возврата
-  push 0x43DF7F
+  xor  eax, eax
+  inc  eax
+  mov  [esp+0xC], eax
+  push 0x437B41
 end:
   retn
  }
@@ -1080,12 +1142,18 @@ void PerksInit() {
  for (int i = 0; i < 7; i++) SafeWrite8(GainPerks[i][0], (BYTE)GainPerks[i][1]);
 
  HookCall(0x442729, &PerkInitWrapper);
- if(GetPrivateProfileString("Misc", "PerksFile", "", &perksFile[2], 257, ini)) {
-  perksFile[0]='.';
-  perksFile[1]='\\';
-  HookCall(0x44272E, &TraitInitWrapper);
- } else perksFile[0]=0;
- MakeCall(0x43DF71, &is_supper_bonus_hook, false);
+
+ if (GetPrivateProfileString("Misc", "PerksFile", "", &perksFile[2], 257, ini)) {
+  perksFile[0] = '.';
+  perksFile[1] = '\\';
+  HookCall(0x44272E, &game_init_hook);
+ } else perksFile[0] = 0;
+
+ MakeCall(0x43DF6F, &is_supper_bonus_hook, false);
+ MakeCall(0x434BFF, &PrintBasicStat_hook, false);
+
+ HookCall(0x437AB4, &StatButton_hook);
+ HookCall(0x437B26, &StatButton_hook1);
 }
 
 void PerksReset() {

@@ -118,6 +118,7 @@ const DWORD gsound_get_sound_ready_for_effect_ = 0x452378;
 const DWORD gsound_play_sfx_file_ = 0x4519A8;
 const DWORD gsound_red_butt_press_ = 0x451970;
 const DWORD inc_game_time_ = 0x4A34CC;
+const DWORD inc_stat_ = 0x4AF5D4;
 const DWORD insert_withdrawal_ = 0x47A290;
 const DWORD interpret_ = 0x46CCA4;
 const DWORD interpretAddString_ = 0x467A80;
