@@ -20,6 +20,7 @@
 #include "FalloutStructs.h"
 
 extern const DWORD access_;
+extern const DWORD action_can_talk_to_;
 extern const DWORD action_get_an_object_;
 extern const DWORD action_loot_container_;
 extern const DWORD action_push_critter_;
@@ -28,6 +29,7 @@ extern const DWORD add_bar_box_;
 extern const DWORD AddHotLines_;
 extern const DWORD adjust_ac_;
 extern const DWORD adjust_fid_;
+extern const DWORD ai_find_attackers_;
 extern const DWORD ai_search_inven_armor_;
 extern const DWORD art_alias_num_;
 extern const DWORD art_exists_;
@@ -58,6 +60,7 @@ extern const DWORD credits_get_next_line_;
 extern const DWORD critter_body_type_;
 extern const DWORD critter_can_obj_dude_rest_;
 extern const DWORD critter_get_hits_;
+extern const DWORD critter_is_active_;
 extern const DWORD critter_is_dead_;
 extern const DWORD critter_kill_;
 extern const DWORD critter_kill_count_type_;
@@ -104,6 +107,7 @@ extern const DWORD game_get_global_var_;
 extern const DWORD game_set_global_var_;
 extern const DWORD game_time_date_;
 extern const DWORD gdialog_barter_cleanup_tables_;
+extern const DWORD gdialog_barter_pressed_;
 extern const DWORD gdialogDisplayMsg_;
 extern const DWORD get_input_;
 extern const DWORD get_time_;
@@ -275,6 +279,7 @@ extern const DWORD register_object_animate_and_hide_;
 extern const DWORD register_object_change_fid_;
 extern const DWORD register_object_funset_;
 extern const DWORD register_object_light_;
+extern const DWORD register_object_move_to_tile_;
 extern const DWORD register_object_must_erase_;
 extern const DWORD register_object_take_out_;
 extern const DWORD register_object_turn_towards_;
@@ -318,7 +323,9 @@ extern const DWORD talk_to_translucent_trans_buf_to_buf_;
 extern const DWORD text_font_;
 extern const DWORD text_object_create_;
 extern const DWORD tile_coord_;
+extern const DWORD tile_dir_;
 extern const DWORD tile_num_;
+extern const DWORD tile_num_in_direction_;
 extern const DWORD tile_refresh_display_;
 extern const DWORD tile_refresh_rect_;
 extern const DWORD tile_scroll_to_;
@@ -402,6 +409,8 @@ extern const DWORD xvfprintf_;
 #define _debug_func                 0x51DF04
 #define _dialog_target              0x518848
 #define _dialog_target_is_party     0x51884C
+#define _dialogue_state             0x518714
+#define _dialogue_switch_mode       0x518718
 #define _drugInfoList               0x5191CC
 #define _edit_win                   0x57060C
 #define _editor_msg                 0x501694

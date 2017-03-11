@@ -20,6 +20,7 @@
 
 #include <hash_map>
 #include "AI.h"
+#include "Define.h"
 #include "FalloutEngine.h"
 #include "SafeWrite.h"
 
@@ -27,6 +28,8 @@ typedef stdext::hash_map<DWORD, DWORD> :: const_iterator iter;
 
 static stdext::hash_map<DWORD,DWORD> targets;
 static stdext::hash_map<DWORD,DWORD> sources;
+
+static int AI_Called_Freq_Div;
 
 DWORD _stdcall AIGetLastAttacker(DWORD target) {
  iter itr = sources.find(target);
@@ -89,8 +92,139 @@ end:
  }
 }
 
+static void __declspec(naked) ai_called_shot_hook() {
+ __asm {
+  xchg edx, eax                             // eax = cap.called_freq
+  cdq
+  div  dword ptr AI_Called_Freq_Div
+  xchg edx, eax
+  xor  eax, eax
+  inc  eax
+  cmp  eax, edx
+  jbe  end
+  mov  edx, eax
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) action_push_critter() {
+// eax, esi = source, edx = target
+ __asm {
+  push ebp
+  push edi
+  push esi
+  push ecx
+  push ebx
+  cmp  eax, edx
+  je   fail
+  mov  edi, edx                             // edi = target
+  xchg edx, eax
+  call critter_is_active_
+  dec  eax
+  jnz  fail
+  mov  eax, edi
+  xchg edx, eax
+  call action_can_talk_to_
+  test eax, eax
+  jnz  fail
+  test byte ptr ds:[_combat_state], 1       // В бою?
+  jz   skip                                 // Нет
+  mov  eax, [esi+0x50]                      // eax = source.team_num
+  mov  ecx, [edi+0x54]                      // edx = target.who_hit_me
+  cmp  eax, [edi+0x50]                      // source.team_num == target.team_num?
+  jne  notTeam
+  cmp  esi, ecx                             // source стрелял в братюню?
+  je   fail                                 // Да, обидка
+notTeam:
+  jecxz skip                                // target никто не обижал
+  cmp  eax, [ecx+0x50]                      // source.team_num == target.who_hit_me.team_num?
+  je   fail                                 // кто-то из группы поддержки source обидел target
+skip:
+  mov  eax, [edi+0x78]
+  inc  eax                                  // У target есть скрипт?
+  jz   noScript                             // Нет
+  dec  eax
+  push eax
+  sub  esp, 4
+  mov  edx, esp
+  call scr_ptr_
+  mov  ecx, [esp]                           // ecx = Script
+  add  esp, 4
+  inc  eax
+  pop  eax
+  jz   noScript
+  mov  [ecx+0x38], esi                      // Script.source_obj
+  mov  [ecx+0x3C], edi                      // Script.target_obj
+  mov  edx, push_p_proc
+  call exec_script_proc_
+  inc  eax
+  jz   noScript
+  cmp  [ecx+0x44], eax                      // Script.override
+  je   fail
+noScript:  
+  mov  edx, [edi+0x4]                       // target_tile
+  mov  eax, [esi+0x4]                       // source_tile
+  call tile_dir_
+  xchg ebp, eax
+  mov  ecx, 5
+loopRot:
+  lea  eax, [ebp+1]
+  mov  ebx, 6
+  cdq
+//  mov  edx, eax
+//  sar  edx, 0x1F
+  div  ebx                                  // rotation
+  xor  ebx, ebx
+  inc  ebx                                  // distance
+  mov  eax, [edi+0x4]                       // tile
+  call tile_num_in_direction_
+  mov  esi, eax
+  xchg edx, eax                             // tile
+  mov  ebx, [edi+0x28]                      // elev
+  mov  eax, edi                             // source
+  call obj_blocking_at_
+  test eax, eax
+  jz   canMove
+  inc  ebp
+  loop loopRot
+fail:
+  xor  eax, eax
+  dec  eax
+  jmp  end
+canMove:
+  xor  ecx, ecx
+  dec  ecx
+  test byte ptr ds:[_combat_state], 1       // В бою?
+  jz   moveTarget                           // Нет
+  mov  ecx, [edi+0x40]                      // ecx = target.curr_mp
+moveTarget:
+  xor  eax, eax
+  inc  eax
+  inc  eax                                  // RB_RESERVED
+  call register_begin_
+  mov  edx, esi                             // tile_num
+  mov  eax, edi                             // source
+  call register_object_turn_towards_
+  push eax
+  mov  edx, esi                             // tile_num
+  mov  eax, edi                             // source
+  mov  ebx, [edi+0x28]                      // elev
+  call register_object_move_to_tile_
+  call register_end_
+end:
+  pop  ebx
+  pop  ecx
+  pop  esi
+  pop  edi
+  pop  ebp
+  retn
+ }
+}
+
 static const char* PushFmt = "\n%s (->%s) move %s from %d to %d";
 static void __declspec(naked) ai_move_steps_closer_hook() {
+// esi = source, edx = target
  __asm {
   jz   fail                                 // Нет объекта
   mov  eax, [edx+0x64]
@@ -98,16 +232,16 @@ static void __declspec(naked) ai_move_steps_closer_hook() {
   dec  eax                                  // ObjType_Critter?
   jnz  fail                                 // Нет
   push edx
-  mov  eax, esi                             // eax=source, edx=target
+  mov  eax, esi                             // eax = source, edx = target
   call obj_dist_
   pop  edx
-  dec  eax                                  // Расстояние = 1
+  dec  eax                                  // Расстояние == 1?
   jnz  end                                  // Нет
   call register_end_
   mov  ebx, [edx+0x4]                       // target.tile_num
   push edx
-  mov  eax, esi                             // eax=source, edx=target
-  call action_push_critter_
+  mov  eax, esi                             // eax = source, edx = target
+  call action_push_critter
   pop  edx
   inc  eax                                  // Сдвинули?
   jz   skip                                 // Нет
@@ -145,6 +279,21 @@ end:
  }
 }
 
+static void __declspec(naked) ai_danger_source_hook() {
+// esi = source
+ __asm {
+  call ai_find_attackers_
+// ebx = team_num, edx = count
+  test edx, edx
+  jz   end
+  cmp  edx, 3
+  je   end
+
+end:
+  retn
+ }
+}
+
 void AIInit() {
  HookCall(0x426A95, combat_attack_hook);
  HookCall(0x42A796, combat_attack_hook);
@@ -152,14 +301,12 @@ void AIInit() {
  HookCall(0x4432A6, &game_handle_input_hook);
  GetPrivateProfileString("sfall", "BlockedCombat", "You cannot enter combat at this time.", CombatBlockedMessage, 128, translationIni);
 
-/* HookCall(0x42B1AF, (void*)item_name_);
- SafeWriteStr(0x50108C, "\n%s minHp = %d; curHp = %d\n");
- SafeWriteStr(0x501174, "%s: FLEEING: Out of Range -> min_to_hit !\n");
- SafeWriteStr(0x5012D4, "%s is using %s packet with a %d chance to taunt\n");
- SafeWriteStr(0x501268, ">>>NOTE: %s had extra AP''s to use!<<<\n");
+ AI_Called_Freq_Div = GetPrivateProfileIntA("Misc", "AI_Called_Freq_Div", 0, ini);
+ if (AI_Called_Freq_Div > 0) MakeCall(0x42A6BA, &ai_called_shot_hook, false);
 
- SafeWrite8(0x413747, 0x0);
- MakeCall(0x42A0C9, &ai_move_steps_closer_hook, false);*/
+// SafeWrite8(0x428F6E, 0xEB);
+// MakeCall(0x42A0C9, &ai_move_steps_closer_hook, false);
+// HookCall(0x4290D3, &ai_danger_source_hook);
 
 }
 

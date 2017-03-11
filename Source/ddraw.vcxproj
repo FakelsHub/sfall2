@@ -333,6 +333,7 @@
     <ClInclude Include="Credits.h" />
     <ClInclude Include="Criticals.h" />
     <ClInclude Include="DebugEditor.h" />
+    <ClInclude Include="DebugMode.h" />
     <ClInclude Include="Define.h" />
     <ClInclude Include="Elevators.h" />
     <ClInclude Include="Explosions.h" />
@@ -400,6 +401,7 @@
     <ClCompile Include="ddraw.cpp" />
     <ClCompile Include="ddraw2.cpp" />
     <ClCompile Include="DebugEditor.cpp" />
+    <ClCompile Include="DebugMode.cpp" />
     <ClCompile Include="dinput.cpp" />
     <ClCompile Include="Elevators.cpp" />
     <ClCompile Include="Explosions.cpp" />

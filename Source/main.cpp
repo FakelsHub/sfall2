@@ -32,6 +32,7 @@
 #include "Credits.h"
 #include "Criticals.h"
 #include "CRC.h"
+#include "DebugMode.h"
 #include "Define.h"
 #include "Elevators.h"
 #include "Explosions.h"
@@ -207,16 +208,6 @@ static void __declspec(naked) TimedRest_hook() {
 end:
   pop  ebx
   pop  edx
-  retn
- }
-}
-
-static void __declspec(naked) win_debug_hook() {
- __asm {
-  call debug_log_
-  xor  eax, eax
-  cmp  ds:[_GNW_win_init_flag], eax
-  push 0x4DC320
   retn
  }
 }
@@ -1515,25 +1506,7 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
- dlogr("Patching out ereg call.", DL_INIT);
- MakeCall(0x4425E6, (void*)debug_register_env_, false);
-
- tmp = GetPrivateProfileIntA("Debugging", "DebugMode", 0, ini);
- if (tmp && *((DWORD*)0x444A60) == 0xFFFE76FC && *((DWORD*)0x444A64) == 0x0F01FE83) {
-  dlog("Applying DebugMode patch.", DL_INIT);
-  MotionSensorFlags = 0x50F90C;             // "log"
-  if (tmp&1) {
-   if (tmp&2) {
-    SafeWrite16(0x4C6E75, 0x66EB);          // jmps 0x4C6EDD
-    SafeWrite8(0x4C6EF2, 0xEB);
-    SafeWrite8(0x4C7034, 0x0);
-    MakeCall(0x4DC319, &win_debug_hook, true);
-   } else MotionSensorFlags = 0x50F928;     // "gnw"
-  }
-  SafeWrite8(0x4C6D9B, 0xB8);               // mov  eax, offset ???
-  SafeWrite32(0x4C6D9C, MotionSensorFlags);
-  dlogr(" Done", DL_INIT);
- }
+ DebugModeInit();
 
  npcautolevel = GetPrivateProfileIntA("Misc", "NPCAutoLevel", 0, ini) != 0;
  if (npcautolevel) {

@@ -284,6 +284,7 @@
 #define start                     (1)
 #define map_enter_p_proc          (15)
 #define destroy_p_proc            (18)
+#define push_p_proc               (24)
 #define combat_is_starting_p_proc (26)
 #define combat_is_over_p_proc     (27)
 

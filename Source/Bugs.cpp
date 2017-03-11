@@ -1015,6 +1015,25 @@ end:
  }
 }
 
+static void __declspec(naked) gdActivateBarter_hook() {
+ __asm {
+  call gdialog_barter_pressed_
+  cmp  ds:[_dialogue_state], ecx
+  jne  skip
+  cmp  ds:[_dialogue_switch_mode], esi
+  je   end
+skip:
+  push ecx
+  push esi
+  push edi
+  push ebp
+  sub  esp, 0x18
+  push 0x44A5CC
+end:
+  retn
+ }
+}
+
 static void __declspec(naked) combat_display_hook1() {
  __asm {
   mov  ecx, [eax+0x20]                      // pobj.fid
@@ -1210,6 +1229,9 @@ void BugsInit() {
 // Исправление использования фиксированной позиции для вызова скриптовой процедуры start при отсутствии стандартного обработчика
  MakeCall(0x4A4926, &exec_script_proc_hook, false);
  MakeCall(0x4A4979, &exec_script_proc_hook1, false);
+
+// Скрывать неиспользуемые окна при вызове gdialog_mod_barter
+ HookCall(0x448250, &gdActivateBarter_hook);
 
 // Временный костыль, ошибка в sfall, нужно поискать причину
  HookCall(0x42530A, &combat_display_hook1);

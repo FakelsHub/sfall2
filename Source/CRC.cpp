@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include "Logging.h"
+#include "SafeWrite.h"
 #include "version.h"
 
 static const DWORD ExpectedSize=0x00122800;
@@ -80,6 +81,8 @@ void CRC(const char* filepath) {
   sprintf_s(buf, "You're trying to use sfall with an incompatible version of fallout\nWas expecting '" TARGETVERSION "'\n\nfallout2.exe had an unexpected crc. Expected 0x%x but got 0x%x", ExpectedCRC[0], crc);
   Fail(buf);
  }
+
+ if (size == 1639936) SafeWrite8(0x440C35, 0xEB);// Fallout:Nevada, игнорируем обработку GVAR 491
 
  CloseHandle(h);
  delete[] bytes;

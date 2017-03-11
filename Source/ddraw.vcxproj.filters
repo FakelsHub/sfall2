@@ -15,6 +15,9 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AI.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
     <ClInclude Include="AmmoMod.h">
       <Filter>Headers</Filter>
     </ClInclude>
@@ -34,6 +37,9 @@
       <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="DebugEditor.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="DebugMode.h">
       <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="Define.h">
@@ -130,9 +136,6 @@
     <ClInclude Include="MainMenu.h">
       <Filter>Headers</Filter>
     </ClInclude>
-    <ClInclude Include="AI.h">
-      <Filter>Headers</Filter>
-    </ClInclude>
     <ClInclude Include="PartyControl.h">
       <Filter>Headers</Filter>
     </ClInclude>
@@ -195,6 +198,9 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AI.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
     <ClCompile Include="AmmoMod.cpp">
       <Filter>Source</Filter>
     </ClCompile>
@@ -220,6 +226,9 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="DebugEditor.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="DebugMode.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="dinput.cpp">
@@ -308,9 +317,6 @@
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="MainMenu.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="AI.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="PartyControl.cpp">
