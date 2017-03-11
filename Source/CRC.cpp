@@ -82,7 +82,7 @@ void CRC(const char* filepath) {
   Fail(buf);
  }
 
- if (size == 1639936) SafeWrite8(0x440C35, 0xEB);// Fallout:Nevada, игнорируем обработку GVAR 491
+ if (size == 1639936) SafeWrite8(0x440C35, 0xEB);// Fallout:Nevada, игнорируем обработку GVAR_MODOC_SHITTY_DEATH (491)
 
  CloseHandle(h);
  delete[] bytes;

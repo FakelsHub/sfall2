@@ -279,17 +279,67 @@ end:
  }
 }
 
-static void __declspec(naked) ai_danger_source_hook() {
-// esi = source
+static void __declspec(naked) ai_find_attackers() {
+// eax,esi = source, edx = *target2
  __asm {
-  call ai_find_attackers_
-// ebx = team_num, edx = count
-  test edx, edx
-  jz   end
-  cmp  edx, 3
-  je   end
-
+  push ebp
+  push edi
+  mov  ebx, 4
+  sub  edx, ebx
+  mov  edi, edx                             // edi = *target1
+  lea  ebp, [ecx+ebx]                       // ebp = *target4+4
+  mov  edx, ds:[_curr_crit_num]
+  test edx, edx                             // Есть персонажи в списке?
+  jz   end                                  // Нет
+  mov  ds:[_combat_obj], eax
+  mov  eax, ds:[_curr_crit_list]
+  mov  ecx, compare_nearer_
+  call qsort_
+  mov  ebx, [esi+0x50]                      // ebx = source.team_num
+  xor  edx, edx
+  mov  eax, edi
+  cmp  [edi], edx                           // target1 занят?
+  je   clearTargets                         // Нет
+  add  edi, 4
+  mov  eax, edi
+clearTargets:
+  mov  [edi], edx
+  add  edi, 4
+  cmp  edi, ebp
+  jne  clearTargets
+  xchg edi, eax
+// eax = target, ebx = source.team_num, ecx = target.who_hit_me, edx = crit_count, esi = source, edi = *target#, ebp = *target4+4
+loopCritters:
+  mov  eax, ds:[_curr_crit_list]
+  mov  eax, [eax+edx*4]                     // eax = target
+  cmp  ebx, [eax+0x50]                      // source.team_num = target.team_num?
+  je   nextCritter                          // Да, это собутыльник
+  mov  ecx, [eax+0x54]                      // ecx = target.who_hit_me
+  jecxz nextCritter                         // У target нет обидчика
+  cmp  ebx, [ecx+0x50]                      // source.team_num = target.who_hit_me.team_num?
+  jne  nextCritter                          // Кто-то левый обидел target
+  test byte ptr [eax+0x44], 0x80            // target & DAM_DEAD?
+  jnz  nextCritter                          // Да, target трупик
+  cmp  [ebp-16], eax                        // *target1 == target?
+  je   nextCritter                          // Да
+  cmp  [ebp-12], eax                        // *target2 == target?
+  je   nextCritter                          // Да
+  cmp  [ebp-8], eax                         // *target3 == target?
+  je   nextCritter                          // Да
+  cmp  [ebp-4], eax                         // *target4 == target?
+  je   nextCritter                          // Да
+  mov  [edi], eax
+  add  edi, 4
+  cmp  edi, ebp                             // Использованы все слоты для целей?
+  je   end                                  // Да
+nextCritter:
+  inc  edx
+  cmp  edx, ds:[_curr_crit_num]             // Все персонажи из списка?
+  jl   loopCritters                         // Нет
 end:
+  xor  eax, eax
+  pop  edi
+  pop  ebp
   retn
  }
 }
@@ -304,9 +354,11 @@ void AIInit() {
  AI_Called_Freq_Div = GetPrivateProfileIntA("Misc", "AI_Called_Freq_Div", 0, ini);
  if (AI_Called_Freq_Div > 0) MakeCall(0x42A6BA, &ai_called_shot_hook, false);
 
-// SafeWrite8(0x428F6E, 0xEB);
-// MakeCall(0x42A0C9, &ai_move_steps_closer_hook, false);
-// HookCall(0x4290D3, &ai_danger_source_hook);
+ if (GetPrivateProfileIntA("Misc", "SmarterAI", 0, ini)) {
+//  SafeWrite8(0x428F6E, 0xEB);
+//  MakeCall(0x42A0C9, &ai_move_steps_closer_hook, false);
+  HookCall(0x4290D3, &ai_find_attackers);
+ }
 
 }
 

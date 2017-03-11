@@ -2312,8 +2312,8 @@ skip:
   push ebx
   push edx
   call SetAppearanceGlobals                 // store new globals
-  call DrawPC
 end:
+  call DrawPC
   popad
   retn
  }

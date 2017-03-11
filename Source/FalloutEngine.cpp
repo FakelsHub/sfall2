@@ -54,6 +54,7 @@ const DWORD combat_attack_ = 0x422F3C;
 const DWORD combat_should_end_ = 0x422C60;
 const DWORD combat_turn_ = 0x42299C;
 const DWORD combat_turn_run_ = 0x4227DC;
+const DWORD compare_nearer_ = 0x428B1C;
 const DWORD container_exit_ = 0x476394;
 const DWORD correctFidForRemovedItem_ = 0x45409C;
 const DWORD credits_ = 0x42C860;

@@ -24,6 +24,7 @@
 #define VERSION_MINOR 7
 #define VERSION_BUILD 17
 #define VERSION_REV 0
+#define VERSION_NAME "sfall2"
 #ifdef WIN2K
 #define VERSION_STRING "v1.7.17 win2k"
 #else

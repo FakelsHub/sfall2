@@ -53,6 +53,7 @@ extern const DWORD combat_attack_;
 extern const DWORD combat_should_end_;
 extern const DWORD combat_turn_;
 extern const DWORD combat_turn_run_;
+extern const DWORD compare_nearer_;
 extern const DWORD container_exit_;
 extern const DWORD correctFidForRemovedItem_;
 extern const DWORD credits_;
@@ -393,11 +394,14 @@ extern const DWORD xvfprintf_;
 #define _colorTable                 0x6A38D0
 #define _combat_free_move           0x56D39C
 #define _combat_list                0x56D390
+#define _combat_obj                 0x51805C
 #define _combat_state               0x510944
 #define _combat_turn_running        0x51093C
 #define _combatNumTurns             0x510940
 #define _crit_succ_eff              0x510978
 #define _crnt_func                  0x664508
+#define _curr_crit_num              0x56D61C
+#define _curr_crit_list             0x56D620
 #define _curr_font_num              0x51E3B0
 #define _curr_pc_stat               0x6681AC
 #define _curr_rot                   0x5190F8

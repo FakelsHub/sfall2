@@ -685,12 +685,14 @@ end:
 
 static void __declspec(naked) obj_load_func_hook() {
  __asm {
+  mov  edx, 0x488EF9
   test byte ptr [eax+0x25], 0x4             // Temp_
   jnz  end
+  mov  edx, 0x488F14
   mov  edi, [eax+0x64]
   shr  edi, 0x18
-  cmp  edi, ObjType_Critter
-  jne  skip
+  dec  edi                                  // ObjType_Critter?
+  jnz  end                                  // Нет
   test byte ptr [eax+0x44], 0x2             // DAM_KNOCKED_DOWN?
   jz   clear                                // Нет
   pushad
@@ -703,12 +705,8 @@ static void __declspec(naked) obj_load_func_hook() {
   popad
 clear:
   and  word ptr [eax+0x44], 0x7FFD          // not (DAM_LOSE_TURN or DAM_KNOCKED_DOWN)
-skip:
-  push 0x488F14
-  retn
 end:
-  push 0x488EF9
-  retn
+  jmp  edx
  }
 }
 

@@ -91,7 +91,7 @@ static void __declspec(naked) ReadInt() {
   call interpretPopLong_
   cmp dx, 0xC001;
   jnz error;
-  mov edx, [eax]
+  mov  edx, [eax]
   jmp result;
 error:
   xor  edx, edx
@@ -209,7 +209,7 @@ static void __declspec(naked) WriteInt() {
   jnz end;
   cmp si, 0xC001;
   jnz end;
-  //mov ds:[eax], edx;
+//  mov  [eax], edx
   push edx;
   push eax;
   call SafeWrite32;

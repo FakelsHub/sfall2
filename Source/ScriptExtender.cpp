@@ -611,7 +611,7 @@ static void __declspec(naked) sfall_ver_build() {
  __asm {
   push edx
   push eax
-  mov  edx, VERSION_BUILD
+  mov  edx, 509
   jmp  sfall_ver
  }
 }

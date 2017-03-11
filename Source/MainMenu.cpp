@@ -41,7 +41,7 @@ static void __declspec(naked) MainMenuTextYHook() {
  }
 }
 
-static const char* VerString1 = "SFALL2 " VERSION_STRING;
+static const char* VerString = VERSION_NAME " " VERSION_STRING;
 static DWORD OverrideColour;
 static void __declspec(naked) FontColour() {
  __asm {
@@ -69,7 +69,7 @@ static void __declspec(naked) MainMenuTextHook() {
   call win_print_
   call FontColour;
   push eax;//colour
-  mov edx, VerString1;//msg
+  mov edx, VerString;//msg
   xor ebx, ebx;//font
   mov ecx, ebp;
   dec ecx; //xpos
