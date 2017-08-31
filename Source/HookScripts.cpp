@@ -1479,7 +1479,7 @@ void _stdcall RegisterHook( DWORD script, DWORD id, DWORD procNum ) {
  sScriptProgram *prog = GetGlobalScriptProgram(script);
  if (prog) {
 #ifdef TRACE
-  dlog_f( "Global script %8x registered as hook id %d ", DL_HOOK, script, id);
+  dlog_f("Global script %08x registered as hook id %d\r\n", DL_HOOK, script, id);
 #endif
   sHookScript hook;
   hook.prog = *prog;
@@ -1493,25 +1493,26 @@ static void LoadHookScript(const char* name, int id) {
  if (id < numHooks) {
   char filename[MAX_PATH];
   sprintf(filename, "scripts\\%s.int", name);
-  DWORD result;
+  bool fileExist;
   __asm {
    lea  eax, filename
    call db_access_
-   mov  result, eax
+   mov  fileExist, al
   }
-  if (result) {
+  if (fileExist && !isGameScript(name)) {
    sScriptProgram prog;
-   dlog("Loading hook script: ", DL_HOOK);
-   dlogr(filename, DL_HOOK);
+   dlog(">", DL_HOOK);
+   dlog(name, DL_HOOK);
    LoadScriptProgram(prog, name);
    if (prog.ptr) {
+    dlogr(", success!", DL_HOOK);
     sHookScript hook;
     hook.prog = prog;
     hook.callback = -1;
     hook.isGlobalScript = false;
     hooks[id].push_back(hook);
     AddProgramToMap(prog);
-   }
+   } else dlogr(", error!", DL_HOOK);
   }
  }
 }
@@ -1523,19 +1524,16 @@ void HookScriptClear() {
 void HookScriptInit() {
  isGlobalScriptLoading = 1; // this should allow to register global exported variables
 
- dlogr("Initing hook scripts", DL_HOOK|DL_INIT);
+ dlogr("Loading hook scripts", DL_HOOK|DL_INIT);
 
  char* mask = "scripts\\hs_*.int";
- DWORD count, *filenames;
+ DWORD *filenames;
  __asm {
-  push edx
-  push ebx
-  mov  eax, mask
+  xor  ecx, ecx
+  xor  ebx, ebx
   lea  edx, filenames
+  mov  eax, mask
   call db_get_file_list_
-  pop  ebx
-  pop  edx
-  mov  count, eax
  }
 
  LoadHookScript("hs_tohit", HOOK_TOHIT);
@@ -1633,13 +1631,12 @@ void HookScriptInit() {
  HookCall(0x495F21, &partyMemberCopyLevelInfo_hook);
 
  __asm {
-  push edx
+  xor  edx, edx
   lea  eax, filenames
   call db_free_file_list_
-  pop  edx
  }
 
- dlogr("Completed hook script init", DL_HOOK|DL_INIT);
+ dlogr("Finished loading hook scripts", DL_HOOK|DL_INIT);
 
  InitingHookScripts = 1;
  for (int i = 0; i < numHooks; i++) {

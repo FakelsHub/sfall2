@@ -1112,6 +1112,171 @@ end:
  }
 }
 
+static DWORD drugExploit = 0;
+static void __declspec(naked) protinst_use_item_hook() {
+ __asm {
+  inc  dword ptr drugExploit
+  call obj_use_book_
+  dec  dword ptr drugExploit
+  retn
+ }
+}
+
+static void __declspec(naked) UpdateLevel_hook() {
+ __asm {
+  inc  dword ptr drugExploit
+  call perks_dialog_
+  dec  dword ptr drugExploit
+  retn
+ }
+}
+
+static void __declspec(naked) skill_level_hook() {
+ __asm {
+  inc  dword ptr drugExploit
+  call skill_level_
+  dec  dword ptr drugExploit
+  retn
+ }
+}
+
+static void __declspec(naked) SliderBtn_hook() {
+ __asm {
+  inc  dword ptr drugExploit
+  call skill_inc_point_
+  dec  dword ptr drugExploit
+  retn
+ }
+}
+
+static void __declspec(naked) SliderBtn_hook1() {
+ __asm {
+  inc  dword ptr drugExploit
+  call skill_dec_point_
+  dec  dword ptr drugExploit
+  retn
+ }
+}
+
+static void __declspec(naked) checkPerk() {
+ __asm {
+  inc  eax                                  // Есть перк?
+  jz   end                                  // Нет
+  dec  eax
+  imul edx, eax, 0x4C
+  mov  eax, offset Perks                    // _perk_data
+  lea  eax, [eax+edx]
+  cmp  esi, [eax+0x14]                      // Perk.Stat
+  jne  skip
+  sub  ebp, [eax+0x18]                      // Perk.StatMod
+skip:
+  cmp  dword ptr [eax+0xC], -1              // Perk.Ranks
+  jne  end
+  sub  ebp, [eax+esi*4+0x30]                // Perk.Str
+end:
+  retn
+ }
+}
+
+static void __declspec(naked) stat_get_real_bonus() {
+ __asm {
+  push ecx
+  xchg ebp, eax
+  mov  eax, ebx
+  call inven_worn_
+  test eax, eax
+  jz   noArmor
+  call item_ar_perk_
+  call checkPerk
+noArmor:
+  mov  eax, ebx
+  call inven_right_hand_
+  test eax, eax
+  jz   noRightWeapon
+  mov  edx, eax
+  call item_get_type_
+  cmp  eax, item_type_weapon
+  jne  noRightWeapon
+  xchg edx, eax                             // eax = weapon
+  call item_w_perk_
+  call checkPerk
+noRightWeapon:
+  mov  eax, ebx
+  call inven_left_hand_
+  test eax, eax
+  jz   noLeftWeapon
+  mov  edx, eax
+  call item_get_type_
+  cmp  eax, item_type_weapon
+  jne  noLeftWeapon
+  xchg edx, eax                             // eax = weapon
+  call item_w_perk_
+  call checkPerk
+noLeftWeapon:
+  mov  ecx, ds:[_queue]
+loopQueue:
+  jecxz end                                 // Ничего нет в очереди
+  cmp  ebx, [ecx+0x8]                       // source == queue.object?
+  jne  nextQueue                            // Нет
+  mov  edx, [ecx+0x4]                       // edx = queue.type
+  mov  edi, [ecx+0xC]                       // edi = queue.data
+  test edx, edx                             // Наркотик?
+  jz   checkDrug                            // Да
+  cmp  edx, 2                               // Зависимость?
+  je   checkAddict                          // Да
+  cmp  edx, 6                               // Радиация?
+  jne  nextQueue                            // Нет
+  cmp  esi, edx                             // STAT_lu?
+  je   nextQueue                            // Да
+  mov  eax, [edi]                           // eax = queue_rads.rad_level
+  dec  eax
+  shl  eax, 5
+  sub  ebp, ds:[_rad_bonus][eax+esi*4]
+  jmp  nextQueue
+checkDrug:
+  cmp  dword ptr [edi+0x4], -2              // Особая ситуация?
+  jne  loopStats                            // Нет
+  inc  edx
+  inc  edx
+loopStats:
+  cmp  esi, [edi+edx*4+0x4]                 // stat == queue_drug.stat#?
+  jne  nextStat                             // Нет
+  add  ebp, [edi+edx*4+0x10]
+nextStat:  
+  inc  edx
+  cmp  edx, 3
+  jl   loopStats
+  jmp  nextQueue
+checkAddict:
+  dec  edx
+  cmp  [edi], edx                           // Перк активен?
+  je   nextQueue                            // Нет
+  mov  eax, [edi+0x8]                       // eax = queue_addict.perk
+  call checkPerk
+nextQueue:
+  mov  ecx, [ecx+0x10]                      // ecx = queue.next
+  jmp  loopQueue
+end:
+  xchg ebp, eax
+  pop  ecx
+  retn
+ }
+}
+
+static void __declspec(naked) stat_level_hook() {
+// ebx = source, ecx = base, esi = stat
+ __asm {
+  call stat_get_bonus_
+  cmp  esi, STAT_lu
+  ja   end                                  // Проверяем только силу-удачу
+  cmp  dword ptr drugExploit, 0             // Вызов из нужных мест?
+  je   end                                  // Нет
+  call stat_get_real_bonus                  // Не учитываем временные эффекты
+end:
+  retn
+ }
+}
+
 void _stdcall SetPerkValue(int id, int value, DWORD offset) {
  if(id<0||id>=PERK_count) return;
  *(DWORD*)((DWORD)(&Perks[id])+offset)=value;
@@ -1143,6 +1308,17 @@ void PerksInit() {
  MakeCall(0x434BFF, &PrintBasicStat_hook, false);
  HookCall(0x437AB4, &StatButton_hook);
  HookCall(0x437B26, &StatButton_hook1);
+
+ if (GetPrivateProfileIntA("Misc", "DrugExploitFix", 0, ini)) {
+  HookCall(0x49BF5B, &protinst_use_item_hook);
+  HookCall(0x43C342, &UpdateLevel_hook);
+  HookCall(0x43A8A1, &skill_level_hook);    // SavePlayer_
+  HookCall(0x43B3FC, &SliderBtn_hook);
+  HookCall(0x43B463, &skill_level_hook);    // SliderBtn_
+  HookCall(0x43B47C, &SliderBtn_hook1);
+  HookCall(0x4AEFC3, &stat_level_hook);
+ }
+
 }
 
 void PerksReset() {

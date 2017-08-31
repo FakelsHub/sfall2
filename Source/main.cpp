@@ -139,16 +139,6 @@ static const DWORD PartySkills[] = {
  0x4ABA5C,
 };
 
-static DWORD TimeScale;
-static void __declspec(naked) script_chk_timed_events_hook() {
- __asm {
-  mov  eax, TimeScale
-  add  ds:[_fallout_game_time], eax
-  push 0x4A3DFB
-  retn
- }
-}
-
 static void __declspec(naked) game_time_date_hook() {
  __asm {
   test edi, edi
@@ -191,12 +181,14 @@ end:
  }
 }
 
-static void __declspec(naked) script_chk_timed_events_hook1() {
+static void __declspec(naked) script_chk_timed_events_hook() {
  __asm {
-  mov  eax, TimeScale
-  add  ds:[_fallout_game_time], eax
+  test dl, 1                                // В бою?
+  jnz  end                                  // Да
+  inc  dword ptr ds:[_fallout_game_time]
   call TimerReset
-  push 0x4A3DFB
+end:
+  push 0x4A3E08
   retn
  }
 }
@@ -412,7 +404,7 @@ static void __declspec(naked) removeDatabase() {
   mov  ecx, ebx
 nextPath:
   mov  edx, [esp+0x104+4+4]                 // path_patches
-  mov  eax, [ebx+0x0]                       // database.path
+  mov  eax, [ebx]                           // database.path
   call stricmp_
   test eax, eax                             // Нашли путь?
   jz   skip                                 // Да
@@ -444,7 +436,7 @@ static void __declspec(naked) game_init_databases_hook1() {
   cmp  eax, -1
   je   end
   mov  eax, ds:[_master_db_handle]
-  mov  eax, [eax+0x0]                       // eax = master_patches.path
+  mov  eax, [eax]                           // eax = master_patches.path
   call xremovepath_
   dec  eax                                  // Удалили путь (critter_patches == master_patches)?
   jz   end                                  // Да
@@ -1144,72 +1136,6 @@ static void __declspec(naked) wmSetupRandomEncounter_hook() {
  }
 }
 
-static int drugExploit = 0;
-static void __declspec(naked) protinst_use_item_hook() {
- __asm {
-  dec  drugExploit
-  call obj_use_book_
-  inc  drugExploit
-  retn
- }
-}
-
-static void __declspec(naked) UpdateLevel_hook() {
- __asm {
-  inc  drugExploit
-  call perks_dialog_
-  dec  drugExploit
-  retn
- }
-}
-
-static void __declspec(naked) skill_level_hook() {
- __asm {
-  dec  drugExploit
-  call skill_level_
-  inc  drugExploit
-  retn
- }
-}
-
-static void __declspec(naked) SliderBtn_hook() {
- __asm {
-  dec  drugExploit
-  call skill_inc_point_
-  inc  drugExploit
-  retn
- }
-}
-
-static void __declspec(naked) SliderBtn_hook1() {
- __asm {
-  dec  drugExploit
-  call skill_dec_point_
-  inc  drugExploit
-  retn
- }
-}
-
-static void __declspec(naked) stat_level_hook() {
-// ebx = source, esi = stat, ecx = base
- __asm {
-  call stat_get_bonus_
-  cmp  esi, STAT_lu                         // Проверяем только силу-удачу
-  ja   end
-  xor  edx, edx
-  cmp  drugExploit, edx                     // Вызов из нужных мест?
-  je   end                                  // Нет
-  jg   noBonus                              // Получение перков
-// Проверка чтения книг/скилла
-  cmp  eax, edx                             // Положительный эффект?
-  jg   end                                  // Да - учитываем его
-noBonus:
-  xchg edx, eax                             // Не учитываем эффект от наркотиков/радиации/etc
-end:
-  retn
- }
-}
-
 static void __declspec(naked) barter_attempt_transaction_hook() {
  __asm {
   cmp  dword ptr [eax+0x64], PID_ACTIVE_GEIGER_COUNTER
@@ -1263,6 +1189,22 @@ static void __declspec(naked) gdAddOptionStr_hook() {
   add  ecx, '1'
   push ecx
   push 0x4458FA
+  retn
+ }
+}
+
+static void __declspec(naked) partyMemberWithHighestSkill_hook() {
+ __asm {
+  dec  edx                                  // ObjType_Critter?
+  jnz  skip                                 // Нет
+  call critter_body_type_
+  dec  eax                                  // Body_Type_Quadruped?
+  mov  eax, [esi]
+  jnz  end                                  // Нет
+skip:
+  pop  edx                                  // Уничтожаем адрес возврата
+  push 0x4955AB
+end:
   retn
  }
 }
@@ -1495,10 +1437,6 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
- TimeScale = GetPrivateProfileIntA("Speed", "TimeScale", 1, ini);
- if (TimeScale > 1 && TimeScale <= 100) MakeCall(0x4A3DF5, &script_chk_timed_events_hook, true);
- else TimeScale = 1;
-
  tmp = GetPrivateProfileIntA("Misc", "TimeLimit", 13, ini);
  if (tmp < 13 && tmp > -4) {
   dlog("Applying time limit patch.", DL_INIT);
@@ -1507,7 +1445,7 @@ static void DllMain2() {
    SafeWrite32(0x51D864, 99);
    HookCall(0x4A34F9, &TimerReset);         // inc_game_time_
    HookCall(0x4A3551, &TimerReset);         // inc_game_time_in_seconds_
-   MakeCall(0x4A3DF5, &script_chk_timed_events_hook1, true);
+   MakeCall(0x4A3DF0, &script_chk_timed_events_hook, true);
    for (int i = 0; i < sizeof(TimedRest)/4; i++) HookCall(TimedRest[i], &TimedRest_hook);
   } else {
    SafeWrite8(0x4A34EC, (BYTE)tmp);
@@ -1950,16 +1888,6 @@ static void DllMain2() {
 // Force the party members to play the idle animation when reloading their weapon
 // SafeWrite16(0x421F2E, 0xEA89);             // mov  edx, ebp
 
- if (GetPrivateProfileIntA("Misc", "DrugExploitFix", 0, ini)) {
-  HookCall(0x49BF5B, &protinst_use_item_hook);
-  HookCall(0x43C342, &UpdateLevel_hook);
-  HookCall(0x43A8A1, &skill_level_hook);    // SavePlayer_
-  HookCall(0x43B3FC, &SliderBtn_hook);
-  HookCall(0x43B463, &skill_level_hook);    // SliderBtn_
-  HookCall(0x43B47C, &SliderBtn_hook1);
-  HookCall(0x4AEFC3, &stat_level_hook);
- }
-
 // Исправление невозможности продажи ранее использованных "Счетчик Гейгера"/"Невидимка"
  if (GetPrivateProfileIntA("Misc", "CanSellUsedGeiger", 0, ini)) {
   SafeWrite8(0x478115, 0xBA);
@@ -1996,11 +1924,18 @@ static void DllMain2() {
   MakeCall(0x4458F5, &gdAddOptionStr_hook, true);
  }
 
+ tmp = GetPrivateProfileIntA("Speed", "TimeScale", 1, ini);
+ if (tmp > 1 && tmp <= 10) {
+  SafeWrite32(0x4A3DBC, 30000/tmp);
+  SafeWrite8(0x4A3DE1, (BYTE)(100/tmp));
+ }
+
  switch (GetPrivateProfileIntA("Misc", "UsePartySkills", 0, ini)) {
   case 2:                                   // отсутствие break - хитрый трюк :)
    for (int i = 0; i < sizeof(AddPartySkills)/4; i++) SafeWrite32(AddPartySkills[i], 0x0);
   case 1:
    for (int i = 0; i < sizeof(PartySkills)/4; i++) SafeWrite8(PartySkills[i], 0x0);
+   MakeCall(0x495594, &partyMemberWithHighestSkill_hook, false);
    break;
  }
 

@@ -1361,6 +1361,7 @@ void InitScriptProgram(sScriptProgram &prog) {
 void AddProgramToMap(sScriptProgram &prog) {
  sfallProgsMap[prog.ptr] = prog;
 }
+
 sScriptProgram* GetGlobalScriptProgram(DWORD scriptPtr) {
  for (std::vector<sGlobalScript>::iterator it = globalScripts.begin(); it != globalScripts.end(); it++) {
   if (it->prog.ptr == scriptPtr) return &it->prog;
@@ -1368,51 +1369,58 @@ sScriptProgram* GetGlobalScriptProgram(DWORD scriptPtr) {
  return NULL;
 }
 
+bool _stdcall isGameScript(const char* filename) {
+ for (DWORD i = 0; i < *(DWORD*)_maxScriptNum; i++) {
+  if (strcmp(filename, (char*)(*(DWORD*)_scriptListInfo + i*20)) == 0) return true;
+ }
+ return false;
+}
+
 // this runs after the game was loaded/started
 void LoadGlobalScripts() {
  isGameLoading = false;
  HookScriptInit();
- dlogr("Loading global scripts", DL_SCRIPT);
+ dlogr("Loading global scripts", DL_SCRIPT|DL_INIT);
 
  char* name = "scripts\\gl*.int";
  DWORD count, *filenames;
  __asm {
-  push edx
-  push ebx
-  mov  eax, name
+  xor  ecx, ecx
+  xor  ebx, ebx
   lea  edx, filenames
+  mov  eax, name
   call db_get_file_list_
-  pop  ebx
-  pop  edx
   mov  count, eax
  }
 
  sScriptProgram prog;
  for (DWORD i = 0; i < count; i++) {
-  name = (char*)filenames[i];
-
+  name = _strlwr((char*)filenames[i]);
   name[strlen(name) - 4] = 0;
-  dlogr(name, DL_SCRIPT);
-  isGlobalScriptLoading = 1;
-  LoadScriptProgram(prog, name);
-  if (prog.ptr) {
-   DWORD idx;
-   sGlobalScript gscript = sGlobalScript(prog);
-   idx = globalScripts.size();
-   globalScripts.push_back(gscript);
-   AddProgramToMap(prog);
-   // initialize script (start proc will be executed for the first time) -- this needs to be after script is added to "globalScripts" array
-   InitScriptProgram(prog);
+  if (!isGameScript(name)) {
+   dlog(">", DL_SCRIPT);
+   dlog(name, DL_SCRIPT);
+   isGlobalScriptLoading = 1;
+   LoadScriptProgram(prog, name);
+   if (prog.ptr) {
+    dlogr(", success!", DL_SCRIPT);
+    DWORD idx;
+    sGlobalScript gscript = sGlobalScript(prog);
+    idx = globalScripts.size();
+    globalScripts.push_back(gscript);
+    AddProgramToMap(prog);
+    // initialize script (start proc will be executed for the first time) -- this needs to be after script is added to "globalScripts" array
+    InitScriptProgram(prog);
+   } else dlogr(", error!", DL_SCRIPT);
+   isGlobalScriptLoading = 0;
   }
-  isGlobalScriptLoading = 0;
  }
  __asm {
-  push edx
+  xor  edx, edx
   lea  eax, filenames
   call db_free_file_list_
-  pop  edx
  }
- dlogr("Finished loading global scripts", DL_SCRIPT); 
+ dlogr("Finished loading global scripts", DL_SCRIPT|DL_INIT); 
 }
 
 static DWORD _stdcall ScriptHasLoaded(DWORD script) {

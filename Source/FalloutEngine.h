@@ -164,6 +164,7 @@ extern const DWORD is_pc_sneak_working_;
 extern const DWORD is_within_perception_;
 extern const DWORD isPartyMember_;
 extern const DWORD item_add_force_;
+extern const DWORD item_ar_perk_;
 extern const DWORD item_c_curr_size_;
 extern const DWORD item_c_max_size_;
 extern const DWORD item_caps_total_;
@@ -191,6 +192,7 @@ extern const DWORD item_w_damage_;
 extern const DWORD item_w_damage_type_;
 extern const DWORD item_w_dr_adjust_;
 extern const DWORD item_w_max_ammo_;
+extern const DWORD item_w_perk_;
 extern const DWORD item_w_range_;
 extern const DWORD item_w_rounds_;
 extern const DWORD item_w_try_reload_;
@@ -490,6 +492,7 @@ extern const DWORD xvfprintf_;
 #define _map_global_vars            0x51956C
 #define _master_db_handle           0x58E948
 #define _max                        0x56FB50
+#define _maxScriptNum               0x51C7CC
 #define _Meet_Frank_Horrigan        0x672E04
 #define _mesg                       0x5700E8
 #define _mouse_hotx                 0x6AC7D0
@@ -537,10 +540,12 @@ extern const DWORD xvfprintf_;
 #define _pud                        0x59E960
 #define _queue                      0x6648C0
 #define _quick_done                 0x5193BC
+#define _rad_bonus                  0x518378
 #define _read_callback              0x51DEEC
 #define _RedColor                   0x6AB4D0
 #define _retvals                    0x43EA7C
 #define _scr_size                   0x6AC9F0
+#define _scriptListInfo             0x51C7C8
 #define _sfx_file_name              0x596FB5
 #define _skill_data                 0x51D118
 #define _slot_cursor                0x5193B8

@@ -41,7 +41,7 @@ void dlogr(const char* a, int type) {
 }
 
 void LoggingInit() {
- Log.open("sfall-log.txt", ios_base::out | ios_base::trunc);
+ Log.open("sfall2-log.txt", ios_base::out | ios_base::trunc);
  if(GetPrivateProfileIntA("Debugging", "Init", 0, ".\\ddraw.ini")) DebugTypes|=DL_INIT;
  if(GetPrivateProfileIntA("Debugging", "Hook", 0, ".\\ddraw.ini")) DebugTypes|=DL_HOOK;
  if(GetPrivateProfileIntA("Debugging", "Script", 0, ".\\ddraw.ini")) DebugTypes|=DL_SCRIPT;
