@@ -99,7 +99,8 @@ notCritter:
   dec ebx;
   call obj_new_sid_inst_
   mov eax, [ecx+0x78];
-  mov edx, 1; // start
+  xor  edx, edx
+  inc  edx                                  // start
   call exec_script_proc_
   cmp esi, 1; // run map enter?
   jnz end;
@@ -142,7 +143,8 @@ static void _stdcall op_create_spatial2() {
  // this will load appropriate script program and link it to the script instance we just created:
  __asm {
   mov eax, scriptId;
-  mov edx, 1; // start_p_proc
+  xor  edx, edx
+  inc  edx                                  // start
   call exec_script_proc_
   mov eax, scriptPtr;
   mov eax, [eax + 0x18]; // program pointer

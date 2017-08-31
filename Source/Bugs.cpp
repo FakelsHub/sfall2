@@ -1032,16 +1032,52 @@ end:
  }
 }
 
-static void __declspec(naked) combat_display_hook1() {
+static void __declspec(naked) db_get_file_list_hook() {
  __asm {
-  mov  ecx, [eax+0x20]                      // pobj.fid
-  and  ecx, 0x0F000000
-  sar  ecx, 0x18
-  cmp  ecx, ObjType_Critter
-  jne  skip
-  jmp  stat_level_
+  push edi
+  push edx
+  xchg edi, eax                             // edi = *filename
+  mov  eax, [eax+4]                         // file_lists.filenames
+  lea  esi, [eax+edx]
+  cld
+  push es
+  push ds
+  pop  es
+  xor  ecx, ecx
+  dec  ecx
+  mov  edx, ecx
+  mov  ebx, ecx
+  xor  eax, eax                             // Ищем конец строки
+  repne scasb
+  not  ecx
+  dec  ecx
+  xchg ebx, ecx                             // ebx = длина имени
+  lea  edi, [esp+0x200+4*6]
+  repne scasb
+  not  ecx
+  xchg edx, ecx                             // edx = длина расширения + 1 для "конца строки"
+  mov  edi, [esi]
+  repne scasb
+  not  ecx                                  // ecx = длина буферной строки +1 для "конца строки"
+  pop  es
+  lea  eax, [ebx+edx]                       // eax = длина новой строки
+  cmp  eax, ecx                             // Длина новой строки <= длины буферной строки?
+  jbe  end                                  // Да
+  mov  edx, [esi]
+  xchg edx, eax
+  call nrealloc_                            // eax = mem, edx = size
+  test eax, eax
+  jnz  skip
+  push 0x50B2F0                             // "Error: Ran out of memory!"
+  call debug_printf_
+  add  esp, 4
+  jmp  end
 skip:
-  xor  eax, eax
+  mov  [esi], eax
+end:
+  xchg esi, eax
+  pop  edx
+  pop  edi
   retn
  }
 }
@@ -1231,7 +1267,8 @@ void BugsInit() {
 // Скрывать неиспользуемые окна при вызове gdialog_mod_barter
  HookCall(0x448250, &gdActivateBarter_hook);
 
-// Временный костыль, ошибка в sfall, нужно поискать причину
- HookCall(0x42530A, &combat_display_hook1);
+ dlog("Applying print to file patch.", DL_INIT);
+ MakeCall(0x4C67D4, &db_get_file_list_hook, false);
+ dlogr(" Done", DL_INIT);
 
 }

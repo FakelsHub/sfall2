@@ -130,6 +130,25 @@ static const DWORD TimedRest[] = {
  0x499B0C, 0x499B4B, 0x499BE0, 0x499CE9, 0x499D2C, 0x499DF2,
 };
 
+static const DWORD AddPartySkills[] = {
+ 0x4AB0F5, 0x4AB5C6, 0x4ABAF8, 0x4AAC3D,
+};
+
+static const DWORD PartySkills[] = {
+ 0x4127F8, 0x4AAAE3, 0x4AAF4C, 0x4AB059, 0x4AB400, 0x4AB557, 0x4AB8FF,
+ 0x4ABA5C,
+};
+
+static DWORD TimeScale;
+static void __declspec(naked) script_chk_timed_events_hook() {
+ __asm {
+  mov  eax, TimeScale
+  add  ds:[_fallout_game_time], eax
+  push 0x4A3DFB
+  retn
+ }
+}
+
 static void __declspec(naked) game_time_date_hook() {
  __asm {
   test edi, edi
@@ -172,9 +191,10 @@ end:
  }
 }
 
-static void __declspec(naked) script_chk_timed_events_hook() {
+static void __declspec(naked) script_chk_timed_events_hook1() {
  __asm {
-  inc  dword ptr ds:[_fallout_game_time]
+  mov  eax, TimeScale
+  add  ds:[_fallout_game_time], eax
   call TimerReset
   push 0x4A3DFB
   retn
@@ -228,7 +248,7 @@ static DWORD _stdcall PathfinderFix2(DWORD perkLevel, DWORD ticks) {
  return (DWORD)d;
 }
 
-static __declspec(naked) void PathfinderFix() {
+static void __declspec(naked) PathfinderFix() {
  __asm {
   push eax
   mov  eax, ds:[_obj_dude]
@@ -241,7 +261,7 @@ static __declspec(naked) void PathfinderFix() {
 }
 
 static double FadeMulti;
-static __declspec(naked) void palette_fade_to_hook() {
+static void __declspec(naked) palette_fade_to_hook() {
  __asm {
   pushf
   push ebx
@@ -341,26 +361,6 @@ static void __declspec(naked) wmWorldMap_reset_hook() {
   mov  ds:[_wmWorldOffsetY], eax
   retn
  }
-}
-
-HANDLE _stdcall FakeFindFirstFile(const char* str, WIN32_FIND_DATAA* data) {
- HANDLE h=FindFirstFileA(str,data);
- if(h==INVALID_HANDLE_VALUE) return h;
- while(strlen(data->cFileName)>12) {
-  int i=FindNextFileA(h, data);
-  if(i==0) {
-   FindClose(h);
-   return INVALID_HANDLE_VALUE;
-  }
- }
- return h;
-}
-int _stdcall FakeFindNextFile(HANDLE h, WIN32_FIND_DATAA* data) {
- int i=FindNextFileA(h, data);
- while(strlen(data->cFileName)>12&&i) {
-  i=FindNextFileA(h, data);
- }
- return i;
 }
 
 static void __declspec(naked) art_get_code_hook() {
@@ -1267,26 +1267,6 @@ static void __declspec(naked) gdAddOptionStr_hook() {
  }
 }
 
-static void __declspec(naked) combat_begin_hook() {
- __asm {
-  push eax
-  call scr_set_ext_param_
-  pop  eax                                  // pobj.sid
-  mov  edx, combat_is_starting_p_proc
-  jmp  exec_script_proc_
- }
-}
-
-static void __declspec(naked) combat_over_hook() {
- __asm {
-  push eax
-  call scr_set_ext_param_
-  pop  eax                                  // pobj.sid
-  mov  edx, combat_is_over_p_proc
-  jmp  exec_script_proc_
- }
-}
-
 static void DllMain2() {
  int tmp;
  //SafeWrite8(0x4B15E8, 0xc3);
@@ -1294,6 +1274,10 @@ static void DllMain2() {
  dlogr("In DllMain2", DL_MAIN);
 
  //BlockCall(0x4123BC);
+
+ dlog("Running BugsInit.", DL_INIT);
+ BugsInit();
+ dlogr(" Done", DL_INIT);
 
  if (GetPrivateProfileIntA("Speed", "Enable", 0, ini)) {
   dlog("Applying speed patch.", DL_INIT);
@@ -1511,6 +1495,10 @@ static void DllMain2() {
   dlogr(" Done", DL_INIT);
  }
 
+ TimeScale = GetPrivateProfileIntA("Speed", "TimeScale", 1, ini);
+ if (TimeScale > 1 && TimeScale <= 100) MakeCall(0x4A3DF5, &script_chk_timed_events_hook, true);
+ else TimeScale = 1;
+
  tmp = GetPrivateProfileIntA("Misc", "TimeLimit", 13, ini);
  if (tmp < 13 && tmp > -4) {
   dlog("Applying time limit patch.", DL_INIT);
@@ -1519,7 +1507,7 @@ static void DllMain2() {
    SafeWrite32(0x51D864, 99);
    HookCall(0x4A34F9, &TimerReset);         // inc_game_time_
    HookCall(0x4A3551, &TimerReset);         // inc_game_time_in_seconds_
-   MakeCall(0x4A3DF5, &script_chk_timed_events_hook, true);
+   MakeCall(0x4A3DF5, &script_chk_timed_events_hook1, true);
    for (int i = 0; i < sizeof(TimedRest)/4; i++) HookCall(TimedRest[i], &TimedRest_hook);
   } else {
    SafeWrite8(0x4A34EC, (BYTE)tmp);
@@ -1606,11 +1594,6 @@ static void DllMain2() {
 
  if (GetPrivateProfileIntA("Misc", "UseFileSystemOverride", 0, ini)) FileSystemInit();
 
- dlog("Applying print to file patch.", DL_INIT);
- SafeWrite32(0x6C0364, (DWORD)&FakeFindFirstFile);
- SafeWrite32(0x6C0368, (DWORD)&FakeFindNextFile);
- dlogr(" Done", DL_INIT);
-
  if (GetPrivateProfileIntA("Misc", "AdditionalWeaponAnims", 0, ini)) {
   dlog("Applying additional weapon animations patch.", DL_INIT);
   MakeCall(0x41931C, &art_get_code_hook, false);
@@ -1646,7 +1629,7 @@ static void DllMain2() {
 
  if (GetPrivateProfileInt("Misc", "AlwaysReloadMsgs", 0, ini)) {
   dlog("Applying always reload messages patch. ", DL_INIT);
-  SafeWrite16(0x4A6B83, 0x0CEB);            // jmps 0x4A6B91
+  SafeWrite8(0x4A6B8D, 0x0);
   dlogr(" Done", DL_INIT);
  }
 
@@ -1977,10 +1960,6 @@ static void DllMain2() {
   HookCall(0x4AEFC3, &stat_level_hook);
  }
 
- dlog("Running BugsInit.", DL_INIT);
- BugsInit();
- dlogr(" Done", DL_INIT);
-
 // Исправление невозможности продажи ранее использованных "Счетчик Гейгера"/"Невидимка"
  if (GetPrivateProfileIntA("Misc", "CanSellUsedGeiger", 0, ini)) {
   SafeWrite8(0x478115, 0xBA);
@@ -2017,9 +1996,13 @@ static void DllMain2() {
   MakeCall(0x4458F5, &gdAddOptionStr_hook, true);
  }
 
-// todo: перенести в ScriptExtender.cpp
- HookCall(0x421B72, &combat_begin_hook);
- HookCall(0x421FC1, &combat_over_hook);
+ switch (GetPrivateProfileIntA("Misc", "UsePartySkills", 0, ini)) {
+  case 2:                                   // отсутствие break - хитрый трюк :)
+   for (int i = 0; i < sizeof(AddPartySkills)/4; i++) SafeWrite32(AddPartySkills[i], 0x0);
+  case 1:
+   for (int i = 0; i < sizeof(PartySkills)/4; i++) SafeWrite8(PartySkills[i], 0x0);
+   break;
+ }
 
  dlogr("Leave DllMain2", DL_MAIN);
 }

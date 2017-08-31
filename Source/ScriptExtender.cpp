@@ -172,8 +172,6 @@ TScript OverrideScriptStruct;
 //To return a value, move it to edx, mov the script pointer to eax, call interpretPushLong_
 //mov the value type to edx, mov the script pointer to eax, call interpretPushShort_
 
-
-
 static void _stdcall SetGlobalScriptRepeat2(DWORD script, DWORD frames) {
  for(DWORD d=0;d<globalScripts.size();d++) {
   if(globalScripts[d].prog.ptr==script) {
@@ -966,6 +964,26 @@ end:
  }
 }
 
+static void __declspec(naked) combat_begin_hook() {
+ __asm {
+  push eax
+  call scr_set_ext_param_
+  pop  eax                                  // pobj.sid
+  mov  edx, combat_is_starting_p_proc
+  jmp  exec_script_proc_
+ }
+}
+
+static void __declspec(naked) combat_over_hook() {
+ __asm {
+  push eax
+  call scr_set_ext_param_
+  pop  eax                                  // pobj.sid
+  mov  edx, combat_is_over_p_proc
+  jmp  exec_script_proc_
+ }
+}
+
 void ScriptExtenderSetup() {
  toggleHighlightsKey = GetPrivateProfileIntA("Input", "ToggleItemHighlightsKey", 0, ini);
  if (toggleHighlightsKey) {
@@ -1289,8 +1307,11 @@ void ScriptExtenderSetup() {
  opcodes[0x273]=op_create_spatial;
  opcodes[0x274]=op_art_exists;
  opcodes[0x275]=op_obj_is_carrying_obj;
-}
 
+ HookCall(0x421B72, &combat_begin_hook);
+ HookCall(0x421FC1, &combat_over_hook);
+
+}
 
 DWORD GetScriptProcByName(DWORD scriptPtr, const char* procName) {
  DWORD result;
@@ -1352,33 +1373,44 @@ void LoadGlobalScripts() {
  isGameLoading = false;
  HookScriptInit();
  dlogr("Loading global scripts", DL_SCRIPT);
- WIN32_FIND_DATA file;
- char buf[MAX_PATH];
- sprintf(buf, "%s\\scripts\\gl*.int", *(char**)_patches);
- HANDLE h = FindFirstFileA(buf, &file);
- if (h != INVALID_HANDLE_VALUE) {
-  char* fName = file.cFileName;
-  // TODO: refactor script programs
-  sScriptProgram prog;
-  DWORD found = 1;
-  while (found) {
-   fName[strlen(fName) - 4] = 0;
-   dlogr(fName, DL_SCRIPT);
-   isGlobalScriptLoading = 1;
-   LoadScriptProgram(prog, fName);
-   if (prog.ptr) {
-    DWORD idx;
-    sGlobalScript gscript = sGlobalScript(prog);
-    idx = globalScripts.size();
-    globalScripts.push_back(gscript);
-    AddProgramToMap(prog);
-    // initialize script (start proc will be executed for the first time) -- this needs to be after script is added to "globalScripts" array
-    InitScriptProgram(prog);
-   }
-   isGlobalScriptLoading = 0;
-   found = FindNextFileA(h, &file);
+
+ char* name = "scripts\\gl*.int";
+ DWORD count, *filenames;
+ __asm {
+  push edx
+  push ebx
+  mov  eax, name
+  lea  edx, filenames
+  call db_get_file_list_
+  pop  ebx
+  pop  edx
+  mov  count, eax
+ }
+
+ sScriptProgram prog;
+ for (DWORD i = 0; i < count; i++) {
+  name = (char*)filenames[i];
+
+  name[strlen(name) - 4] = 0;
+  dlogr(name, DL_SCRIPT);
+  isGlobalScriptLoading = 1;
+  LoadScriptProgram(prog, name);
+  if (prog.ptr) {
+   DWORD idx;
+   sGlobalScript gscript = sGlobalScript(prog);
+   idx = globalScripts.size();
+   globalScripts.push_back(gscript);
+   AddProgramToMap(prog);
+   // initialize script (start proc will be executed for the first time) -- this needs to be after script is added to "globalScripts" array
+   InitScriptProgram(prog);
   }
-  FindClose(h);
+  isGlobalScriptLoading = 0;
+ }
+ __asm {
+  push edx
+  lea  eax, filenames
+  call db_free_file_list_
+  pop  edx
  }
  dlogr("Finished loading global scripts", DL_SCRIPT); 
 }

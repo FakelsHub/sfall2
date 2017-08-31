@@ -471,6 +471,17 @@ end:
  }
 }
 
+static void __declspec(naked) op_obj_can_hear_obj_hook() {
+ __asm {
+  mov  esi, eax                             // esi = source
+  mov  ebx, [esi+0x44]
+  or   byte ptr [esi+0x44], 0x40            // source.results & DAM_BLIND
+  call is_within_perception_
+  mov  [esi+0x44], ebx
+  retn
+ }
+}
+
 void AIInit() {
  HookCall(0x426A95, combat_attack_hook);
  HookCall(0x42A796, combat_attack_hook);
@@ -488,7 +499,10 @@ void AIInit() {
  }
 
 // Дополнительные проверки на слепоту и прямую видимость
- if (GetPrivateProfileIntA("Misc", "CanSeeAndHearFix", 1, ini)) MakeCall(0x42BA09, &is_within_perception_hook, true);
+ if (GetPrivateProfileIntA("Misc", "CanSeeAndHearFix", 1, ini)) {
+  MakeCall(0x42BA09, &is_within_perception_hook, true);
+  HookCall(0x458403, &op_obj_can_hear_obj_hook);
+ }
 
 }
 

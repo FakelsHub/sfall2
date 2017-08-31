@@ -1622,12 +1622,19 @@ end:
 }
 
 static void __declspec(naked) op_sneak_success() {
- _OP_BEGIN(ebp)
  __asm {
-  mov eax, ds:[_sneak_working]
+  push edx
+  xchg edx, eax
+  call is_pc_sneak_working_
+  xchg edx, eax
+  push eax
+  call interpretPushLong_
+  mov  edx, VAR_TYPE_INT
+  pop  eax
+  call interpretPushShort_
+  pop  edx
+  retn
  }
- _RET_VAL_INT(ebp)
- _OP_END
 }
 
 static void __declspec(naked) op_tile_light() {
