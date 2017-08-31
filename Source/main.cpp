@@ -1190,22 +1190,21 @@ static void __declspec(naked) SliderBtn_hook1() {
  }
 }
 
-static void __declspec(naked) stat_level_hook1() {
+static void __declspec(naked) stat_level_hook() {
+// ebx = source, esi = stat, ecx = base
  __asm {
   call stat_get_bonus_
   cmp  esi, STAT_lu                         // Проверяем только силу-удачу
   ja   end
-//  test eax, eax                             // А есть хоть какой [+/-]бонус?
-//  jz   end                                  // Нет
-  cmp  drugExploit, 0                       // Вызов из нужных мест?
-  jl   checkPenalty                         // Проверка чтения книг/скилла
+  xor  edx, edx
+  cmp  drugExploit, edx                     // Вызов из нужных мест?
+  je   end                                  // Нет
   jg   noBonus                              // Получение перков
-  retn
-checkPenalty:
-  cmp  eax, 1                               // Положительный эффект?
-  jge  end                                  // Да - учитываем его
+// Проверка чтения книг/скилла
+  cmp  eax, edx                             // Положительный эффект?
+  jg   end                                  // Да - учитываем его
 noBonus:
-  xor  eax, eax                             // Не учитываем эффект от наркотиков/радиации/etc
+  xchg edx, eax                             // Не учитываем эффект от наркотиков/радиации/etc
 end:
   retn
  }
@@ -1934,7 +1933,7 @@ static void DllMain2() {
  if (GetPrivateProfileIntA("Misc", "DisableHotkeysForUnknownAreasInCity", 0, ini)) MakeCall(0x4C4945, &wmTownMapFunc_hook, false);
 
  if (GetPrivateProfileIntA("Misc", "EnableMusicInDialogue", 0, ini)) {
-  SafeWrite8(0x44525B, 0x00);
+  SafeWrite8(0x44525B, 0x0);
 //  BlockCall(0x450627);
  }
 
@@ -1975,7 +1974,7 @@ static void DllMain2() {
   HookCall(0x43B3FC, &SliderBtn_hook);
   HookCall(0x43B463, &skill_level_hook);    // SliderBtn_
   HookCall(0x43B47C, &SliderBtn_hook1);
-  HookCall(0x4AEFC3, &stat_level_hook1);
+  HookCall(0x4AEFC3, &stat_level_hook);
  }
 
  dlog("Running BugsInit.", DL_INIT);

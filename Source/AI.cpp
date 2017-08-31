@@ -282,7 +282,7 @@ end:
 static void __declspec(naked) isGoodTarget() {
 // eax = target, ebp = *target4+4
  __asm {
-  test byte ptr [eax+0x44], 0x80            // target & DAM_DEAD?
+  test byte ptr [eax+0x44], 0x80            // target.results & DAM_DEAD?
   jnz  skip                                 // Да, target трупик
   cmp  [ebp-16], eax                        // *target1 == target?
   je   skip                                 // Да
@@ -387,6 +387,90 @@ end:
  }
 }
 
+static void __declspec(naked) is_within_perception_hook() {
+ __asm {
+  xchg edx, eax                             // edx = source, eax = target
+  test eax, eax                             // Есть цель?
+  jz   end                                  // Нет
+  mov  ecx, edx                             // ecx = source
+  xchg ebx, eax                             // ebx = target
+  xor  eax, eax
+  inc  eax                                  // STAT_pe
+  xchg edx, eax                             // eax = source, edx = STAT_pe
+  call stat_level_
+  mov  ebp, eax                             // ebp = восприятие source
+  test byte ptr ds:[_combat_state], 1       // В бою?
+  jz   notCombat                            // Нет
+  shl  eax, 1                               // eax = восприятие * 2
+notCombat:
+  xchg esi, eax                             // esi = видимость (на данном этапе это слышимость)
+  test byte ptr [ecx+0x44], 0x40            // source.results & DAM_BLIND?
+  jnz  cantSee                              // Да, слепой
+  mov  edx, ebx
+  mov  eax, ecx
+  call can_see_
+  dec  eax                                  // Перед лицом?
+  jnz  cantSee                              // Нет
+  push ecx
+  push ebx
+  push obj_sight_blocking_at_
+  push eax
+  xchg ecx, eax                             // eax = source, ecx = *sad_rotation_ptr (0)
+  mov  ebx, [ebx+0x4]                       // ebx = target.tile_num
+  mov  edx, [eax+0x4]                       // edx = source.tile_num
+  call make_path_func_                      // Проверка прямой видимости
+  pop  ebx
+  pop  ecx
+  test eax, eax                             // Есть преграды?
+  jz   cantSee                              // Да
+  lea  esi, [ebp+ebp*4]                     // esi = восприятие * 5
+  test byte ptr [ebx+0x26], 0x2             // target.flags3 & TransGlass_?
+  jz   cantSee                              // Нет
+  shr  esi, 1                               // esi = видимость / 2
+cantSee:
+  cmp  ebx, ds:[_obj_dude]                  // Цель == ГГ?
+  jne  checkDistance                        // Нет
+  call is_pc_sneak_working_
+  test eax, eax                             // Работает скрытность?
+  jz   noSneakWorking                       // Нет
+  shr  esi, 2                               // esi = видимость / 4
+  mov  edx, SKILL_SNEAK
+  mov  eax, ebx
+  call skill_level_
+  cmp  eax, 120
+  jle  checkDistance
+  dec  esi
+  jmp  checkDistance
+noSneakWorking:
+  call is_pc_flag_
+  test eax, eax                             // Включён режим скрытности?
+  jz   checkDistance                        // Нет
+  inc  eax
+  inc  eax                                  // eax = 3
+  xchg esi, eax
+  shl  eax, 1                               // eax = видимость * 2
+  cdq
+  div  esi                                  // eax = видимость * 2 / 3
+  xchg esi, eax
+checkDistance:
+  mov  edx, ecx
+  xchg ebx, eax
+  call obj_dist_
+  xor  edi, edi
+  xchg edi, eax                             // edi = расстояние
+  cmp  edi, esi                             // Расстояние больше видимости?
+  jg   end                                  // Да
+  inc  eax
+end:
+  pop  ebp
+  pop  edi
+  pop  esi
+  pop  ecx
+  pop  ebx
+  retn
+ }
+}
+
 void AIInit() {
  HookCall(0x426A95, combat_attack_hook);
  HookCall(0x42A796, combat_attack_hook);
@@ -402,6 +486,9 @@ void AIInit() {
 //  MakeCall(0x42A0C9, &ai_move_steps_closer_hook, false);
   HookCall(0x4290D3, &ai_find_attackers);
  }
+
+// Дополнительные проверки на слепоту и прямую видимость
+ if (GetPrivateProfileIntA("Misc", "CanSeeAndHearFix", 1, ini)) MakeCall(0x42BA09, &is_within_perception_hook, true);
 
 }
 

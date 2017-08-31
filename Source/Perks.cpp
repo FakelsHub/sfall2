@@ -671,16 +671,14 @@ end:
 static void PerkSetup() {
  //Character screen
  HookCall(0x00434256, PlayerHasTraitHook);
- SafeWrite8(0x0043436B, 0xe9);
- HookCall(0x0043436B, PlayerHasPerkHook);
+ MakeCall(0x0043436B, PlayerHasPerkHook, true);
  HookCall(0x004343AC, GetPerkLevelHook);
  HookCall(0x004343C1, GetPerkNameHook);
  HookCall(0x004343DF, GetPerkNameHook);
  HookCall(0x0043440D, GetPerkImageHook);
  HookCall(0x0043441B, GetPerkNameHook);
  HookCall(0x00434432, GetPerkDescHook);
- SafeWrite8(0x0043443D, 0xe9);
- HookCall(0x0043443D, EndPerkLoopHook);
+ MakeCall(0x0043443D, EndPerkLoopHook, true);
 
  //GetPlayerAvailablePerks
  HookCall(0x43D127, GetAvailablePerksHook);

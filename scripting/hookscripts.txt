@@ -370,7 +370,7 @@ hs_withinperception.int
 
 Runs when checking if one critter sees another critter. This is used in different situations like combat AI. You can override the result.
 
-NOTE: obj_can_see_obj calls this first when deciding if critter can possibly see another critter with regard to perception, lighting, sneak factors. If check fails, the end result is false. If check succeeds (eg. critter is within perception range), another check is made if there is any blocking tile between two critters (which includes stuff like windows, large bushes, barrels, etc.) and if there is - check still fails. You can override "within perception" check by returning 0 or 1, OR, as a convenience, you can also override blocking check after the perception check by returning 2 instead. In this case you should add "line of sight" check inside your hook script, otherwise critters will detect you through walls.
+NOTE: obj_can_see_obj calls this first when deciding if critter can possibly see another critter with regard to perception, active stealthboy, sneak factors. If check fails, the end result is false. If check succeeds (eg. critter is within perception range), another check is made if there is any blocking tile between two critters (which includes stuff like windows, large bushes, barrels, etc.) and if there is - check still fails. You can override "within perception" check by returning 0 or 1, OR, as a convenience, you can also override blocking check after the perception check by returning 2 instead. In this case you should add "line of sight" check inside your hook script, otherwise critters will detect you through walls.
 
 This is fired after the default calculation is made.
 

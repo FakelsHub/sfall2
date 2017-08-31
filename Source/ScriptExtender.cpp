@@ -698,21 +698,34 @@ loopObject:
   cmp  eax, ds:[_outlined_object]
   je   nextObject
   xchg ecx, eax
+  mov  edx, 0x10                            // жёлтый
   mov  eax, [ecx+0x20]
   and  eax, 0xF000000
   sar  eax, 0x18
   test eax, eax                             // Это ObjType_Item?
+  jz   skip                                 // Да
+  dec  eax                                  // Это ObjType_Critter?
   jnz  nextObject                           // Нет
+  test byte ptr [ecx+0x44], 0x80            // source.results & DAM_DEAD?
+  jz   nextObject                           // Нет
+  push edx
+  shl  edx, 1                               // edx = 0x20 = _Steal
+  mov  eax, [ecx+0x64]                      // eax = source.pid
+  call critter_flag_check_
+  pop  edx
+  test eax, eax                             // Can't be stolen from?|нельзя обворовать?
+  jnz  nextObject                           // Да
+  or   byte ptr [ecx+0x25], dl
+skip:
   cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
   jnz  nextObject                           // Да
   test [ecx+0x74], eax                      // Уже подсвечивается?
   jnz  nextObject                           // Да
-  mov  edx, 0x10                            // жёлтый
   test [ecx+0x25], dl                       // Установлен NoHighlight_ (это контейнер)?
   jz   NoHighlight                          // Нет
   cmp  TurnHighlightContainers, eax         // Подсвечивать контейнеры?
   je   nextObject                           // Нет
-  mov  edx, 0x4                             // светло-серый
+  shr  edx, 2                               // светло-серый
 NoHighlight:
   mov  [ecx+0x74], edx
 nextObject:
@@ -737,7 +750,12 @@ loopObject:
   and  eax, 0xF000000
   sar  eax, 0x18
   test eax, eax                             // Это ObjType_Item?
+  jz   skip                                 // Да
+  dec  eax                                  // Это ObjType_Critter?
   jnz  nextObject                           // Нет
+  test byte ptr [ecx+0x44], 0x80            // source.results & DAM_DEAD?
+  jz   nextObject                           // Нет
+skip:
   cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
   jnz  nextObject                           // Да
   mov  [ecx+0x74], eax
