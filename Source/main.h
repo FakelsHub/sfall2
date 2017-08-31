@@ -31,8 +31,6 @@ extern char dfModelName[65];
 
 extern bool npcautolevel;
 
-extern DWORD MotionSensorFlags;
-
 template<typename T> T SimplePatch(DWORD addr, const char* iniSection, const char* iniKey, T defaultValue, T minValue = 0, T maxValue = INT_MAX)
 {
  return SimplePatch<T>(&addr, 1, iniSection, iniKey, defaultValue, minValue, maxValue);

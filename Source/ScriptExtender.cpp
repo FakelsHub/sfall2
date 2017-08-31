@@ -34,6 +34,8 @@
 #include "ScriptExtender.h"
 #include "version.h"
 
+static void* opTable[maxOpcodes];
+
 void _stdcall HandleMapUpdateForScripts(DWORD procId);
 
 // variables for new opcodes
@@ -117,7 +119,6 @@ static const char* _stdcall GetOpArgStr(int num) {
 
 typedef void (_stdcall *regOpcodeProc)(WORD opcode,void* ptr);
 
-static DWORD TurnHighlightContainers = 0;
 static int idle;
 
 struct sGlobalScript {
@@ -151,14 +152,13 @@ stdext::hash_map<DWORD, TGameObj*> selfOverrideMap;
 
 typedef std::tr1::unordered_map<std::string, sExportedVar> ExportedVarsMap;
 static ExportedVarsMap globalExportedVars;
-DWORD isGlobalScriptLoading = 0;
+DWORD isLoadingGlobalScript = 0;
 
 stdext::hash_map<__int64, int> globalVars;
 typedef stdext::hash_map<__int64, int> :: iterator glob_itr;
 typedef stdext::hash_map<__int64, int> :: const_iterator glob_citr;
 typedef std::pair<__int64, int> glob_pair;
 
-static void* opcodes[0x300];
 DWORD AvailableGlobalScriptTypes=0;
 bool isGameLoading;
 
@@ -686,144 +686,6 @@ end:
  }
 }
 
-static void __declspec(naked) obj_outline_all_items_on() {
- __asm {
-  mov  eax, ds:[_map_elevation]
-  call obj_find_first_at_
-loopObject:
-  test eax, eax
-  jz   end
-  cmp  eax, ds:[_outlined_object]
-  je   nextObject
-  xchg ecx, eax
-  mov  edx, 0x10                            // жёлтый
-  mov  eax, [ecx+0x20]
-  and  eax, 0xF000000
-  sar  eax, 0x18
-  test eax, eax                             // Это ObjType_Item?
-  jz   skip                                 // Да
-  dec  eax                                  // Это ObjType_Critter?
-  jnz  nextObject                           // Нет
-  test byte ptr [ecx+0x44], 0x80            // source.results & DAM_DEAD?
-  jz   nextObject                           // Нет
-  push edx
-  shl  edx, 1                               // edx = 0x20 = _Steal
-  mov  eax, [ecx+0x64]                      // eax = source.pid
-  call critter_flag_check_
-  pop  edx
-  test eax, eax                             // Can't be stolen from?|нельзя обворовать?
-  jnz  nextObject                           // Да
-  or   byte ptr [ecx+0x25], dl
-skip:
-  cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
-  jnz  nextObject                           // Да
-  test [ecx+0x74], eax                      // Уже подсвечивается?
-  jnz  nextObject                           // Да
-  test [ecx+0x25], dl                       // Установлен NoHighlight_ (это контейнер)?
-  jz   NoHighlight                          // Нет
-  cmp  TurnHighlightContainers, eax         // Подсвечивать контейнеры?
-  je   nextObject                           // Нет
-  shr  edx, 2                               // светло-серый
-NoHighlight:
-  mov  [ecx+0x74], edx
-nextObject:
-  call obj_find_next_at_
-  jmp  loopObject
-end:
-  jmp  tile_refresh_display_
- }
-}
-
-static void __declspec(naked) obj_outline_all_items_off() {
- __asm {
-  mov  eax, ds:[_map_elevation]
-  call obj_find_first_at_
-loopObject:
-  test eax, eax
-  jz   end
-  cmp  eax, ds:[_outlined_object]
-  je   nextObject
-  xchg ecx, eax
-  mov  eax, [ecx+0x20]
-  and  eax, 0xF000000
-  sar  eax, 0x18
-  test eax, eax                             // Это ObjType_Item?
-  jz   skip                                 // Да
-  dec  eax                                  // Это ObjType_Critter?
-  jnz  nextObject                           // Нет
-  test byte ptr [ecx+0x44], 0x80            // source.results & DAM_DEAD?
-  jz   nextObject                           // Нет
-skip:
-  cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
-  jnz  nextObject                           // Да
-  mov  [ecx+0x74], eax
-nextObject:
-  call obj_find_next_at_
-  jmp  loopObject
-end:
-  jmp  tile_refresh_display_
- }
-}
-
-static DWORD toggleHighlightsKey;
-static char HighlightFail1[128];
-static char HighlightFail2[128];
-static void __declspec(naked) get_input_hook() {
- __asm {
-  call get_input_
-  pushad
-  mov  eax, toggleHighlightsKey
-  test eax, eax
-  jz   end
-  push eax
-  call KeyDown
-  mov  ebx, ds:[_objItemOutlineState]
-  test eax, eax
-  jz   notOurKey
-  test ebx, ebx
-  jnz  end
-  test MotionSensorFlags, 4                 // Sensor is required to use the item highlight feature
-  jnz  checkSensor
-outlineOn:
-  call obj_outline_all_items_on
-  jmp  stateOn
-checkSensor:
-  mov  eax, ds:[_obj_dude]
-  mov  edx, PID_MOTION_SENSOR
-  call inven_pid_is_carried_ptr_
-  test eax, eax
-  jz   noSensor
-  test MotionSensorFlags, 2                 // Sensor doesn't require charges
-  jnz  outlineOn
-  call item_m_dec_charges_                  // Returns -1 if the item has no charges
-  inc  eax
-  test eax, eax
-  jnz  outlineOn
-  mov  eax, offset HighlightFail2           // "Your motion sensor is out of charge."
-  jmp  printFail
-noSensor:
-  mov  eax, offset HighlightFail1           // "You aren't carrying a motion sensor."
-printFail:
-  call display_print_
-  inc  ebx
-stateOn:
-  inc  ebx
-  jmp  setState
-notOurKey:
-  cmp  ebx, 1
-  jne  stateOff
-  call obj_outline_all_items_off
-stateOff:
-  xor  ebx, ebx  
-setState:
-  mov  ds:[_objItemOutlineState], ebx
-end:
-  call RunGlobalScripts1
-  popad
-  retn
- }
-}
-
 static void __declspec(naked) AfterCombatAttackHook() {
  __asm {
   pushad;
@@ -858,7 +720,7 @@ static DWORD __stdcall GetGlobalExportedVarPtr(const char* name) {
  return 0;
 }
 static DWORD __stdcall CreateGlobalExportedVar(DWORD scr, const char* name) {
- //dlog_f("\nTrying to export variable %s (%d)\r\n", DL_MAIN, name, isGlobalScriptLoading);
+ //dlog_f("\nTrying to export variable %s (%d)\r\n", DL_MAIN, name, isLoadingGlobalScript);
  std::string str(name);
  globalExportedVars[str] = sExportedVar(); // add new
  return 1;
@@ -902,7 +764,7 @@ static const DWORD Export_Export_FindVar_back2 = 0x4414AC;
 static void __declspec(naked) Export_Export_FindVar_Hook() {
  __asm {
   pushad;
-  mov eax, isGlobalScriptLoading;
+  mov eax, isLoadingGlobalScript;
   test eax, eax;
   jz proceedNormal;
   push edx; // char* - var name
@@ -927,6 +789,7 @@ static void _stdcall FreeProgramHook2(DWORD progPtr) {
   }
  }
 }
+
 static void __declspec(naked) FreeProgramHook() {
  __asm {
   pushad;
@@ -934,33 +797,6 @@ static void __declspec(naked) FreeProgramHook() {
   call FreeProgramHook2;
   popad;
   retn;
- }
-}
-
-static void __declspec(naked) gmouse_bk_process_hook() {
- __asm {
-  test eax, eax
-  jz   end
-  test byte ptr [eax+0x25], 0x10            // NoHighlight_
-  jnz  end
-  mov  dword ptr [eax+0x74], 0
-end:
-  mov  edx, 0x40
-  jmp  obj_outline_object_
- }
-}
-
-static void __declspec(naked) obj_remove_outline_hook() {
- __asm {
-  call obj_remove_outline_
-  test eax, eax
-  jnz  end
-  cmp  dword ptr ds:[_objItemOutlineState], 1
-  jne  end
-  mov  ds:[_outlined_object], eax
-  call obj_outline_all_items_on
-end:
-  retn
  }
 }
 
@@ -985,20 +821,287 @@ static void __declspec(naked) combat_over_hook() {
 }
 
 void ScriptExtenderSetup() {
- toggleHighlightsKey = GetPrivateProfileIntA("Input", "ToggleItemHighlightsKey", 0, ini);
- if (toggleHighlightsKey) {
-  HookCall(0x44B9BA, &gmouse_bk_process_hook);
-  HookCall(0x44BD1C, &obj_remove_outline_hook);
-  HookCall(0x44E559, &obj_remove_outline_hook);
-  TurnHighlightContainers = GetPrivateProfileIntA("Input", "TurnHighlightContainers", 0, ini);
-  GetPrivateProfileStringA("Sfall", "HighlightFail1", "You aren't carrying a motion sensor.", HighlightFail1, 128, translationIni);
-  GetPrivateProfileStringA("Sfall", "HighlightFail2", "Your motion sensor is out of charge.", HighlightFail2, 128, translationIni);
- }
-
- idle = GetPrivateProfileIntA("Misc", "ProcessorIdle", -1, ini);
 
  dlogr("Adding additional opcodes", DL_SCRIPT);
- dlogr("  Unsafe opcodes enabled", DL_SCRIPT);
+ dlogr("Unsafe opcodes enabled", DL_SCRIPT);
+
+ SafeWrite32(0x46E370, maxOpcodes);         // Maximum number of allowed opcodes
+ SafeWrite32(0x46CE34, (DWORD)opTable);     // cmp check to make sure opcode exists
+ SafeWrite32(0x46CE6C, (DWORD)opTable);     // call that actually jumps to the opcode
+ SafeWrite32(0x46E390, (DWORD)opTable);     // mov that writes to the opcode
+
+ opTable[0x156]=ReadByte;
+ opTable[0x157]=ReadShort;
+ opTable[0x158]=ReadInt;
+ opTable[0x159]=ReadString;
+ opTable[0x15a]=SetPCBaseStat;
+ opTable[0x15b]=SetPCExtraStat;
+ opTable[0x15c]=GetPCBaseStat;
+ opTable[0x15d]=GetPCExtraStat;
+ opTable[0x15e]=SetCritterBaseStat;
+ opTable[0x15f]=SetCritterExtraStat;
+ opTable[0x160]=GetCritterBaseStat;
+ opTable[0x161]=GetCritterExtraStat;
+ opTable[0x162]=funcTapKey;
+ opTable[0x163]=GetYear;
+ opTable[0x164]=GameLoaded;
+ opTable[0x165]=GraphicsFuncsAvailable;
+ opTable[0x166]=funcLoadShader;
+ opTable[0x167]=funcFreeShader;
+ opTable[0x168]=funcActivateShader;
+ opTable[0x169]=funcDeactivateShader;
+ opTable[0x16a]=SetGlobalScriptRepeat;
+ opTable[0x16b]=InputFuncsAvailable;
+ opTable[0x16c]=KeyPressed;
+ opTable[0x16d]=funcSetShaderInt;
+ opTable[0x16e]=funcSetShaderFloat;
+ opTable[0x16f]=funcSetShaderVector;
+ opTable[0x170]=in_world_map;
+ opTable[0x171]=ForceEncounter;
+ opTable[0x172]=SetWorldMapPos;
+ opTable[0x173]=GetWorldMapXPos;
+ opTable[0x174]=GetWorldMapYPos;
+ opTable[0x175]=SetDMModel;
+ opTable[0x176]=SetDFModel;
+ opTable[0x177]=SetMoviePath;
+ for(int i = 0x178; i < 0x189; i++) opTable[i] = funcSetPerkValue;
+ opTable[0x189]=funcSetPerkName;
+ opTable[0x18a]=funcSetPerkDesc;
+ opTable[0x18b]=SetPipBoyAvailable;
+ if (usingExtraKillTypes) {
+  opTable[0x18c]=GetKillCounter2;
+  opTable[0x18d]=ModKillCounter2;
+ } else {
+  opTable[0x18c]=GetKillCounter;
+  opTable[0x18d]=ModKillCounter;
+ }
+ opTable[0x18e]=GetPerkOwed;
+ opTable[0x18f]=SetPerkOwed;
+ opTable[0x190]=GetPerkAvailable;
+ opTable[0x191]=GetCritterAP;
+ opTable[0x192]=SetCritterAP;
+ opTable[0x193]=GetActiveHand;
+ opTable[0x194]=ToggleActiveHand;
+ opTable[0x195]=SetWeaponKnockback;
+ opTable[0x196]=SetTargetKnockback;
+ opTable[0x197]=SetAttackerKnockback;
+ opTable[0x198]=RemoveWeaponKnockback;
+ opTable[0x199]=RemoveTargetKnockback;
+ opTable[0x19a]=RemoveAttackerKnockback;
+ opTable[0x19b]=SetGlobalScriptType;
+ opTable[0x19c]=GetGlobalScriptTypes;
+ opTable[0x19d]=SetGlobalVar;
+ opTable[0x19e]=GetGlobalVarInt;
+ opTable[0x19f]=GetGlobalVarFloat;
+ opTable[0x1a0]=fSetPickpocketMax;
+ opTable[0x1a1]=fSetHitChanceMax;
+ opTable[0x1a2]=fSetSkillMax;
+ opTable[0x1a3]=EaxAvailable;
+ //opTable[0x1a4]=SetEaxEnvironmentFunc;
+ opTable[0x1a5]=IncNPCLevel;
+ opTable[0x1a6]=GetViewportX;
+ opTable[0x1a7]=GetViewportY;
+ opTable[0x1a8]=SetViewportX;
+ opTable[0x1a9]=SetViewportY;
+ opTable[0x1aa]=SetXpMod;
+ opTable[0x1ab]=SetPerkLevelMod;
+ opTable[0x1ac]=GetIniSetting;
+ opTable[0x1ad]=funcGetShaderVersion;
+ opTable[0x1ae]=funcSetShaderMode;
+ opTable[0x1af]=get_game_mode;
+ opTable[0x1b0]=funcForceGraphicsRefresh;
+ opTable[0x1b1]=funcGetShaderTexture;
+ opTable[0x1b2]=funcSetShaderTexture;
+ opTable[0x1b3]=funcGetTickCount;
+ opTable[0x1b4]=SetStatMax;
+ opTable[0x1b5]=SetStatMin;
+ opTable[0x1b6]=SetCarTown;
+ opTable[0x1b7]=fSetPCStatMax;
+ opTable[0x1b8]=fSetPCStatMin;
+ opTable[0x1b9]=fSetNPCStatMax;
+ opTable[0x1ba]=fSetNPCStatMin;
+ opTable[0x1bb]=fSetFakePerk;
+ opTable[0x1bc]=fSetFakeTrait;
+ opTable[0x1bd]=fSetSelectablePerk;
+ opTable[0x1be]=fSetPerkboxTitle;
+ opTable[0x1bf]=fIgnoreDefaultPerks;
+ opTable[0x1c0]=fRestoreDefaultPerks;
+ opTable[0x1c1]=fHasFakePerk;
+ opTable[0x1c2]=fHasFakeTrait;
+ opTable[0x1c3]=fAddPerkMode;
+ opTable[0x1c4]=fClearSelectablePerks;
+ opTable[0x1c5]=SetCritterHitChance;
+ opTable[0x1c6]=SetBaseHitChance;
+ opTable[0x1c7]=SetCritterSkillMod;
+ opTable[0x1c8]=SetBaseSkillMod;
+ opTable[0x1c9]=SetCritterPickpocket;
+ opTable[0x1ca]=SetBasePickpocket;
+ opTable[0x1cb]=SetPyromaniacMod;
+ opTable[0x1cc]=fApplyHeaveHoFix;
+ opTable[0x1cd]=SetSwiftLearnerMod;
+ opTable[0x1ce]=SetLevelHPMod;
+ opTable[0x1cf]=WriteByte;
+ opTable[0x1d0]=WriteShort;
+ opTable[0x1d1]=WriteInt;
+ for (int i = 0x1d2; i < 0x1dc; i++) opTable[i] = CallOffset;
+ opTable[0x1dc]=ShowIfaceTag;
+ opTable[0x1dd]=HideIfaceTag;
+ opTable[0x1de]=IsIfaceTagActive;
+ opTable[0x1df]=GetBodypartHitModifier;
+ opTable[0x1e0]=SetBodypartHitModifier;
+ opTable[0x1e1]=funcSetCriticalTable;
+ opTable[0x1e2]=funcGetCriticalTable;
+ opTable[0x1e3]=funcResetCriticalTable;
+ opTable[0x1e4]=GetSfallArg;
+ opTable[0x1e5]=SetSfallReturn;
+ opTable[0x1e6]=SetApAcBonus;
+ opTable[0x1e7]=GetApAcBonus;
+ opTable[0x1e8]=SetApAcEBonus;
+ opTable[0x1e9]=GetApAcEBonus;
+ opTable[0x1ea]=InitHook;
+ opTable[0x1eb]=GetIniString;
+ opTable[0x1ec]=funcSqrt;
+ opTable[0x1ed]=funcAbs;
+ opTable[0x1ee]=funcSin;
+ opTable[0x1ef]=funcCos;
+ opTable[0x1f0]=funcTan;
+ opTable[0x1f1]=funcATan;
+ opTable[0x1f2]=SetPalette;
+ opTable[0x1f3]=RemoveScript;
+ opTable[0x1f4]=SetScript;
+ opTable[0x1f5]=GetScript;
+ opTable[0x1f6]=NBCreateChar;
+ opTable[0x1f7]=fs_create;
+ opTable[0x1f8]=fs_copy;
+ opTable[0x1f9]=fs_find;
+ opTable[0x1fa]=fs_write_byte;
+ opTable[0x1fb]=fs_write_short;
+ opTable[0x1fc]=fs_write_int;
+ opTable[0x1fd]=fs_write_int;
+ opTable[0x1fe]=fs_write_string;
+ opTable[0x1ff]=fs_delete;
+ opTable[0x200]=fs_size;
+ opTable[0x201]=fs_pos;
+ opTable[0x202]=fs_seek;
+ opTable[0x203]=fs_resize;
+ opTable[0x204]=get_proto_data;
+ opTable[0x205]=set_proto_data;
+ opTable[0x206]=set_self;
+ opTable[0x207]=register_hook;
+ opTable[0x208]=fs_write_bstring;
+ opTable[0x209]=fs_read_byte;
+ opTable[0x20a]=fs_read_short;
+ opTable[0x20b]=fs_read_int;
+ opTable[0x20c]=fs_read_float;
+ opTable[0x20d]=list_begin;
+ opTable[0x20e]=list_next;
+ opTable[0x20f]=list_end;
+ opTable[0x210]=sfall_ver_major;
+ opTable[0x211]=sfall_ver_minor;
+ opTable[0x212]=sfall_ver_build;
+ opTable[0x213]=funcHeroSelectWin;
+ opTable[0x214]=funcSetHeroRace;
+ opTable[0x215]=funcSetHeroStyle;
+ opTable[0x216]=set_critter_burst_disable;
+ opTable[0x217]=get_weapon_ammo_pid;
+ opTable[0x218]=set_weapon_ammo_pid;
+ opTable[0x219]=get_weapon_ammo_count;
+ opTable[0x21a]=set_weapon_ammo_count;
+ opTable[0x21b]=WriteString;
+ opTable[0x21c]=get_mouse_x;
+ opTable[0x21d]=get_mouse_y;
+ opTable[0x21e]=get_mouse_buttons;
+ opTable[0x21f]=get_window_under_mouse;
+ opTable[0x220]=get_screen_width;
+ opTable[0x221]=get_screen_height;
+ opTable[0x222] = (void*)map_disable_bk_processes_;// Stop game
+ opTable[0x223] = (void*)map_enable_bk_processes_;// Resume the game when it is stopped
+ opTable[0x224]=create_message_window;
+ opTable[0x225]=remove_trait;
+ opTable[0x226]=get_light_level;
+ opTable[0x227]=refresh_pc_art;
+ opTable[0x228]=get_attack_type;
+ opTable[0x229]=ForceEncounterWithFlags;
+ opTable[0x22a]=set_map_time_multi;
+ opTable[0x22b]=play_sfall_sound;
+ opTable[0x22c]=stop_sfall_sound;
+ opTable[0x22d]=create_array;
+ opTable[0x22e]=set_array;
+ opTable[0x22f]=get_array;
+ opTable[0x230]=free_array;
+ opTable[0x231]=len_array;
+ opTable[0x232]=resize_array;
+ opTable[0x233]=temp_array;
+ opTable[0x234]=fix_array;
+ opTable[0x235]=string_split;
+ opTable[0x236]=list_as_array;
+ opTable[0x237]=str_to_int;
+ opTable[0x238]=str_to_flt;
+ opTable[0x239]=scan_array;
+ opTable[0x23a]=get_tile_pid;
+ opTable[0x23b]=modified_ini;
+ opTable[0x23c]=GetSfallArgs;
+ opTable[0x23d]=SetSfallArg;
+ opTable[0x23e]=force_aimed_shots;
+ opTable[0x23f]=disable_aimed_shots;
+ opTable[0x240]=mark_movie_played;
+ opTable[0x241]=get_npc_level;
+ opTable[0x242]=set_critter_skill_points;
+ opTable[0x243]=get_critter_skill_points;
+ opTable[0x244]=set_available_skill_points;
+ opTable[0x245]=get_available_skill_points;
+ opTable[0x246]=mod_skill_points_per_level;
+ opTable[0x247]=set_perk_freq;
+ opTable[0x248]=get_last_attacker;
+ opTable[0x249]=get_last_target;
+ opTable[0x24a]=block_combat;
+ opTable[0x24b]=tile_under_cursor;
+ opTable[0x24c]=gdialog_get_barter_mod;
+ opTable[0x24d]=set_inven_ap_cost;
+ opTable[0x24e]=op_substr;
+ opTable[0x24f]=op_strlen;
+ opTable[0x250]=op_sprintf;
+ opTable[0x251]=op_ord;
+ // opTable[0x252]=  RESERVED
+ opTable[0x253]=op_typeof;
+ opTable[0x254]=op_save_array;
+ opTable[0x255]=op_load_array;
+ opTable[0x256]=op_get_array_key;
+ opTable[0x257]=op_stack_array;
+ // opTable[0x258]= RESERVED for arrays
+ // opTable[0x259]= RESERVED for arrays
+ opTable[0x25a]=op_reg_anim_destroy;
+ opTable[0x25b]=op_reg_anim_animate_and_hide;
+ opTable[0x25c]=op_reg_anim_combat_check;
+ opTable[0x25d]=op_reg_anim_light;
+ opTable[0x25e]=op_reg_anim_change_fid;
+ opTable[0x25f]=op_reg_anim_take_out;
+ opTable[0x260]=op_reg_anim_turn_towards;
+ opTable[0x261]=op_explosions_metarule;
+ opTable[0x262]=register_hook_proc;
+ opTable[0x263]=funcPow;
+ opTable[0x264]=funcLog;
+ opTable[0x265]=funcExp;
+ opTable[0x266]=funcCeil;
+ opTable[0x267]=funcRound;
+ // opTable[0x268]= RESERVED
+ // opTable[0x269]= RESERVED
+ // opTable[0x26a]=op_game_ui_redraw;
+ opTable[0x26b]=op_message_str_game;
+ opTable[0x26c]=op_sneak_success;
+ opTable[0x26d]=op_tile_light;
+ opTable[0x26e]=op_make_straight_path;
+ opTable[0x26f]=op_obj_blocking_at;
+ opTable[0x270]=op_tile_get_objects;
+ opTable[0x271]=op_get_party_members;
+ opTable[0x272]=op_make_path;
+ opTable[0x273]=op_create_spatial;
+ opTable[0x274]=op_art_exists;
+ opTable[0x275]=op_obj_is_carrying_obj;
+
+ memset(&OverrideScriptStruct, 0, 0xE0);
+
+ idle = GetPrivateProfileIntA("Misc", "ProcessorIdle", -1, ini);
 
  arraysBehavior = GetPrivateProfileIntA("Misc", "arraysBehavior", 1, ini);
  if (arraysBehavior > 0) {
@@ -1006,17 +1109,8 @@ void ScriptExtenderSetup() {
   dlogr("New arrays behavior enabled.", DL_SCRIPT);
  } else dlogr("Arrays in backward-compatiblity mode.", DL_SCRIPT);
 
- SafeWrite32(0x46E370, 0x300); //Maximum number of allowed opcodes
- SafeWrite32(0x46ce34, (DWORD)opcodes); //cmp check to make sure opcode exists
- SafeWrite32(0x46ce6c, (DWORD)opcodes); //call that actually jumps to the opcode
- SafeWrite32(0x46e390, (DWORD)opcodes); //mov that writes to the opcode
-
- HookCall(0x480E7B, &get_input_hook);       //hook the main game loop
- HookCall(0x422845, &get_input_hook);       //hook the combat loop
-
  MakeCall(0x4A390C, &FindSidHook, true);
  MakeCall(0x4A5E34, &ScrPtrHook, true);
- memset(&OverrideScriptStruct, 0, sizeof(TScript));
 
  MakeCall(0x4230D5, &AfterCombatAttackHook, true);
  MakeCall(0x4A67F2, &ExecMapScriptsHook, true);
@@ -1026,287 +1120,7 @@ void ScriptExtenderSetup() {
  HookCall(0x441285, &Export_FetchOrStore_FindVar_Hook); // store
  HookCall(0x4413D9, &Export_FetchOrStore_FindVar_Hook); // fetch
 
- // fix vanilla negate operator on float values
- MakeCall(0x46AB63, &NegateFixHook, true);
- // fix incorrect int-to-float conversion
- // op_mult:
- SafeWrite16(0x46A3F4, 0x04DB); // replace operator to "fild 32bit"
- SafeWrite16(0x46A3A8, 0x04DB);
- // op_div:
- SafeWrite16(0x46A566, 0x04DB);
- SafeWrite16(0x46A4E7, 0x04DB);
-
  HookCall(0x46E141, FreeProgramHook);
-
- opcodes[0x156]=ReadByte;
- opcodes[0x157]=ReadShort;
- opcodes[0x158]=ReadInt;
- opcodes[0x159]=ReadString;
- opcodes[0x15a]=SetPCBaseStat;
- opcodes[0x15b]=SetPCExtraStat;
- opcodes[0x15c]=GetPCBaseStat;
- opcodes[0x15d]=GetPCExtraStat;
- opcodes[0x15e]=SetCritterBaseStat;
- opcodes[0x15f]=SetCritterExtraStat;
- opcodes[0x160]=GetCritterBaseStat;
- opcodes[0x161]=GetCritterExtraStat;
- opcodes[0x162]=funcTapKey;
- opcodes[0x163]=GetYear;
- opcodes[0x164]=GameLoaded;
- opcodes[0x165]=GraphicsFuncsAvailable;
- opcodes[0x166]=funcLoadShader;
- opcodes[0x167]=funcFreeShader;
- opcodes[0x168]=funcActivateShader;
- opcodes[0x169]=funcDeactivateShader;
- opcodes[0x16a]=SetGlobalScriptRepeat;
- opcodes[0x16b]=InputFuncsAvailable;
- opcodes[0x16c]=KeyPressed;
- opcodes[0x16d]=funcSetShaderInt;
- opcodes[0x16e]=funcSetShaderFloat;
- opcodes[0x16f]=funcSetShaderVector;
- opcodes[0x170]=in_world_map;
- opcodes[0x171]=ForceEncounter;
- opcodes[0x172]=SetWorldMapPos;
- opcodes[0x173]=GetWorldMapXPos;
- opcodes[0x174]=GetWorldMapYPos;
- opcodes[0x175]=SetDMModel;
- opcodes[0x176]=SetDFModel;
- opcodes[0x177]=SetMoviePath;
- for(int i=0x178;i<0x189;i++)
-  opcodes[i]=funcSetPerkValue;
- opcodes[0x189]=funcSetPerkName;
- opcodes[0x18a]=funcSetPerkDesc;
- opcodes[0x18b]=SetPipBoyAvailable;
- if (usingExtraKillTypes) {
-  opcodes[0x18c]=GetKillCounter2;
-  opcodes[0x18d]=ModKillCounter2;
- } else {
-  opcodes[0x18c]=GetKillCounter;
-  opcodes[0x18d]=ModKillCounter;
- }
- opcodes[0x18e]=GetPerkOwed;
- opcodes[0x18f]=SetPerkOwed;
- opcodes[0x190]=GetPerkAvailable;
- opcodes[0x191]=GetCritterAP;
- opcodes[0x192]=SetCritterAP;
- opcodes[0x193]=GetActiveHand;
- opcodes[0x194]=ToggleActiveHand;
- opcodes[0x195]=SetWeaponKnockback;
- opcodes[0x196]=SetTargetKnockback;
- opcodes[0x197]=SetAttackerKnockback;
- opcodes[0x198]=RemoveWeaponKnockback;
- opcodes[0x199]=RemoveTargetKnockback;
- opcodes[0x19a]=RemoveAttackerKnockback;
- opcodes[0x19b]=SetGlobalScriptType;
- opcodes[0x19c]=GetGlobalScriptTypes;
- opcodes[0x19d]=SetGlobalVar;
- opcodes[0x19e]=GetGlobalVarInt;
- opcodes[0x19f]=GetGlobalVarFloat;
- opcodes[0x1a0]=fSetPickpocketMax;
- opcodes[0x1a1]=fSetHitChanceMax;
- opcodes[0x1a2]=fSetSkillMax;
- opcodes[0x1a3]=EaxAvailable;
- //opcodes[0x1a4]=SetEaxEnvironmentFunc;
- opcodes[0x1a5]=IncNPCLevel;
- opcodes[0x1a6]=GetViewportX;
- opcodes[0x1a7]=GetViewportY;
- opcodes[0x1a8]=SetViewportX;
- opcodes[0x1a9]=SetViewportY;
- opcodes[0x1aa]=SetXpMod;
- opcodes[0x1ab]=SetPerkLevelMod;
- opcodes[0x1ac]=GetIniSetting;
- opcodes[0x1ad]=funcGetShaderVersion;
- opcodes[0x1ae]=funcSetShaderMode;
- opcodes[0x1af]=get_game_mode;
- opcodes[0x1b0]=funcForceGraphicsRefresh;
- opcodes[0x1b1]=funcGetShaderTexture;
- opcodes[0x1b2]=funcSetShaderTexture;
- opcodes[0x1b3]=funcGetTickCount;
- opcodes[0x1b4]=SetStatMax;
- opcodes[0x1b5]=SetStatMin;
- opcodes[0x1b6]=SetCarTown;
- opcodes[0x1b7]=fSetPCStatMax;
- opcodes[0x1b8]=fSetPCStatMin;
- opcodes[0x1b9]=fSetNPCStatMax;
- opcodes[0x1ba]=fSetNPCStatMin;
- opcodes[0x1bb]=fSetFakePerk;
- opcodes[0x1bc]=fSetFakeTrait;
- opcodes[0x1bd]=fSetSelectablePerk;
- opcodes[0x1be]=fSetPerkboxTitle;
- opcodes[0x1bf]=fIgnoreDefaultPerks;
- opcodes[0x1c0]=fRestoreDefaultPerks;
- opcodes[0x1c1]=fHasFakePerk;
- opcodes[0x1c2]=fHasFakeTrait;
- opcodes[0x1c3]=fAddPerkMode;
- opcodes[0x1c4]=fClearSelectablePerks;
- opcodes[0x1c5]=SetCritterHitChance;
- opcodes[0x1c6]=SetBaseHitChance;
- opcodes[0x1c7]=SetCritterSkillMod;
- opcodes[0x1c8]=SetBaseSkillMod;
- opcodes[0x1c9]=SetCritterPickpocket;
- opcodes[0x1ca]=SetBasePickpocket;
- opcodes[0x1cb]=SetPyromaniacMod;
- opcodes[0x1cc]=fApplyHeaveHoFix;
- opcodes[0x1cd]=SetSwiftLearnerMod;
- opcodes[0x1ce]=SetLevelHPMod;
- opcodes[0x1cf]=WriteByte;
- opcodes[0x1d0]=WriteShort;
- opcodes[0x1d1]=WriteInt;
- for (int i = 0x1d2; i < 0x1dc; i++) opcodes[i] = CallOffset;
- opcodes[0x1dc]=ShowIfaceTag;
- opcodes[0x1dd]=HideIfaceTag;
- opcodes[0x1de]=IsIfaceTagActive;
- opcodes[0x1df]=GetBodypartHitModifier;
- opcodes[0x1e0]=SetBodypartHitModifier;
- opcodes[0x1e1]=funcSetCriticalTable;
- opcodes[0x1e2]=funcGetCriticalTable;
- opcodes[0x1e3]=funcResetCriticalTable;
- opcodes[0x1e4]=GetSfallArg;
- opcodes[0x1e5]=SetSfallReturn;
- opcodes[0x1e6]=SetApAcBonus;
- opcodes[0x1e7]=GetApAcBonus;
- opcodes[0x1e8]=SetApAcEBonus;
- opcodes[0x1e9]=GetApAcEBonus;
- opcodes[0x1ea]=InitHook;
- opcodes[0x1eb]=GetIniString;
- opcodes[0x1ec]=funcSqrt;
- opcodes[0x1ed]=funcAbs;
- opcodes[0x1ee]=funcSin;
- opcodes[0x1ef]=funcCos;
- opcodes[0x1f0]=funcTan;
- opcodes[0x1f1]=funcATan;
- opcodes[0x1f2]=SetPalette;
- opcodes[0x1f3]=RemoveScript;
- opcodes[0x1f4]=SetScript;
- opcodes[0x1f5]=GetScript;
- opcodes[0x1f6]=NBCreateChar;
- opcodes[0x1f7]=fs_create;
- opcodes[0x1f8]=fs_copy;
- opcodes[0x1f9]=fs_find;
- opcodes[0x1fa]=fs_write_byte;
- opcodes[0x1fb]=fs_write_short;
- opcodes[0x1fc]=fs_write_int;
- opcodes[0x1fd]=fs_write_int;
- opcodes[0x1fe]=fs_write_string;
- opcodes[0x1ff]=fs_delete;
- opcodes[0x200]=fs_size;
- opcodes[0x201]=fs_pos;
- opcodes[0x202]=fs_seek;
- opcodes[0x203]=fs_resize;
- opcodes[0x204]=get_proto_data;
- opcodes[0x205]=set_proto_data;
- opcodes[0x206]=set_self;
- opcodes[0x207]=register_hook;
- opcodes[0x208]=fs_write_bstring;
- opcodes[0x209]=fs_read_byte;
- opcodes[0x20a]=fs_read_short;
- opcodes[0x20b]=fs_read_int;
- opcodes[0x20c]=fs_read_float;
- opcodes[0x20d]=list_begin;
- opcodes[0x20e]=list_next;
- opcodes[0x20f]=list_end;
- opcodes[0x210]=sfall_ver_major;
- opcodes[0x211]=sfall_ver_minor;
- opcodes[0x212]=sfall_ver_build;
- opcodes[0x213]=funcHeroSelectWin;
- opcodes[0x214]=funcSetHeroRace;
- opcodes[0x215]=funcSetHeroStyle;
- opcodes[0x216]=set_critter_burst_disable;
- opcodes[0x217]=get_weapon_ammo_pid;
- opcodes[0x218]=set_weapon_ammo_pid;
- opcodes[0x219]=get_weapon_ammo_count;
- opcodes[0x21a]=set_weapon_ammo_count;
- opcodes[0x21b]=WriteString;
- opcodes[0x21c]=get_mouse_x;
- opcodes[0x21d]=get_mouse_y;
- opcodes[0x21e]=get_mouse_buttons;
- opcodes[0x21f]=get_window_under_mouse;
- opcodes[0x220]=get_screen_width;
- opcodes[0x221]=get_screen_height;
- opcodes[0x222] = (void*)map_disable_bk_processes_;// Stop game
- opcodes[0x223] = (void*)map_enable_bk_processes_;// Resume the game when it is stopped
- opcodes[0x224]=create_message_window;
- opcodes[0x225]=remove_trait;
- opcodes[0x226]=get_light_level;
- opcodes[0x227]=refresh_pc_art;
- opcodes[0x228]=get_attack_type;
- opcodes[0x229]=ForceEncounterWithFlags;
- opcodes[0x22a]=set_map_time_multi;
- opcodes[0x22b]=play_sfall_sound;
- opcodes[0x22c]=stop_sfall_sound;
- opcodes[0x22d]=create_array;
- opcodes[0x22e]=set_array;
- opcodes[0x22f]=get_array;
- opcodes[0x230]=free_array;
- opcodes[0x231]=len_array;
- opcodes[0x232]=resize_array;
- opcodes[0x233]=temp_array;
- opcodes[0x234]=fix_array;
- opcodes[0x235]=string_split;
- opcodes[0x236]=list_as_array;
- opcodes[0x237]=str_to_int;
- opcodes[0x238]=str_to_flt;
- opcodes[0x239]=scan_array;
- opcodes[0x23a]=get_tile_pid;
- opcodes[0x23b]=modified_ini;
- opcodes[0x23c]=GetSfallArgs;
- opcodes[0x23d]=SetSfallArg;
- opcodes[0x23e]=force_aimed_shots;
- opcodes[0x23f]=disable_aimed_shots;
- opcodes[0x240]=mark_movie_played;
- opcodes[0x241]=get_npc_level;
- opcodes[0x242]=set_critter_skill_points;
- opcodes[0x243]=get_critter_skill_points;
- opcodes[0x244]=set_available_skill_points;
- opcodes[0x245]=get_available_skill_points;
- opcodes[0x246]=mod_skill_points_per_level;
- opcodes[0x247]=set_perk_freq;
- opcodes[0x248]=get_last_attacker;
- opcodes[0x249]=get_last_target;
- opcodes[0x24a]=block_combat;
- opcodes[0x24b]=tile_under_cursor;
- opcodes[0x24c]=gdialog_get_barter_mod;
- opcodes[0x24d]=set_inven_ap_cost;
- opcodes[0x24e]=op_substr;
- opcodes[0x24f]=op_strlen;
- opcodes[0x250]=op_sprintf;
- opcodes[0x251]=op_ord;
- // opcodes[0x252]=  RESERVED
- opcodes[0x253]=op_typeof;
- opcodes[0x254]=op_save_array;
- opcodes[0x255]=op_load_array;
- opcodes[0x256]=op_get_array_key;
- opcodes[0x257]=op_stack_array;
- // opcodes[0x258]= RESERVED for arrays
- // opcodes[0x259]= RESERVED for arrays
- opcodes[0x25a]=op_reg_anim_destroy;
- opcodes[0x25b]=op_reg_anim_animate_and_hide;
- opcodes[0x25c]=op_reg_anim_combat_check;
- opcodes[0x25d]=op_reg_anim_light;
- opcodes[0x25e]=op_reg_anim_change_fid;
- opcodes[0x25f]=op_reg_anim_take_out;
- opcodes[0x260]=op_reg_anim_turn_towards;
- opcodes[0x261]=op_explosions_metarule;
- opcodes[0x262]=register_hook_proc;
- opcodes[0x263]=funcPow;
- opcodes[0x264]=funcLog;
- opcodes[0x265]=funcExp;
- opcodes[0x266]=funcCeil;
- opcodes[0x267]=funcRound;
- // opcodes[0x268]= RESERVED
- // opcodes[0x269]= RESERVED
- // opcodes[0x26a]=op_game_ui_redraw;
- opcodes[0x26b]=op_message_str_game;
- opcodes[0x26c]=op_sneak_success;
- opcodes[0x26d]=op_tile_light;
- opcodes[0x26e]=op_make_straight_path;
- opcodes[0x26f]=op_obj_blocking_at;
- opcodes[0x270]=op_tile_get_objects;
- opcodes[0x271]=op_get_party_members;
- opcodes[0x272]=op_make_path;
- opcodes[0x273]=op_create_spatial;
- opcodes[0x274]=op_art_exists;
- opcodes[0x275]=op_obj_is_carrying_obj;
 
  HookCall(0x421B72, &combat_begin_hook);
  HookCall(0x421FC1, &combat_over_hook);
@@ -1323,6 +1137,7 @@ DWORD GetScriptProcByName(DWORD scriptPtr, const char* procName) {
  }
  return result;
 }
+
 // loads script from .int file into a sScriptProgram struct, filling script pointer and proc lookup table
 void LoadScriptProgram(sScriptProgram &prog, const char* fileName) {
  DWORD scriptPtr;
@@ -1400,7 +1215,7 @@ void LoadGlobalScripts() {
   if (!isGameScript(name)) {
    dlog(">", DL_SCRIPT);
    dlog(name, DL_SCRIPT);
-   isGlobalScriptLoading = 1;
+   isLoadingGlobalScript = 1;
    LoadScriptProgram(prog, name);
    if (prog.ptr) {
     dlogr(", success!", DL_SCRIPT);
@@ -1412,7 +1227,7 @@ void LoadGlobalScripts() {
     // initialize script (start proc will be executed for the first time) -- this needs to be after script is added to "globalScripts" array
     InitScriptProgram(prog);
    } else dlogr(", error!", DL_SCRIPT);
-   isGlobalScriptLoading = 0;
+   isLoadingGlobalScript = 0;
   }
  }
  __asm {
@@ -1491,6 +1306,7 @@ void RunScriptProc(sScriptProgram* prog, DWORD procId) {
   }
  }
 }
+
 static void RunScript(sGlobalScript* script) {
  script->count=0;
  RunScriptProc(&script->prog, start); // run "start"
@@ -1517,7 +1333,7 @@ void AfterAttackCleanup() {
  ResetExplosionSettings();
 }
 
-static void RunGlobalScripts1() {
+void RunGlobalScripts1() {
  if(idle>-1) Sleep(idle);
  for(DWORD d=0;d<globalScripts.size();d++) {
   if(!globalScripts[d].repeat||(globalScripts[d].mode!=0&&globalScripts[d].mode!=3)) continue;
@@ -1527,6 +1343,7 @@ static void RunGlobalScripts1() {
  }
  ResetStateAfterFrame();
 }
+
 void RunGlobalScripts2() {
  if(idle>-1) Sleep(idle);
  for(DWORD d=0;d<globalScripts.size();d++) {
@@ -1537,6 +1354,7 @@ void RunGlobalScripts2() {
  }
  ResetStateAfterFrame();
 }
+
 void RunGlobalScripts3() {
  if(idle>-1) Sleep(idle);
  for(DWORD d=0;d<globalScripts.size();d++) {

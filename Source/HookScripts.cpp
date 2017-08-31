@@ -1522,7 +1522,7 @@ void HookScriptClear() {
 }
 
 void HookScriptInit() {
- isGlobalScriptLoading = 1; // this should allow to register global exported variables
+ isLoadingGlobalScript = 1; // this should allow to register global exported variables
 
  dlogr("Loading hook scripts", DL_HOOK|DL_INIT);
 
@@ -1642,7 +1642,7 @@ void HookScriptInit() {
  for (int i = 0; i < numHooks; i++) {
   if (hooks[i].size()) InitScriptProgram(hooks[i][0].prog);// zero hook is always hs_*.int script because Hook scripts are loaded BEFORE global scripts
  }
- isGlobalScriptLoading = 0;
+ isLoadingGlobalScript = 0;
  InitingHookScripts = 0;
 }
 

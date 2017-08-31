@@ -71,24 +71,28 @@ struct TGameObj
 struct TScript
 {
  int script_id;
- char gap_4[4];
+ DWORD next;
  int elevation_and_tile;
  int spatial_radius;
- char gap_10[4];
+ DWORD flags;
  int script_index;
  int program_ptr;
  int self_obj_id;
- char gap_20[8];
+ DWORD local_var_offset;
+ DWORD num_local_vars;
  int scr_return;
- char gap_2C[4];
+ DWORD action;
  int fixed_param;
  TGameObj *self_obj;
  TGameObj *source_obj;
  TGameObj *target_obj;
+ DWORD action_num;
  int script_overrides;
- char field_44;
- char gap_45[15];
+ DWORD unknown;
+ DWORD how_much;
+ DWORD not_used;
  int procedure_table[28];
+ DWORD unused[7];
 };
 #pragma pack(pop)
 

@@ -9,6 +9,10 @@
 DWORD WeightOnBody = 0;
 DWORD SizeOnBody = 0;
 
+static const DWORD QWordToDWord[] = {
+ 0x46A3A8, 0x46A3F4, 0x46A4E7, 0x46A566,
+};
+
 static void __declspec(naked) determine_to_hit_func_hook() {
  __asm {
   call stat_level_                          // Perception|Восприятие
@@ -1082,6 +1086,27 @@ end:
  }
 }
 
+static void __declspec(naked) op_negate_hook() {
+ __asm {
+  mov  ebx, edi
+  lea  edx, [ecx+0x24]
+  cmp  si, VAR_TYPE_FLOAT
+  jne  end
+  mov  eax, [ecx+0x1C]
+  push ebx
+  fld  dword ptr [esp]                      // Загрузка из памяти в вершину стека ST(0) вещественного числа (float)
+  fchs                                      // Изменение знака
+  fstp dword ptr [esp]                      // Загрузка из вершины стека ST(0) в память вещественного числа (float)
+  pop  ebx
+  call pushLongStack_
+  mov  edx, VAR_TYPE_FLOAT
+  pop  eax                                  // Уничтожаем адрес возврата
+  push 0x46AB77
+end:
+  retn
+ }
+}
+
 void BugsInit() {
 
  dlog("Applying sharpshooter patch.", DL_INIT);
@@ -1270,5 +1295,11 @@ void BugsInit() {
  dlog("Applying print to file patch.", DL_INIT);
  MakeCall(0x4C67D4, &db_get_file_list_hook, false);
  dlogr(" Done", DL_INIT);
+
+ // fix for negate operator not working on float values
+ MakeCall(0x46AB63, &op_negate_hook, false);
+
+ // fix incorrect int-to-float conversion, replace "fild qword ptr [esp]" to "fild dword ptr [esp]"
+ for (int i = 0; i < sizeof(QWordToDWord)/4; i++) SafeWrite16(QWordToDWord[i], 0x04DB);
 
 }

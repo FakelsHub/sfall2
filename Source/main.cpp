@@ -40,6 +40,7 @@
 #include "FileSystem.h"
 #include "Graphics.h"
 #include "HeroAppearance.h"
+#include "input.h"
 #include "Inventory.h"
 #include "KillCounter.h"
 #include "knockback.h"
@@ -79,7 +80,7 @@ static const char* musicOverridePath = "data\\sound\\music\\";
 
 bool npcautolevel;
 
-DWORD MotionSensorFlags;
+static DWORD MotionSensorFlags = 0;
 
 static int* scriptDialog;
 
@@ -266,8 +267,177 @@ static void __declspec(naked) palette_fade_to_hook() {
  }
 }
 
-static int mapSlotsScrollMax=27 * (17 - 7);
+static DWORD TurnHighlightContainers = 0;
+static void __declspec(naked) obj_outline_all_items_on() {
+ __asm {
+  mov  eax, ds:[_map_elevation]
+  call obj_find_first_at_
+loopObject:
+  test eax, eax
+  jz   end
+  cmp  eax, ds:[_outlined_object]
+  je   nextObject
+  xchg ecx, eax
+  mov  edx, 0x10                            // жёлтый
+  mov  eax, [ecx+0x20]
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  test eax, eax                             // Это ObjType_Item?
+  jz   skip                                 // Да
+  dec  eax                                  // Это ObjType_Critter?
+  jnz  nextObject                           // Нет
+  test byte ptr [ecx+0x44], 0x80            // source.results & DAM_DEAD?
+  jz   nextObject                           // Нет
+  push edx
+  shl  edx, 1                               // edx = 0x20 = _Steal
+  mov  eax, [ecx+0x64]                      // eax = source.pid
+  call critter_flag_check_
+  pop  edx
+  test eax, eax                             // Can't be stolen from?|нельзя обворовать?
+  jnz  nextObject                           // Да
+  or   byte ptr [ecx+0x25], dl
+skip:
+  cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
+  jnz  nextObject                           // Да
+  test [ecx+0x74], eax                      // Уже подсвечивается?
+  jnz  nextObject                           // Да
+  test [ecx+0x25], dl                       // Установлен NoHighlight_ (это контейнер)?
+  jz   NoHighlight                          // Нет
+  cmp  TurnHighlightContainers, eax         // Подсвечивать контейнеры?
+  je   nextObject                           // Нет
+  shr  edx, 2                               // светло-серый
+NoHighlight:
+  mov  [ecx+0x74], edx
+nextObject:
+  call obj_find_next_at_
+  jmp  loopObject
+end:
+  jmp  tile_refresh_display_
+ }
+}
 
+static void __declspec(naked) obj_outline_all_items_off() {
+ __asm {
+  mov  eax, ds:[_map_elevation]
+  call obj_find_first_at_
+loopObject:
+  test eax, eax
+  jz   end
+  cmp  eax, ds:[_outlined_object]
+  je   nextObject
+  xchg ecx, eax
+  mov  eax, [ecx+0x20]
+  and  eax, 0xF000000
+  sar  eax, 0x18
+  test eax, eax                             // Это ObjType_Item?
+  jz   skip                                 // Да
+  dec  eax                                  // Это ObjType_Critter?
+  jnz  nextObject                           // Нет
+  test byte ptr [ecx+0x44], 0x80            // source.results & DAM_DEAD?
+  jz   nextObject                           // Нет
+skip:
+  cmp  [ecx+0x7C], eax                      // Кому-то принадлежит?
+  jnz  nextObject                           // Да
+  mov  [ecx+0x74], eax
+nextObject:
+  call obj_find_next_at_
+  jmp  loopObject
+end:
+  jmp  tile_refresh_display_
+ }
+}
+
+static DWORD toggleHighlightsKey;
+static char HighlightFail1[128];
+static char HighlightFail2[128];
+static void __declspec(naked) get_input_call() {
+ __asm {
+  call get_input_
+  pushad
+  mov  eax, toggleHighlightsKey
+  test eax, eax
+  jz   end
+  push eax
+  call KeyDown
+  mov  ebx, ds:[_objItemOutlineState]
+  test eax, eax
+  jz   notOurKey
+  test ebx, ebx
+  jnz  end
+  test MotionSensorFlags, 4                 // Sensor is required to use the item highlight feature
+  jnz  checkSensor
+outlineOn:
+  call obj_outline_all_items_on
+  jmp  stateOn
+checkSensor:
+  mov  eax, ds:[_obj_dude]
+  mov  edx, PID_MOTION_SENSOR
+  call inven_pid_is_carried_ptr_
+  test eax, eax
+  jz   noSensor
+  test MotionSensorFlags, 2                 // Sensor doesn't require charges
+  jnz  outlineOn
+  call item_m_dec_charges_                  // Returns -1 if the item has no charges
+  inc  eax
+  test eax, eax
+  jnz  outlineOn
+  mov  eax, offset HighlightFail2           // "Your motion sensor is out of charge."
+  jmp  printFail
+noSensor:
+  mov  eax, offset HighlightFail1           // "You aren't carrying a motion sensor."
+printFail:
+  call display_print_
+  inc  ebx
+stateOn:
+  inc  ebx
+  jmp  setState
+notOurKey:
+  cmp  ebx, 1
+  jne  stateOff
+  call obj_outline_all_items_off
+stateOff:
+  xor  ebx, ebx  
+setState:
+  mov  ds:[_objItemOutlineState], ebx
+end:
+  call RunGlobalScripts1
+  popad
+  retn
+ }
+}
+
+static void __declspec(naked) gmouse_bk_process_hook() {
+ __asm {
+  test eax, eax
+  jz   end
+  test byte ptr [eax+0x25], 0x10            // NoHighlight_
+  jnz  end
+  mov  dword ptr [eax+0x74], 0
+end:
+  mov  edx, 0x40
+  jmp  obj_outline_object_
+ }
+}
+
+static void __declspec(naked) obj_remove_outline_call() {
+ __asm {
+  call obj_remove_outline_
+  inc  eax
+  jz   end
+  cmp  ds:[_objItemOutlineState], eax
+  jne  end
+  push eax
+  dec  eax
+  mov  ds:[_outlined_object], eax
+  call obj_outline_all_items_on
+  pop  eax
+end:
+  dec  eax
+  retn
+ }
+}
+
+static int mapSlotsScrollMax=27 * (17 - 7);
 static void __declspec(naked) wmInterfaceScrollTabsStart_hook() {
  __asm {
   xchg ebx, eax
@@ -835,7 +1005,7 @@ end:
  }
 }
 
-static void __declspec(naked) gmouse_bk_process_hook() {
+static void __declspec(naked) gmouse_bk_process_hook1() {
  __asm {
   xchg edi, eax
   call FirstTurnAndNoEnemy
@@ -1170,7 +1340,7 @@ static void __declspec(naked) register_object_take_out_hook() {
   mov  edx, [eax+0x20]                      // fid
   and  edx, 0xFFF                           // Index
   xor  eax, eax
-  inc  eax                                  // ObjType
+  inc  eax                                  // ObjType_Critter
   call art_id_
   xor  ebx, ebx
   dec  ebx
@@ -1270,6 +1440,18 @@ static void DllMain2() {
   HookCall(0x493B16, &palette_fade_to_hook);
   FadeMulti = ((double)tmp)/100.0;
   dlogr(" Done", DL_INIT);
+ }
+
+ toggleHighlightsKey = GetPrivateProfileIntA("Input", "ToggleItemHighlightsKey", 0, ini);
+ HookCall(0x480E7B, &get_input_call);       // hook the main game loop
+ HookCall(0x422845, &get_input_call);       // hook the combat loop
+ if (toggleHighlightsKey) {
+  HookCall(0x44B9BA, &gmouse_bk_process_hook);
+  HookCall(0x44BD1C, &obj_remove_outline_call);
+  HookCall(0x44E559, &obj_remove_outline_call);
+  TurnHighlightContainers = GetPrivateProfileIntA("Input", "TurnHighlightContainers", 0, ini);
+  GetPrivateProfileStringA("Sfall", "HighlightFail1", "You aren't carrying a motion sensor.", HighlightFail1, 128, translationIni);
+  GetPrivateProfileStringA("Sfall", "HighlightFail2", "Your motion sensor is out of charge.", HighlightFail2, 128, translationIni);
  }
 
  AmmoModInit();
@@ -1841,7 +2023,7 @@ static void DllMain2() {
 // fix "Pressing A to enter combat before anything else happens, thus getting infinite free running"
  if (GetPrivateProfileIntA("Misc", "FakeCombatFix", 0, ini)) {
   MakeCall(0x41803A, &check_move_hook, false);
-  MakeCall(0x44B8A9, &gmouse_bk_process_hook, false);
+  MakeCall(0x44B8A9, &gmouse_bk_process_hook1, false);
   HookCall(0x44C130, &FakeCombatFix1);      // action_get_an_object_
   HookCall(0x44C7B0, &FakeCombatFix1);      // action_get_an_object_
   HookCall(0x44C1D9, &FakeCombatFix2);      // action_loot_container_

@@ -24,6 +24,8 @@
 #define DATATYPE_FLOAT (2)
 #define DATATYPE_STR   (3)
 
+#define maxOpcodes (0x300)
+
 struct sGlobalVar {
  __int64 id;
  int val;
@@ -80,4 +82,4 @@ sScriptProgram* GetGlobalScriptProgram(DWORD scriptPtr);
 char* _stdcall mysubstr(char* str, int pos, int length);
 // variables
 static char reg_anim_combat_check = 1;
-extern DWORD isGlobalScriptLoading;
+extern DWORD isLoadingGlobalScript;
