@@ -160,7 +160,7 @@ typedef stdext::hash_map<__int64, int> :: const_iterator glob_citr;
 typedef std::pair<__int64, int> glob_pair;
 
 DWORD AvailableGlobalScriptTypes=0;
-bool isGameLoading;
+bool isLoadingGame;
 
 TScript OverrideScriptStruct;
 
@@ -782,7 +782,7 @@ proceedNormal:
 
 // this hook prevents sfall scripts from being removed after switching to another map, since normal script engine re-loads completely
 static void _stdcall FreeProgramHook2(DWORD progPtr) {
- if (isGameLoading || (sfallProgsMap.find(progPtr) == sfallProgsMap.end())) { // only delete non-sfall scripts or when actually loading the game
+ if (isLoadingGame || (sfallProgsMap.find(progPtr) == sfallProgsMap.end())) { // only delete non-sfall scripts or when actually loading the game
   __asm {
    mov eax, progPtr;
    call interpretFreeProgram_
@@ -1193,7 +1193,7 @@ bool _stdcall isGameScript(const char* filename) {
 
 // this runs after the game was loaded/started
 void LoadGlobalScripts() {
- isGameLoading = false;
+ isLoadingGame = false;
  HookScriptInit();
  dlogr("Loading global scripts", DL_SCRIPT|DL_INIT);
 
@@ -1248,7 +1248,7 @@ static DWORD _stdcall ScriptHasLoaded(DWORD script) {
 
 // this runs before actually loading/starting the game
 void ClearGlobalScripts() {
- isGameLoading = true;
+ isLoadingGame = true;
  checkedScripts.clear();
  sfallProgsMap.clear();
  globalScripts.clear();

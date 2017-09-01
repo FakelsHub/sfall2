@@ -81,6 +81,7 @@ extern const DWORD db_free_file_list_;
 extern const DWORD db_fseek_;
 extern const DWORD db_fwriteByteCount_;
 extern const DWORD db_fwriteIntCount_;
+extern const DWORD db_fwriteLongCount_;
 extern const DWORD db_get_file_list_;
 extern const DWORD db_read_to_buf_;
 extern const DWORD dbase_open_;

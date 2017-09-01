@@ -1296,10 +1296,13 @@ void BugsInit() {
  MakeCall(0x4C67D4, &db_get_file_list_hook, false);
  dlogr(" Done", DL_INIT);
 
- // fix for negate operator not working on float values
+// fix for negate operator not working on float values
  MakeCall(0x46AB63, &op_negate_hook, false);
 
- // fix incorrect int-to-float conversion, replace "fild qword ptr [esp]" to "fild dword ptr [esp]"
+// fix incorrect int-to-float conversion, replace "fild qword ptr [esp]" to "fild dword ptr [esp]"
  for (int i = 0; i < sizeof(QWordToDWord)/4; i++) SafeWrite16(QWordToDWord[i], 0x04DB);
+
+// Исправление обработки параметра mood в функции start_gdialog 
+ SafeWrite32(0x456F03, 0x75FFF883);
 
 }

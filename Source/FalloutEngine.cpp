@@ -82,6 +82,7 @@ const DWORD db_free_file_list_ = 0x4C6868;
 const DWORD db_fseek_ = 0x4C60C0;
 const DWORD db_fwriteByteCount_ = 0x4C6464;
 const DWORD db_fwriteIntCount_ = 0x4C64F8;
+const DWORD db_fwriteLongCount_ = 0x4C6550;
 const DWORD db_get_file_list_ = 0x4C6628;
 const DWORD db_read_to_buf_ = 0x4C5DD4;
 const DWORD dbase_open_ = 0x4E4F58;
