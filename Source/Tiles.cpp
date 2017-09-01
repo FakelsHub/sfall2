@@ -20,6 +20,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include "Define.h"
 #include "FalloutEngine.h"
 #include "FileSystem.h"
 #include "Tiles.h"
@@ -299,6 +300,22 @@ end:
  }
 }
 
+static void __declspec(naked) art_get_name_hook() {
+ __asm {
+  sar  eax, 0x18
+  cmp  eax, ObjType_Tile
+  jne  end
+  mov  esi, edx
+  mov  ebp, edx
+  and  esi, 0x3FFF
+  and  ebp, 0xC000
+  sar  ebp, 0xE
+end:
+  test esi, esi
+  retn
+ }
+}
+
 void TilesInit() {
  tileMode = GetPrivateProfileIntA("Misc", "AllowLargeTiles", 0, ini);
  if (tileMode == 1 || tileMode == 2) {
@@ -312,9 +329,7 @@ void TilesInit() {
 // art_id_
   SafeWrite8(0x419D48, 0x3F);
 // art_get_name_
-  SafeWrite8(0x41945D, 0x3F);
-  SafeWrite8(0x419469, 0xC0);
-  SafeWrite8(0x419478, 0xE);
+  MakeCall(0x419479, &art_get_name_hook, false);
 
 // ----- _square -----
 // check_gravity_
